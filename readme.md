@@ -1,7 +1,7 @@
-# Home Assistant's Scalable Picture Elements
+# Home Assistant's Scalable House Plan
 
 ## About
-Scalable version of Home Assistant's [Picture Elements](https://www.home-assistant.io/dashboards/picture-elements/).
+Scalable version of Home Assistant's [House Plan](https://www.home-assistant.io/dashboards/picture-elements/).
 
 It scales the whole content, including inner elements, to fit both width and height into the parent container.
 
@@ -9,12 +9,12 @@ This library also contains some custom elements like door/window element to bett
 
 ## Table of Contents
 
-- [Home Assistant's Scalable Picture Elements](#home-assistants-scalable-picture-elements)
+- [Home Assistant's Scalable House Plan](#home-assistants-scalable-picture-elements)
   - [About](#about)
   - [Table of Contents](#table-of-contents)
   - [Installing](#installing)
   - [Quick Reference](#quick-reference)
-  - [Main Component: `picture-elements-scalable`](#main-component-picture-elements-scalable)
+  - [Main Component: `scalable-house-plan`](#main-component-scalable-house-plan)
     - [Key Features](#key-features)
     - [Configuration](#configuration)
     - [How It Works](#how-it-works)
@@ -57,7 +57,7 @@ This library also contains some custom elements like door/window element to bett
     - [Features](#features-8)
     - [Configuration](#configuration-9)
     - [Example](#example-8)
-  - [10. `picture-elements-scalable-layers`](#10-picture-elements-scalable-layers)
+  - [10. `scalable-house-plan-layers`](#10-scalable-house-plan-layers)
     - [Features](#features-9)
     - [Configuration](#configuration-10)
     - [Example](#example-9)
@@ -82,7 +82,7 @@ This library also contains some custom elements like door/window element to bett
 
 This card is available in [HACS](https://hacs.xyz/) (Home Assistant Community Store).
 
-Just search for Scalable Picture Elements in the plugins tab.
+Just search for Scalable House Plan in the plugins tab.
 
 ---
 
@@ -90,23 +90,23 @@ Just search for Scalable Picture Elements in the plugins tab.
 
 | Element | Purpose | Key Features |
 |---------|---------|--------------|
-| `picture-elements-scalable` | Main card component | Automatic scaling, layer management, persistence |
+| `scalable-house-plan` | Main card component | Automatic scaling, layer management, persistence |
 | `analog-bar-element` | Vertical bar graph | Min/max ranges, value display, color customization |
 | `analog-element` | Numeric value display | Simple text with formatting |
-| `badge-element` | Entity badge | Native HA badge in picture elements |
+| `badge-element` | Entity badge | Native HA badge in House Plan |
 | `camera-element` | Camera stream | Live video feed display |
 | `door-window-element` | Door/window sensor | Visual bar, alarm integration, last change time |
 | `gate-buttons-element` | Gate/garage controls | State-aware buttons (open/close/stop) |
 | `iframe-element` | Embed webpage | External content via iframe |
 | `image-last-change-element` | Entity image + time | Circular image with last change |
 | `motion-sensor-element` | Motion sensor | Icon with alarm state colors |
-| `picture-elements-scalable-layers` | Layer controls | Toggle buttons for layers |
+| `scalable-house-plan-layers` | Layer controls | Toggle buttons for layers |
 | `scripts-buttons-group-element` | Script controls | Multiple script buttons with running status |
 | `state-icon-trigger-element` | State icon + trigger | Shows how state was triggered (A/U/M) |
 
 ---
 
-## Main Component: `picture-elements-scalable`
+## Main Component: `scalable-house-plan`
 
 The main component is an enhanced version of Home Assistant's picture-elements card that provides automatic scaling and layer management.
 
@@ -122,7 +122,7 @@ The main component is an enhanced version of Home Assistant's picture-elements c
 ### Configuration
 
 ```yaml
-type: custom:picture-elements-scalable
+type: custom:scalable-house-plan
 image: /local/path/to/image.png
 image_width: 1360      # Original image width in pixels
 image_height: 849      # Original image height in pixels
@@ -157,7 +157,7 @@ layers:
 
 ## Custom Elements
 
-All custom elements can be used either within `picture-elements-scalable` or in standard Home Assistant picture-elements cards.
+All custom elements can be used either within `scalable-house-plan` or in standard Home Assistant picture-elements cards.
 
 ### Common Features
 
@@ -251,7 +251,7 @@ shorten_and_use_prefix: K  # Optional: K, M, B for number formatting
 
 ## 3. `badge-element`
 
-A wrapper for Home Assistant's built-in entity badge element, allowing badges within picture elements.
+A wrapper for Home Assistant's built-in entity badge element, allowing badges within House Plan.
 
 ### Features
 - Displays entity as a badge (icon + state)
@@ -389,7 +389,7 @@ orientation: horizontal  # "horizontal" or "vertical"
 Embeds an external webpage or resource via iframe.
 
 ### Features
-- Embed any URL within picture elements
+- Embed any URL within House Plan
 - Configurable dimensions
 - No border styling
 
@@ -476,7 +476,7 @@ entity: binary_sensor.living_room_motion
 
 ---
 
-## 10. `picture-elements-scalable-layers`
+## 10. `scalable-house-plan-layers`
 
 A layer toggle control element that provides buttons to show/hide different layers.
 
@@ -491,7 +491,7 @@ A layer toggle control element that provides buttons to show/hide different laye
 ### Configuration
 
 ```yaml
-type: custom:picture-elements-scalable-layers
+type: custom:scalable-house-plan-layers
 # No additional configuration needed - layers are passed from parent card
 ```
 
@@ -510,13 +510,13 @@ layers:
     showInToggles: true
     groups: [...]
 elements:
-  - type: custom:picture-elements-scalable-layers
+  - type: custom:scalable-house-plan-layers
     left: 10
     top: 10
 ```
 
 ### Notes
-- Automatically receives layer configuration from parent `picture-elements-scalable` card
+- Automatically receives layer configuration from parent `scalable-house-plan` card
 - Only layers with `showInToggles: true` appear in the control
 - Layer visibility changes are persisted to localStorage
 
@@ -625,7 +625,7 @@ entity: light.living_room
 Here's a comprehensive example showing how to use the main card with multiple custom elements and layers:
 
 ```yaml
-type: custom:picture-elements-scalable
+type: custom:scalable-house-plan
 image: /local/floorplan.png
 image_width: 1920
 image_height: 1080
@@ -804,7 +804,7 @@ layers:
       - group_name: "Controls"
         elements:
           # Layer toggle controls
-          - type: custom:picture-elements-scalable-layers
+          - type: custom:scalable-house-plan-layers
             left: 10
             top: 850
           
@@ -843,10 +843,10 @@ layers:
 1. Modify **devcontainer.json** and add following while the source points to folder if this repository. For example:
     ```json
     "mounts": [
-    "source=/mnt/d/hass-picture-elements-scalable,target=/workspaces/hass-core/config/www/hass-picture-elements-scalable,type=bind,consistency=cached"
+    "source=/mnt/d/hass-scalable-house-plan,target=/workspaces/hass-core/config/www/hass-scalable-house-plan,type=bind,consistency=cached"
     ]
 
 2. Clone https://github.com/home-assistant/frontend to hass-frontend. It's in .gitignore, but it's needed as types are used from the official repo
 3. Once you run the dev HASS, you also need to register appropriate resources (JS files)
    1. Goto settings -> Dashobards -> Three dots in upper right corner -> Resources -> + ADD RESOURCE
-   2. Add required resource (e.g. /local/hass-picture-elements-scalable/dist/hass-picture-elements-scalable-dev.js?dummy=1).
+   2. Add required resource (e.g. /local/hass-scalable-house-plan/dist/hass-scalable-house-plan-dev.js?dummy=1).

@@ -1,1 +1,1 @@
-export * from "./picture-elements-scalable"
+export * from "./scalable-house-plan"

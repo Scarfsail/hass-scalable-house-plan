@@ -4,7 +4,7 @@
 
 ### Basic Usage (Shared State)
 ```yaml
-type: custom:picture-elements-scalable
+type: custom:scalable-house-plan
 image: /local/floorplan.png
 layers:
   - name: "Lights"
@@ -14,7 +14,7 @@ layers:
 
 ### Separate State Per Card
 ```yaml
-type: custom:picture-elements-scalable
+type: custom:scalable-house-plan
 image: /local/floorplan.png
 layers_visibility_persistence_id: "living-room-card"  # Unique state for this card
 layers:
@@ -25,12 +25,12 @@ layers:
 ### Shared State Across Multiple Cards
 ```yaml
 # Card 1 - Living Room
-type: custom:picture-elements-scalable
+type: custom:scalable-house-plan
 layers_visibility_persistence_id: "main-house"  # Shared state
 # ...
 
 # Card 2 - Kitchen  
-type: custom:picture-elements-scalable
+type: custom:scalable-house-plan
 layers_visibility_persistence_id: "main-house"  # Same ID = shared state
 # ...
 ```
@@ -49,7 +49,7 @@ The layer state persistence works automatically:
 #### View Current Stored State
 ```javascript
 // In browser console
-const cardElement = document.querySelector('picture-elements-scalable');
+const cardElement = document.querySelector('scalable-house-plan');
 const storageKey = `hass-layers-state-${cardElement.layerStateManager.persistenceId}`;
 console.log('Stored state:', JSON.parse(localStorage.getItem(storageKey) || '{}'));
 ```
@@ -57,7 +57,7 @@ console.log('Stored state:', JSON.parse(localStorage.getItem(storageKey) || '{}'
 #### Reset Layer State
 ```javascript
 // In browser console - reset single card
-document.querySelector('picture-elements-scalable').resetLayerState();
+document.querySelector('scalable-house-plan').resetLayerState();
 
 // Reset all layer states for all cards
 Object.keys(localStorage)

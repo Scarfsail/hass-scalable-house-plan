@@ -2,15 +2,15 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
-import type { PictureElementsScalableConfig, Layer } from "./picture-elements-scalable";
+import type { ScalableHousePlanConfig, Layer } from "./scalable-house-plan";
 import { sharedStyles } from "./editor-components/shared-styles";
 import "./editor-components/editor-layers";
 import { CrossContainerCoordinator } from "./editor-components/cross-container-coordinator";
 
-@customElement("picture-elements-scalable-editor")
-export class PictureElementsScalableEditor extends LitElement implements LovelaceCardEditor {
+@customElement("scalable-house-plan-editor")
+export class ScalableHousePlanEditor extends LitElement implements LovelaceCardEditor {
     @property({ attribute: false }) public hass!: HomeAssistant;
-    @state() private _config!: PictureElementsScalableConfig;
+    @state() private _config!: ScalableHousePlanConfig;
     @state() private _expandedLayers: Set<number> = new Set();
     @state() private _pendingAdd: { 
         type: 'element' | 'group';
@@ -42,7 +42,7 @@ export class PictureElementsScalableEditor extends LitElement implements Lovelac
         `
     ];
 
-    public setConfig(config: PictureElementsScalableConfig): void {
+    public setConfig(config: ScalableHousePlanConfig): void {
         // Handle backward compatibility: migrate old groups structure to new layers structure
         if ((config as any).groups && !config.layers?.length) {
             // Create a default layer containing all existing groups

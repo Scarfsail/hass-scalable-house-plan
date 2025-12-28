@@ -2,7 +2,7 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import { DragDropMixin } from "./drag-drop-mixin";
-import type { Layer } from "../picture-elements-scalable";
+import type { Layer } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import "./editor-layer";
 

@@ -19,7 +19,7 @@ export interface PictureElementGroup {
     elements: PictureElement[];
 }
 
-export interface PictureElementsScalableConfig extends LovelaceCardConfig {
+export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     layers: Layer[];
     image: string;
     style?: any
@@ -45,11 +45,11 @@ interface PictureElement {
 }
 
 
-@customElement("picture-elements-scalable")
-export class PictureElementsScalable extends LitElement implements LovelaceCard {
+@customElement("scalable-house-plan")
+export class ScalableHousePlan extends LitElement implements LovelaceCard {
     private resizeObserver: ResizeObserver;
 
-    private config?: PictureElementsScalableConfig;
+    private config?: ScalableHousePlanConfig;
     private layerStateManager?: LayerStateManager;
 
     //@property({ attribute: false }) public hass?: HomeAssistant;
@@ -68,7 +68,7 @@ export class PictureElementsScalable extends LitElement implements LovelaceCard 
         this.resizeObserver = new ResizeObserver(this.onResize.bind(this));
     }
 
-    async setConfig(config: PictureElementsScalableConfig) {
+    async setConfig(config: ScalableHousePlanConfig) {
         this.config = {
             ...config,
             layers: config.layers || [], // Ensure backward compatibility
@@ -196,7 +196,7 @@ export class PictureElementsScalable extends LitElement implements LovelaceCard 
             </div>
             `
   */  }
-    createPictureCardElement(config: PictureElementsScalableConfig) {
+    createPictureCardElement(config: ScalableHousePlanConfig) {
         // Flatten all layers and groups into a single elements array with layer info
         const allElements = (config.layers || []).reduce((acc: (PictureElement & { _layerIndex?: number })[], layer: Layer, layerIndex: number) => {
             const layerElements = (layer.groups || []).reduce((groupAcc: (PictureElement & { _layerIndex?: number })[], group: PictureElementGroup) => {
@@ -234,7 +234,7 @@ export class PictureElementsScalable extends LitElement implements LovelaceCard 
             // Elements without layer assignment remain always visible (backward compatibility)
             
             // If this is a layers element, pass the layers configuration
-            if (el.type === "custom:picture-elements-scalable-layers") {
+            if (el.type === "custom:scalable-house-plan-layers") {
                 return {
                     ...el, 
                     style: style,
@@ -334,13 +334,13 @@ export class PictureElementsScalable extends LitElement implements LovelaceCard 
     }
 
     public static async getConfigElement(): Promise<LovelaceCardEditor> {
-        await import("./picture-elements-scalable-editor");
-        return document.createElement("picture-elements-scalable-editor") as LovelaceCardEditor;
+        await import("./scalable-house-plan-editor");
+        return document.createElement("scalable-house-plan-editor") as LovelaceCardEditor;
     }
 
-    public static getStubConfig(): PictureElementsScalableConfig {
+    public static getStubConfig(): ScalableHousePlanConfig {
         return {
-            type: "custom:picture-elements-scalable",
+            type: "custom:scalable-house-plan",
             image: "/local/path/to/image.png",
             image_width: 1360,
             image_height: 849,

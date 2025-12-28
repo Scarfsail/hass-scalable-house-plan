@@ -1,19 +1,19 @@
 import { html, css } from "lit"
 import { customElement, property } from "lit/decorators.js";
 import { ElementBase, ElementBaseConfig } from "./base";
-import type { Layer } from "../cards/picture-elements-scalable";
+import type { Layer } from "../cards/scalable-house-plan";
 
-interface PictureElementsScalableLayersConfig extends ElementBaseConfig {
+interface ScalableHousePlanLayersConfig extends ElementBaseConfig {
     layers?: Layer[];
     _layerVisibility?: Map<number, boolean>;
 }
 
-@customElement("picture-elements-scalable-layers")
-export class PictureElementsScalableLayersElement extends ElementBase<PictureElementsScalableLayersConfig> {
+@customElement("scalable-house-plan-layers")
+export class ScalableHousePlanLayersElement extends ElementBase<ScalableHousePlanLayersConfig> {
     @property({ attribute: false }) layers: Layer[] = [];
     @property({ attribute: false }) _layerVisibility: Map<number, boolean> = new Map();
 
-    async setConfig(config: PictureElementsScalableLayersConfig): Promise<void> {
+    async setConfig(config: ScalableHousePlanLayersConfig): Promise<void> {
         await super.setConfig(config);
         
         // Get layers and visibility from config if passed directly

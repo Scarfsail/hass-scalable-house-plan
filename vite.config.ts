@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
             lib: {
                 entry: "./src/app.tsx",
                 formats: ["es"],
-                fileName: () => `picture-elements-scalable-${isProduction ? "prod" : "dev"}.js`, // Force .js extension                
+                fileName: () => `scalable-house-plan-${isProduction ? "prod" : "dev"}.js`, // Force .js extension                
             },
             emptyOutDir: false,
             // Relative to the root

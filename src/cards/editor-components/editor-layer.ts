@@ -1,7 +1,7 @@
 import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
-import type { Layer, PictureElementGroup } from "../picture-elements-scalable";
+import type { Layer, PictureElementGroup } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import "./editor-groups";
 

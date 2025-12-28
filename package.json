@@ -1,8 +1,8 @@
 {
-  "name": "picture-elements-scalable",
+  "name": "scalable-house-plan",
   "version": "1.0.0",
-  "description": "A scalable picture-elements card for Home Assistant",
-  "main": "dist/picture-elements-scalable-prod.js",
+  "description": "A scalable house plan card for Home Assistant",
+  "main": "dist/scalable-house-plan-prod.js",
   "scripts": {
     "build-dev": "vite build --mode development",
     "build-prod": "vite build",
@@ -44,8 +44,8 @@
         {
           "assets": [
             {
-              "path": "dist/picture-elements-scalable-prod.js",
-              "label": "picture-elements-scalable-prod.js"
+              "path": "dist/scalable-house-plan-prod.js",
+              "label": "scalable-house-plan-prod.js"
             }
           ]
         }
