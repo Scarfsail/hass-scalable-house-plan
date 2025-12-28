@@ -4,8 +4,8 @@ import { sharedStyles } from "./shared-styles";
 import type { Layer } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 
-@customElement("editor-layers")
-export class EditorLayers extends LitElement {
+@customElement("editor-layers-shp")
+export class EditorLayersShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
     @property({ type: Array }) layers: Layer[] = [];
 

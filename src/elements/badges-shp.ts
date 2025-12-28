@@ -14,7 +14,7 @@ interface Badge {
     entity: string;
     element: any;
 }
-@customElement("badge-elements")
+@customElement("badges-shp")
 export class BadgeElements extends ElementBase<BadgeElementsConfig> {
 
     private badges?: Badge[];

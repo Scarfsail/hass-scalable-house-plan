@@ -3,7 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import { DragDropMixin } from "./drag-drop-mixin";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
-import "./editor-element";
+import "./editor-element-shp";
 import { CrossContainerCoordinator } from "./cross-container-coordinator";
 
 interface PictureElement {
@@ -19,8 +19,8 @@ interface PictureElement {
     height?: string | number;
 }
 
-@customElement("editor-elements")
-export class EditorElements extends LitElement {
+@customElement("editor-elements-shp")
+export class EditorElementsShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
     @property({ type: Array }) elements: PictureElement[] = [];
     @property({ attribute: false }) expandedElements: Set<number> = new Set();
@@ -65,7 +65,7 @@ export class EditorElements extends LitElement {
                         ${this.elements.length === 0 
                             ? html`<div class="empty-drop-zone">${this._renderEmptyState()}</div>`
                             : this.elements.map((element, index) => html`
-                                <editor-element
+                                <editor-element-shp
                                     class="element-item"
                                     .hass=${this.hass}
                                     .element=${element as PictureElement}
@@ -74,7 +74,7 @@ export class EditorElements extends LitElement {
                                     @element-toggle=${this._handleElementToggle}
                                     @element-update=${this._handleElementUpdate}
                                     @element-remove=${this._handleElementRemove}
-                                ></editor-element>
+                                ></editor-element-shp>
                             `)
                         }
                     </div>

@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import { Utils } from '../utils/utils';
 import type { HassEntity } from 'home-assistant-js-websocket';
 
-@customElement('last-change-text')
+@customElement('last-change-text-shp')
 class LastChangeText extends LitElement {
 
   @property({ attribute: false }) public entity?: HassEntity;

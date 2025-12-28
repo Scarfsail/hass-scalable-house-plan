@@ -22,7 +22,7 @@ interface AnalogBarConfig extends ElementEntityBaseConfig {
   decimals?:number;
 }
 
-@customElement('analog-bar-element')
+@customElement('analog-bar-shp')
 class AnalogBar extends ElementEntityBase<AnalogBarConfig> {
   //@state() private activeColor: string = "#ffffff";
   override async setConfig(config: AnalogBarConfig) {
@@ -85,7 +85,7 @@ class AnalogBar extends ElementEntityBase<AnalogBarConfig> {
 
         ${fontSize > 0 ?
         html`<div style=${styleMap({ position: "absolute", left: `4px`, width: `${p.width - 4}px`, ...getValueVerticalPosition(valueHeight) })}>
-            <analog-text .entity=${entity} .shorten_and_use_prefix=${this._config?.shorten_and_use_prefix} .decimals=${this._config?.decimals}></analog-text>
+            <analog-text-shp .entity=${entity} .shorten_and_use_prefix=${this._config?.shorten_and_use_prefix} .decimals=${this._config?.decimals}></analog-text-shp>
         </div>`: null}
     </div>
     `;

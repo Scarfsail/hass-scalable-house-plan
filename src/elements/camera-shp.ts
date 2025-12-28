@@ -8,7 +8,7 @@ interface CameraElementConfig extends ElementEntityBaseConfig {
     width:number;
 }
 
-@customElement("camera-element")
+@customElement("camera-shp")
 export class CameraElement extends ElementEntityBase<CameraElementConfig> {
     
     protected override renderEntityContent(entity: HassEntity) {

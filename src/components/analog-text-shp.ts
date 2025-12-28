@@ -3,7 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import type { HassEntity } from 'home-assistant-js-websocket';
 import { shortenNumberAndAddPrefixUnits, ShortenNumberPrefixType } from '../utils';
 
-@customElement('analog-text')
+@customElement('analog-text-shp')
 class AnalogText extends LitElement {
 
   @property({ attribute: false }) public entity?: HassEntity;

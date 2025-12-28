@@ -11,7 +11,7 @@ interface GateButtonsElementConfig extends ElementEntityBaseConfig {
 
 type GateActions = "open" | "close" | "stop";
 
-@customElement("gate-buttons-element")
+@customElement("gate-buttons-shp")
 export class GateButtonsElement extends ElementEntityBase<GateButtonsElementConfig> {
     protected showMoreInfoOnClick = false;
     protected override renderEntityContent(entity: HassEntity) {

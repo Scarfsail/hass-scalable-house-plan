@@ -1,2 +1,2 @@
-export * from "./last-change-text"
-export * from "./analog-text"
+export * from "./last-change-text-shp"
+export * from "./analog-text-shp"

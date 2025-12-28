@@ -18,7 +18,7 @@ interface ScriptButtonsGroupElementConfig extends ElementBaseConfig {
 }
 
 
-@customElement("scripts-buttons-group-element")
+@customElement("scripts-buttons-group-shp")
 export class ScriptButtonsGroupElement extends ElementBase<ScriptButtonsGroupElementConfig> {
     private _runScript(entity: string) {
         // Implement the script running logic here

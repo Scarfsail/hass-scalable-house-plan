@@ -9,7 +9,7 @@ interface BadgeElementConfig extends ElementEntityBaseConfig {
 
 }
 
-@customElement("badge-element")
+@customElement("badge-shp")
 export class BadgeElement extends ElementEntityBase<BadgeElementConfig> {
 
     private element: any;

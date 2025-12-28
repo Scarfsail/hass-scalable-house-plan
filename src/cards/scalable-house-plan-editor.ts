@@ -4,8 +4,8 @@ import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { ScalableHousePlanConfig, Layer, Room } from "./scalable-house-plan";
 import { sharedStyles } from "./editor-components/shared-styles";
-import "./editor-components/editor-layers";
-import "./editor-components/editor-rooms";
+import "./editor-components/editor-layers-shp";
+import "./editor-components/editor-rooms-shp";
 
 @customElement("scalable-house-plan-editor")
 export class ScalableHousePlanEditor extends LitElement implements LovelaceCardEditor {
@@ -92,22 +92,22 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                 </div>
 
                 <!-- Layers Section (Optional) -->
-                <editor-layers
+                <editor-layers-shp
                     .hass=${this.hass}
                     .layers=${this._config.layers || []}
                     @layer-add=${this._addLayer}
                     @layer-update=${this._updateLayer}
                     @layer-remove=${this._removeLayer}
-                ></editor-layers>
+                ></editor-layers-shp>
 
                 <!-- Rooms Section -->
-                <editor-rooms
+                <editor-rooms-shp
                     .hass=${this.hass}
                     .rooms=${this._config.rooms || []}
                     @room-add=${this._addRoom}
                     @room-update=${this._updateRoom}
                     @room-remove=${this._removeRoom}
-                ></editor-rooms>
+                ></editor-rooms-shp>
             </div>
         `;
     }

@@ -10,7 +10,7 @@ interface StateIconTriggerElementConfig extends ElementEntityBaseConfig {
 
 }
 
-@customElement("state-icon-trigger-element")
+@customElement("state-icon-trigger-shp")
 export class StateIconTriggerElement extends ElementEntityBase<StateIconTriggerElementConfig> {
     static styles = css`
         :host {

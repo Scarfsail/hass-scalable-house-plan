@@ -9,7 +9,7 @@ interface IframeElementConfig extends ElementBaseConfig {
     src:string;
 }
 
-@customElement("iframe-element")
+@customElement("iframe-shp")
 export class IframeElement extends ElementBase<IframeElementConfig> {
     
     protected override renderContent() {

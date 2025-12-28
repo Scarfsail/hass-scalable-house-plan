@@ -7,7 +7,7 @@ interface ImageLastChangeElementConfig extends ElementEntityBaseConfig {
     size?: number;
 }
 
-@customElement("image-last-change-element")
+@customElement("image-last-change-shp")
 export class ImageLastChangeElement extends ElementEntityBase<ImageLastChangeElementConfig> {
     private element: any;
     protected override renderEntityContent(entity: HassEntity) {
@@ -26,7 +26,7 @@ export class ImageLastChangeElement extends ElementEntityBase<ImageLastChangeEle
             <div style=${style}>   
                 ${this.element}
             </div>
-            <last-change-text .entity=${entity}></last-change-text>            
+            <last-change-text-shp .entity=${entity}></last-change-text-shp>            
         `
     }
 }

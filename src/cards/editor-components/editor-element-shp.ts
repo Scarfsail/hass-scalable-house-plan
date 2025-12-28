@@ -16,8 +16,8 @@ interface PictureElement {
     height?: string | number;
 }
 
-@customElement("editor-element")
-export class EditorElement extends LitElement {
+@customElement("editor-element-shp")
+export class EditorElementShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
     @property({ type: Object }) element!: PictureElement;
     @property({ type: Number }) index!: number;

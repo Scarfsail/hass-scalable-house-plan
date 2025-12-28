@@ -1,6 +1,6 @@
 import { html, nothing } from "lit"
 import { customElement } from "lit/decorators.js";
-import "../components/last-change-text";
+import "../components/last-change-text-shp";
 
 import { ElementEntityBaseConfig, ElementEntityArmableBase } from "./base/";
 import type { HassEntity } from "home-assistant-js-websocket";
@@ -13,7 +13,7 @@ interface DoorWindowElementConfig extends ElementEntityBaseConfig {
 }
 
 
-@customElement("door-window-element")
+@customElement("door-window-shp")
 export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElementConfig> {
     async setConfig(config: DoorWindowElementConfig) {
         await super.setConfig({
@@ -53,7 +53,7 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
                         <path d=${svgPathArea} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
                     </svg>
                 </div>
-                <last-change-text .entity=${entity} .secondsForSuperHighlight=${5}></last-change-text>
+                <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5}></last-change-text-shp>
             </div>            
             `
     }

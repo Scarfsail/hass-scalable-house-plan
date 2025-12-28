@@ -3,10 +3,10 @@ import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { Room } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
-import "./editor-room";
+import "./editor-room-shp";
 
-@customElement("editor-rooms")
-export class EditorRooms extends LitElement {
+@customElement("editor-rooms-shp")
+export class EditorRoomsShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
     @property({ attribute: false }) rooms: Room[] = [];
 
@@ -42,13 +42,13 @@ export class EditorRooms extends LitElement {
                 </div>
                 <div class="rooms-container">
                     ${this.rooms.map((room, index) => html`
-                        <editor-room
+                        <editor-room-shp
                             .hass=${this.hass}
                             .room=${room}
                             .roomIndex=${index}
                             @room-update=${this._handleRoomUpdate}
                             @room-remove=${this._handleRoomRemove}
-                        ></editor-room>
+                        ></editor-room-shp>
                     `)}
                     ${this.rooms.length === 0 ? html`
                         <div class="empty-state">

@@ -106,6 +106,14 @@ Each room supports a standard set of elements:
 
 ## Technical Considerations
 
+### Naming Convention
+All custom elements use the `-shp` suffix (Scalable House Plan) to avoid naming collisions with the original `hass-picture-elements-scalable` library:
+- Element types: `door-window-shp`, `analog-shp`, `camera-shp`, etc.
+- Components: `analog-text-shp`, `last-change-text-shp`
+- Editor components: `editor-layer-shp`, `editor-room-shp`, etc.
+
+This allows both libraries to coexist in the same Home Assistant instance without conflicts.
+
 ### Data Structure Changes
 ```typescript
 // Old structure (picture-elements-scalable)
@@ -206,6 +214,11 @@ Users of the old `picture-elements-scalable` card will need to:
 ## Current Status
 1. ✅ Phase 1: Project Renaming - COMPLETE (Dec 27, 2025)
 2. ✅ Phase 2: Room Foundation & Layer Restructure - COMPLETE (Dec 28, 2025)
+   - **Additional: Element Name Collision Resolution** (Dec 28, 2025)
+     - Added `-shp` suffix to all custom elements to avoid conflicts with original library
+     - Renamed: 12 element types, 2 components, 6 editor components
+     - Deleted obsolete group-based editor components
+     - Ensures both libraries can coexist in Home Assistant without element name collisions
 3. ⏳ Phase 3: Room-Relative Positioning
 4. ⏳ Phase 4: Room Default Elements  
 5. ⏳ Phase 5: Overview Display Control

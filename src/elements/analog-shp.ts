@@ -10,12 +10,12 @@ interface AnalogElementConfig extends ElementEntityBaseConfig {
 
 }
 
-@customElement("analog-element")
+@customElement("analog-shp")
 export class AnalogElement extends ElementEntityBase<AnalogElementConfig> {
     protected override renderEntityContent(entity: HassEntity) {
         const units = entity.attributes.unit_of_measurement;
         return html`
-            <analog-text .entity=${entity} .decimals=${this._config?.decimals} .shorten_and_use_prefix=${this._config?.shorten_and_use_prefix}></analog-text>
+            <analog-text-shp .entity=${entity} .decimals=${this._config?.decimals} .shorten_and_use_prefix=${this._config?.shorten_and_use_prefix}></analog-text-shp>
         `
     }
 }
