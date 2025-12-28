@@ -3,21 +3,38 @@
 ## Project Overview
 Transform `hass-picture-elements-scalable` into `hass-scalable-house-plan` - a Home Assistant card specifically designed for displaying and managing house floor plans with room-based organization.
 
+**Note:** This is a complete rewrite with NO backward compatibility with the original card.
+
 ## Key Concept Changes
 
-### 1. Groups → Rooms
-- **Original**: Generic grouping of elements
-- **New**: Groups represent physical rooms in a house
-- Each room has defined boundaries (supports any shape/polygon)
-- Rooms are the primary organizational unit
+### 1. Layers → Independent & Optional
+- **Original**: Layers contained nested groups, which contained elements
+- **New**: Layers are optional, ID-based, and independent of structure
+- Each layer has: ID, name, icon, default visibility, show in toggles
+- Elements can optionally reference a layer by `layer_id`
+- Layers provide cross-cutting concerns (e.g., "electrical", "temperature", "security")
 
-### 2. Room-Relative Element Positioning
+### 2. Groups → Rooms (Top-Level)
+- **Original**: Generic grouping nested under layers
+- **New**: Rooms are the primary top-level organizational unit
+- Each room has a defined boundary (polygon with [x, y] coordinate pairs)
+- Room boundaries enable click detection for room interactions
+- Rooms contain elements directly
+
+### 3. Room Boundaries
+- Each room defines a polygon boundary using coordinate pairs
+- Format: `boundary: [[x1, y1], [x2, y2], ...]`
+- Coordinates are in pixels relative to the image dimensions
+- Supports any shape (rectangular, L-shaped, irregular)
+- Used for click detection and room interaction
+
+### 4. Room-Relative Element Positioning
 - **Original**: Elements positioned relative to the entire canvas
 - **New**: Elements positioned relative to their parent room
 - Simplifies layout management when moving/resizing rooms
 - More intuitive for house plan design
 
-### 3. Room Default Elements
+### 5. Room Default Elements
 Each room supports a standard set of elements:
 - Temperature sensor/display
 - Presence/motion detection
@@ -26,13 +43,13 @@ Each room supports a standard set of elements:
 - Humidity sensor
 - Other room-specific elements
 
-### 4. Overview Display Mode
+### 6. Overview Display Mode
 - Each element has a new setting: `show_in_overview`
 - When enabled, element appears on the main house plan view
 - When disabled, element only appears in room detail view
 - Allows decluttering the main plan while keeping full control available
 
-### 5. Room Detail Navigation
+### 7. Room Detail Navigation
 - **Interaction**: Clicking anywhere on a room opens room detail view
 - Clicking on individual elements within a room also opens room detail
 - Room detail view shows ALL elements for that room (regardless of overview setting)
@@ -46,11 +63,15 @@ Each room supports a standard set of elements:
 - Update package.json, hacs.json, and configuration files
 - Update class names and component identifiers
 
-### Phase 2: Room Foundation
+### Phase 2: Room Foundation & Layer Restructure ✅
 - Rename "group" terminology to "room" throughout codebase
-- Add room boundary definition support (polygon/shape)
-- Update UI labels and editor components
-- Add room metadata (name, type, floor level, etc.)
+- Make rooms the top-level structure (remove layer nesting)
+- Add room boundary definition support (polygon with coordinate pairs)
+- Restructure layers to be ID-based and optional
+- Add `layer_id` support to elements
+- Update editor components for new structure
+- Implement point-in-polygon click detection for rooms
+- Start with minimal room metadata: name and boundary only
 
 ### Phase 3: Relative Positioning System
 - Implement coordinate transformation system
@@ -87,56 +108,114 @@ Each room supports a standard set of elements:
 
 ### Data Structure Changes
 ```typescript
-// Old structure
-interface Group {
+// Old structure (picture-elements-scalable)
+interface Layer {
   name: string;
-  elements: Element[];
-  // ... other properties
+  icon: string;
+  visible: boolean;
+  showInToggles: boolean;
+  groups: PictureElementGroup[];
 }
 
-// New structure
+interface PictureElementGroup {
+  group_name: string;
+  elements: Element[];
+}
+
+// New structure (scalable-house-plan)
+interface Layer {
+  id: string;         // NEW: Unique identifier
+  name: string;
+  icon: string;
+  visible: boolean;
+  showInToggles: boolean;
+  // No more nested structure!
+}
+
 interface Room {
   name: string;
-  type?: string; // bedroom, kitchen, bathroom, etc.
-  floor?: number;
-  boundary: Polygon; // Define room shape
+  boundary: [number, number][]; // Array of [x, y] coordinate pairs
   elements: RoomElement[];
-  // ... other properties
 }
 
 interface RoomElement extends Element {
-  position: RelativePosition; // Relative to room
-  show_in_overview: boolean;
-  // ... other properties
-}
-```
+  layer_id?: string;           // Optional reference to layer
+  show_in_overview?: boolean;  // Show in main view vs detail only
+  // Position can be absolute or room-relative (future phase)
+image_width: 1360
+image_height: 849
 
-### Component Architecture
-- Main card component: `scalable-house-plan`
-- Editor component: `scalable-house-plan-editor`
-- Room detail component: `room-detail-view` (new)
-- Room boundary editor: `room-boundary-editor` (new)
+# Layers are optional and independent (can be omitted)
+layers:
+  - id: electricity
+    name: "Electrical"
+    icon: "mdi:lightning-bolt"
+    visible: true
+    showInToggles: true
+  - id: temperature
+    name: "Temperature"
+    icon: "mdi:thermometer"
+    visible: true
+    showInToggles: true
 
-### Configuration Schema
-```yaml
-type: custom:scalable-house-plan
-image: /local/floorplan.png
+# Rooms are the top-level structure
 rooms:
-  - name: Living Room
-    type: living_room
-    floor: 1
+  - name: "Living Room"
     boundary:
-      - [x1, y1]
-      - [x2, y2]
-      # ... polygon points
+      - [100, 100]   # Top-left
+      - [400, 100]   # Top-right
+      - [400, 300]   # Bottom-right
+      - [100, 300]   # Bottom-left
     elements:
-      - type: temperature
-        entity: sensor.living_room_temperature
+      - type: custom:door-window-element
+        entity: sensor.living_room_temp
+        layer_id: temperature  # Optional layer assignment
         show_in_overview: true
-        position:
-          x: 50%  # Relative to room
-          y: 50%
-      - type: presence
+        left: 200
+        top: 150
+        
+  - name: "Kitchen"
+    boundary:
+      - [400, 100]
+      - [700, 100]
+      - [700, 300]
+      - [400, 300]
+    elements:
+**No backward compatibility.** This is a completely new card with a different structure and purpose.
+
+Users of the old `picture-elements-scalable` card will need to:
+1. Keep using the old card if they need the old functionality
+2. Manually migrate their configuration to the new structure if they want house plan features
+
+## Implementation Notes
+
+### Phase 2 Specifics
+- **Boundary coordinates**: Pixels relative to image dimensions (image_width × image_height)
+- **Click detection**: Implement point-in-polygon algorithm (ray casting method)
+- **Layer visibility**: Continue using CSS variables but now based on layer IDs
+- **Room metadata**: Start minimal (name only), add more in future phases
+- **Editor updates**: Significant restructuring of editor components needed
+
+### Future Enhancements (Beyond Current Phases)
+- Circle/ellipse boundary support
+- Room templates by type (bedroom, kitchen, etc.)
+- Floor level support for multi-story houses
+- Automatic room labeling on the plan
+- Visual boundary editor with drag handles
+
+## Current Status
+1. ✅ Phase 1: Project Renaming - COMPLETE (Dec 27, 2025)
+2. ✅ Phase 2: Room Foundation & Layer Restructure - COMPLETE (Dec 28, 2025)
+3. ⏳ Phase 3: Room-Relative Positioning
+4. ⏳ Phase 4: Room Default Elements  
+5. ⏳ Phase 5: Overview Display Control
+6. ⏳ Phase 6: Room Detail View
+7. ⏳ Phase 7: Testing & Documentation
+
+---
+*Document created: December 27, 2025*
+*Last updated: December 28, 2025*
+*Current Phase: Phase 2 Complete - Ready for Phase 3*
         entity: binary_sensor.living_room_motion
         show_in_overview: true
         position:

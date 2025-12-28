@@ -5,13 +5,13 @@ import type { Layer } from "../cards/scalable-house-plan";
 
 interface ScalableHousePlanLayersConfig extends ElementBaseConfig {
     layers?: Layer[];
-    _layerVisibility?: Map<number, boolean>;
+    _layerVisibility?: Map<string, boolean>;
 }
 
 @customElement("scalable-house-plan-layers")
 export class ScalableHousePlanLayersElement extends ElementBase<ScalableHousePlanLayersConfig> {
     @property({ attribute: false }) layers: Layer[] = [];
-    @property({ attribute: false }) _layerVisibility: Map<number, boolean> = new Map();
+    @property({ attribute: false }) _layerVisibility: Map<string, boolean> = new Map();
 
     async setConfig(config: ScalableHousePlanLayersConfig): Promise<void> {
         await super.setConfig(config);
@@ -101,14 +101,14 @@ export class ScalableHousePlanLayersElement extends ElementBase<ScalableHousePla
         super.disconnectedCallback();
     }
 
-    private _toggleLayer(layerIndex: number) {
+    private _toggleLayer(layerId: string) {
         // Toggle visibility in our local map
-        const currentVisibility = this._layerVisibility.get(layerIndex) ?? true;
-        this._layerVisibility.set(layerIndex, !currentVisibility);
+        const currentVisibility = this._layerVisibility.get(layerId) ?? true;
+        this._layerVisibility.set(layerId, !currentVisibility);
         
         // Dispatch event to parent card to update its state
         const event = new CustomEvent('layer-visibility-changed', {
-            detail: { layerIndex, visible: !currentVisibility },
+            detail: { layerId, visible: !currentVisibility },
             bubbles: true,
             composed: true
         });
@@ -118,8 +118,8 @@ export class ScalableHousePlanLayersElement extends ElementBase<ScalableHousePla
         this.requestUpdate();
     }
 
-    private _getLayerVisibility(layerIndex: number): boolean {
-        return this._layerVisibility.get(layerIndex) ?? true;
+    private _getLayerVisibility(layerId: string): boolean {
+        return this._layerVisibility.get(layerId) ?? true;
     }
 
     protected override renderContent() {
@@ -137,14 +137,12 @@ export class ScalableHousePlanLayersElement extends ElementBase<ScalableHousePla
 
         return html`
             <div class="layers-control">
-                ${toggleableLayers.map((layer, filteredIndex) => {
-                    // Find the original layer index in the full layers array
-                    const originalLayerIndex = this.layers.findIndex(l => l === layer);
-                    const isVisible = this._getLayerVisibility(originalLayerIndex);
+                ${toggleableLayers.map((layer) => {
+                    const isVisible = this._getLayerVisibility(layer.id);
                     return html`
                         <button
                             class="layer-button ${isVisible ? 'active' : 'inactive'}"
-                            @click=${() => this._toggleLayer(originalLayerIndex)}
+                            @click=${() => this._toggleLayer(layer.id)}
                             type="button"
                         >
                             <ha-icon icon="${layer.icon}" class="layer-icon"></ha-icon>

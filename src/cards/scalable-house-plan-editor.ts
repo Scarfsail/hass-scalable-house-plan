@@ -2,25 +2,15 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
-import type { ScalableHousePlanConfig, Layer } from "./scalable-house-plan";
+import type { ScalableHousePlanConfig, Layer, Room } from "./scalable-house-plan";
 import { sharedStyles } from "./editor-components/shared-styles";
 import "./editor-components/editor-layers";
-import { CrossContainerCoordinator } from "./editor-components/cross-container-coordinator";
+import "./editor-components/editor-rooms";
 
 @customElement("scalable-house-plan-editor")
 export class ScalableHousePlanEditor extends LitElement implements LovelaceCardEditor {
     @property({ attribute: false }) public hass!: HomeAssistant;
     @state() private _config!: ScalableHousePlanConfig;
-    @state() private _expandedLayers: Set<number> = new Set();
-    @state() private _pendingAdd: { 
-        type: 'element' | 'group';
-        layerIndex?: number; 
-        groupIndex?: number; 
-        index: number; 
-        timestamp: number;
-    } | null = null;
-
-    private coordinator = CrossContainerCoordinator.getInstance();
 
     static styles = [
         sharedStyles,
@@ -43,35 +33,11 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     ];
 
     public setConfig(config: ScalableHousePlanConfig): void {
-        // Handle backward compatibility: migrate old groups structure to new layers structure
-        if ((config as any).groups && !config.layers?.length) {
-            // Create a default layer containing all existing groups
-            const defaultLayer: Layer = {
-                name: 'Default Layer',
-                icon: 'mdi:layers',
-                visible: true,
-                showInToggles: false,
-                groups: (config as any).groups.map((group: any) => ({
-                    group_name: group.group_name,
-                    elements: group.elements || []
-                }))
-            };
-            
-            this._config = {
-                ...config,
-                layers: [defaultLayer]
-            };
-        } else {
-            this._config = { 
-                ...config,
-                layers: config.layers || []
-            };
-        }
-
-        // Set up cross-container coordination callback
-        this.coordinator.setConfigUpdateCallback((moveInfo: any) => {
-            this._handleCrossContainerMove(moveInfo);
-        });
+        this._config = { 
+            ...config,
+            layers: config.layers || [],
+            rooms: config.rooms || []
+        };
     }
 
     protected render() {
@@ -125,62 +91,49 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                     </div>
                 </div>
 
-                <!-- Layers Section -->
+                <!-- Layers Section (Optional) -->
                 <editor-layers
                     .hass=${this.hass}
-                    .layers=${this._config.layers}
-                    .expandedLayers=${this._expandedLayers}
-                    @layers-add=${this._addLayer}
-                    @layers-toggle=${this._toggleLayer}
-                    @layers-update=${this._updateLayer}
-                    @layers-remove=${this._removeLayer}
-                    @layers-reorder=${this._reorderLayers}
-                    @group-added=${this._handleGroupAdded}
-                    @group-removed=${this._handleGroupRemoved}
-                    @element-added=${this._handleElementAdded}
-                    @element-removed=${this._handleElementRemoved}
+                    .layers=${this._config.layers || []}
+                    @layer-add=${this._addLayer}
+                    @layer-update=${this._updateLayer}
+                    @layer-remove=${this._removeLayer}
                 ></editor-layers>
+
+                <!-- Rooms Section -->
+                <editor-rooms
+                    .hass=${this.hass}
+                    .rooms=${this._config.rooms || []}
+                    @room-add=${this._addRoom}
+                    @room-update=${this._updateRoom}
+                    @room-remove=${this._removeRoom}
+                ></editor-rooms>
             </div>
         `;
     }
 
+    // Layer handlers
     private _addLayer(): void {
         const newLayer: Layer = {
+            id: `layer_${Date.now()}`,
             name: "New Layer",
-            icon: "mdi:layer-group",
+            icon: "mdi:layers",
             visible: true,
-            showInToggles: true,
-            groups: []
+            showInToggles: true
         };
 
         this._config = {
             ...this._config,
-            layers: [...this._config.layers, newLayer]
+            layers: [...(this._config.layers || []), newLayer]
         };
-
-        // Expand the new layer automatically
-        this._expandedLayers.add(this._config.layers.length - 1);
         
         this._configChanged();
     }
 
-    private _toggleLayer(ev: CustomEvent): void {
-        const { index } = ev.detail;
-        if (this._expandedLayers.has(index)) {
-            this._expandedLayers.delete(index);
-        } else {
-            this._expandedLayers.add(index);
-        }
-        this.requestUpdate();
-    }
-
     private _updateLayer(ev: CustomEvent): void {
-        const { index, property, value } = ev.detail;
-        const layers = [...this._config.layers];
-        layers[index] = {
-            ...layers[index],
-            [property]: value
-        };
+        const { layerIndex, layer } = ev.detail;
+        const layers = [...(this._config.layers || [])];
+        layers[layerIndex] = layer;
 
         this._config = {
             ...this._config,
@@ -191,35 +144,60 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     }
 
     private _removeLayer(ev: CustomEvent): void {
-        const { index } = ev.detail;
-        const layers = [...this._config.layers];
-        layers.splice(index, 1);
+        const { layerIndex } = ev.detail;
+        const layers = [...(this._config.layers || [])];
+        layers.splice(layerIndex, 1);
 
         this._config = {
             ...this._config,
             layers
         };
 
-        // Update expanded layers indices
-        const newExpanded = new Set<number>();
-        for (const expandedIndex of this._expandedLayers) {
-            if (expandedIndex < index) {
-                newExpanded.add(expandedIndex);
-            } else if (expandedIndex > index) {
-                newExpanded.add(expandedIndex - 1);
-            }
-        }
-        this._expandedLayers = newExpanded;
+        this._configChanged();
+    }
+
+    // Room handlers
+    private _addRoom(): void {
+        const newRoom: Room = {
+            name: "New Room",
+            boundary: [
+                [100, 100],
+                [300, 100],
+                [300, 200],
+                [100, 200]
+            ],
+            elements: []
+        };
+
+        this._config = {
+            ...this._config,
+            rooms: [...(this._config.rooms || []), newRoom]
+        };
+        
+        this._configChanged();
+    }
+
+    private _updateRoom(ev: CustomEvent): void {
+        const { roomIndex, room } = ev.detail;
+        const rooms = [...(this._config.rooms || [])];
+        rooms[roomIndex] = room;
+
+        this._config = {
+            ...this._config,
+            rooms
+        };
 
         this._configChanged();
     }
 
-    private _reorderLayers(ev: CustomEvent): void {
-        const { layers } = ev.detail;
-        
+    private _removeRoom(ev: CustomEvent): void {
+        const { roomIndex } = ev.detail;
+        const rooms = [...(this._config.rooms || [])];
+        rooms.splice(roomIndex, 1);
+
         this._config = {
             ...this._config,
-            layers
+            rooms
         };
 
         this._configChanged();
@@ -249,7 +227,6 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     private _persistenceIdChanged(ev: any): void {
         const value = ev.target.value.trim();
         if (value === '') {
-            // Remove the property when empty (use default)
             const { layers_visibility_persistence_id, ...configWithoutId } = this._config;
             this._config = configWithoutId;
         } else {
@@ -265,162 +242,5 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             composed: true,
         });
         this.dispatchEvent(event);
-    }
-
-    // Cross-container drag & drop handlers
-    private _handleGroupAdded(ev: CustomEvent): void {
-        // Store the added group info for cross-container moves
-        this._pendingAdd = {
-            type: 'group',
-            index: ev.detail.index,
-            timestamp: ev.detail.timestamp
-        };
-    }
-
-    private _handleGroupRemoved(ev: CustomEvent): void {
-        const removedIndex = ev.detail.index;
-        
-        // Check if we have a pending add (cross-container move)
-        if (this._pendingAdd && 
-            this._pendingAdd.type === 'group' && 
-            (Date.now() - this._pendingAdd.timestamp) < 100) {
-            
-            // This is a cross-layer group move
-            // We need to find which layer the group was removed from and which layer it was added to
-            // For now, just clear the pending add - the actual move logic will be handled in the nested components
-            this._pendingAdd = null;
-        }
-    }
-
-    private _handleElementAdded(ev: CustomEvent): void {
-        // Store the added element info for cross-container moves
-        this._pendingAdd = {
-            type: 'element',
-            index: ev.detail.index,
-            timestamp: ev.detail.timestamp
-        };
-    }
-
-    private _handleElementRemoved(ev: CustomEvent): void {
-        // For now, just clear the pending add
-        // The actual cross-container logic will be implemented at the component level
-        if (this._pendingAdd && 
-            this._pendingAdd.type === 'element' && 
-            (Date.now() - this._pendingAdd.timestamp) < 100) {
-            this._pendingAdd = null;
-        }
-    }
-
-    private _handleCrossContainerMove(moveInfo: any): void {
-        if (moveInfo.type === 'cross-container-element-move') {
-            this._performCrossContainerElementMove(moveInfo);
-        } else if (moveInfo.type === 'cross-container-group-move') {
-            this._performCrossContainerGroupMove(moveInfo);
-        }
-    }
-
-    private _performCrossContainerElementMove(moveInfo: any): void {
-        const { sourceInfo, targetInfo, element } = moveInfo;
-
-        // Create a completely new config structure to avoid any reference issues
-        const layers = JSON.parse(JSON.stringify(this._config.layers));
-        
-        try {
-            // Ensure source layer and group exist
-            if (!layers[sourceInfo.layerIndex] || 
-                !layers[sourceInfo.layerIndex].groups[sourceInfo.groupIndex]) {
-                console.error('Source layer/group not found:', sourceInfo);
-                return;
-            }
-
-            // Ensure target layer and group exist
-            if (!layers[targetInfo.layerIndex] || 
-                !layers[targetInfo.layerIndex].groups[targetInfo.groupIndex]) {
-                console.error('Target layer/group not found:', targetInfo);
-                return;
-            }
-
-            // Initialize elements arrays if they don't exist
-            if (!layers[sourceInfo.layerIndex].groups[sourceInfo.groupIndex].elements) {
-                layers[sourceInfo.layerIndex].groups[sourceInfo.groupIndex].elements = [];
-            }
-            if (!layers[targetInfo.layerIndex].groups[targetInfo.groupIndex].elements) {
-                layers[targetInfo.layerIndex].groups[targetInfo.groupIndex].elements = [];
-            }
-
-            const sourceElements = layers[sourceInfo.layerIndex].groups[sourceInfo.groupIndex].elements;
-            const targetElements = layers[targetInfo.layerIndex].groups[targetInfo.groupIndex].elements;
-
-            // Remove element from source (find by content match, not index)
-            const sourceIndex = sourceElements.findIndex((el: any) => 
-                JSON.stringify(el) === JSON.stringify(element)
-            );
-            
-            if (sourceIndex >= 0) {
-                sourceElements.splice(sourceIndex, 1);
-            }
-
-            // Add element to target
-            const insertIndex = Math.min(targetInfo.elementIndex, targetElements.length);
-            targetElements.splice(insertIndex, 0, element);
-
-            // Update the config
-            this._config = { ...this._config, layers };
-            this._configChanged();
-            
-        } catch (error) {
-            console.error('Error during cross-container move:', error);
-        }
-    }
-
-    private _performCrossContainerGroupMove(moveInfo: any): void {
-        const { sourceInfo, targetInfo, group } = moveInfo;
-
-        // Create a completely new config structure to avoid any reference issues
-        const layers = JSON.parse(JSON.stringify(this._config.layers));
-        
-        try {
-            // Ensure source and target layers exist
-            if (!layers[sourceInfo.layerIndex]) {
-                console.error('Source layer not found:', sourceInfo.layerIndex);
-                return;
-            }
-
-            if (!layers[targetInfo.layerIndex]) {
-                console.error('Target layer not found:', targetInfo.layerIndex);
-                return;
-            }
-
-            // Initialize groups arrays if they don't exist
-            if (!layers[sourceInfo.layerIndex].groups) {
-                layers[sourceInfo.layerIndex].groups = [];
-            }
-            if (!layers[targetInfo.layerIndex].groups) {
-                layers[targetInfo.layerIndex].groups = [];
-            }
-
-            const sourceGroups = layers[sourceInfo.layerIndex].groups;
-            const targetGroups = layers[targetInfo.layerIndex].groups;
-
-            // Remove group from source (find by content match, not index)
-            const sourceIndex = sourceGroups.findIndex((g: any) => 
-                JSON.stringify(g) === JSON.stringify(group)
-            );
-            
-            if (sourceIndex >= 0) {
-                sourceGroups.splice(sourceIndex, 1);
-            }
-
-            // Add group to target
-            const insertIndex = Math.min(targetInfo.groupIndex, targetGroups.length);
-            targetGroups.splice(insertIndex, 0, group);
-
-            // Update the config
-            this._config = { ...this._config, layers };
-            this._configChanged();
-            
-        } catch (error) {
-            console.error('Error during cross-container group move:', error);
-        }
     }
 }

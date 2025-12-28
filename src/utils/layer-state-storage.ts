@@ -4,7 +4,7 @@
  */
 
 export interface LayerStateStorage {
-    [layerIndex: number]: boolean;
+    [layerId: string]: boolean;
 }
 
 export class LayerStateManager {
@@ -47,9 +47,8 @@ export class LayerStateManager {
                 // Validate that all values are booleans
                 const validated: LayerStateStorage = {};
                 for (const [key, value] of Object.entries(parsed)) {
-                    const layerIndex = parseInt(key, 10);
-                    if (!isNaN(layerIndex) && typeof value === 'boolean') {
-                        validated[layerIndex] = value;
+                    if (typeof value === 'boolean') {
+                        validated[key] = value;
                     }
                 }
                 return validated;
@@ -67,11 +66,8 @@ export class LayerStateManager {
         try {
             const stateToSave: LayerStateStorage = {};
             // Only save non-default states (false values) to keep storage minimal
-            for (const [layerIndex, visible] of Object.entries(layerState)) {
-                const index = parseInt(layerIndex, 10);
-                if (!isNaN(index)) {
-                    stateToSave[index] = visible;
-                }
+            for (const [layerId, visible] of Object.entries(layerState)) {
+                stateToSave[layerId] = visible;
             }
             
             localStorage.setItem(this.getStorageKey(), JSON.stringify(stateToSave));
@@ -83,9 +79,9 @@ export class LayerStateManager {
     /**
      * Update a single layer's visibility state and save
      */
-    updateLayerVisibility(layerIndex: number, visible: boolean): void {
+    updateLayerVisibility(layerId: string, visible: boolean): void {
         const currentState = this.loadLayerState();
-        currentState[layerIndex] = visible;
+        currentState[layerId] = visible;
         this.saveLayerState(currentState);
     }
 

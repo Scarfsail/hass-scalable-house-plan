@@ -7,20 +7,22 @@ import type { LovelaceCardConfig } from "../../hass-frontend/src/data/lovelace/c
 import { LayerStateManager } from "../utils/layer-state-storage";
 
 export interface Layer {
+    id: string;
     name: string;
     icon: string;
     visible: boolean;
     showInToggles: boolean;
-    groups: PictureElementGroup[];
 }
 
-export interface PictureElementGroup {
-    group_name: string;
+export interface Room {
+    name: string;
+    boundary: [number, number][];
     elements: PictureElement[];
 }
 
 export interface ScalableHousePlanConfig extends LovelaceCardConfig {
-    layers: Layer[];
+    rooms: Room[];
+    layers?: Layer[];
     image: string;
     style?: any
     image_width: number;
@@ -36,6 +38,8 @@ interface PictureElement {
     style: any;
     entity?: string;
     tap_action?: any;
+    layer_id?: string;
+    show_in_overview?: boolean;
     left?: string | number;
     right?: string | number;
     top?: string | number;
@@ -54,7 +58,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     //@property({ attribute: false }) public hass?: HomeAssistant;
     @state() private _createCardElement: CreateCardElement = null;
-    @state() private _layerVisibility: Map<number, boolean> = new Map();
+    @state() private _layerVisibility: Map<string, boolean> = new Map();
 
     @property({ attribute: false }) hass?: HomeAssistant;
 
@@ -71,7 +75,8 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     async setConfig(config: ScalableHousePlanConfig) {
         this.config = {
             ...config,
-            layers: config.layers || [], // Ensure backward compatibility
+            layers: config.layers || [],
+            rooms: config.rooms || [],
         };
         this._createCardElement = await getCreateCardElement();
         
@@ -89,16 +94,16 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         // Load persisted layer state from localStorage
         const persistedState = this.layerStateManager?.loadLayerState() || {};
         
-        this.config?.layers?.forEach((layer, index) => {
+        this.config?.layers?.forEach((layer) => {
             // Use persisted state if available, otherwise fall back to layer config default
-            const visibility = persistedState.hasOwnProperty(index) 
-                ? persistedState[index] 
+            const visibility = persistedState.hasOwnProperty(layer.id) 
+                ? persistedState[layer.id] 
                 : LayerStateManager.getDefaultVisibility(layer);
             
-            this._layerVisibility.set(index, visibility);
+            this._layerVisibility.set(layer.id, visibility);
             
             // Set CSS variable immediately for proper initial display
-            this.style.setProperty(`--layer-${index}-display`, visibility ? 'block' : 'none');
+            this.style.setProperty(`--layer-${layer.id}-display`, visibility ? 'block' : 'none');
         });
     }
 
@@ -157,9 +162,9 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         this.style.setProperty("position", "relative");
 
         // Set CSS variables for layer visibility
-        this.config?.layers?.forEach((layer, index) => {
-            const isVisible = this._layerVisibility.get(index) ?? true;
-            this.style.setProperty(`--layer-${index}-display`, isVisible ? 'block' : 'none');
+        this.config?.layers?.forEach((layer) => {
+            const isVisible = this._layerVisibility.get(layer.id) ?? true;
+            this.style.setProperty(`--layer-${layer.id}-display`, isVisible ? 'block' : 'none');
         });
 
         this.card = this.card || this.createPictureCardElement(this.config);
@@ -197,20 +202,13 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             `
   */  }
     createPictureCardElement(config: ScalableHousePlanConfig) {
-        // Flatten all layers and groups into a single elements array with layer info
-        const allElements = (config.layers || []).reduce((acc: (PictureElement & { _layerIndex?: number })[], layer: Layer, layerIndex: number) => {
-            const layerElements = (layer.groups || []).reduce((groupAcc: (PictureElement & { _layerIndex?: number })[], group: PictureElementGroup) => {
-                const groupElements = (group.elements || []).map((el: PictureElement) => ({
-                    ...el,
-                    _layerIndex: layerIndex // Track which layer this element belongs to
-                }));
-                return groupAcc.concat(groupElements);
-            }, []);
-            return acc.concat(layerElements);
+        // Flatten all rooms into a single elements array
+        const allElements = (config.rooms || []).reduce((acc: PictureElement[], room: Room) => {
+            return acc.concat(room.elements || []);
         }, []);
 
         // Process elements and add CSS variables for layer visibility
-        const processedElements = allElements.map((el: PictureElement & { _layerIndex?: number }) => {
+        const processedElements = allElements.map((el: PictureElement) => {
             const style = {...el.style};
             style.transform = "none";
             if (el.left!==undefined)
@@ -226,12 +224,11 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             if (el.width!==undefined)
                 style.width = typeof el.width === "string" ? el.width : `${el.width}px`;    
             
-            // Add layer visibility CSS variable
-            if (el._layerIndex !== undefined) {
-                // Element belongs to a layer, use CSS variable for visibility
-                style.display = `var(--layer-${el._layerIndex}-display, block)`;
+            // Add layer visibility CSS variable if element has layer_id
+            if (el.layer_id) {
+                style.display = `var(--layer-${el.layer_id}-display, block)`;
             }
-            // Elements without layer assignment remain always visible (backward compatibility)
+            // Elements without layer_id remain always visible
             
             // If this is a layers element, pass the layers configuration
             if (el.type === "custom:scalable-house-plan-layers") {
@@ -243,9 +240,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 };
             }
             
-            // Remove the _layerIndex from the final element (it was just for processing)
-            const { _layerIndex, ...finalElement } = el;
-            return {...finalElement, style: style}
+            return {...el, style: style}
         });
 
         const cardConfig = {
@@ -277,33 +272,33 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     private _handleLayerVisibilityChange(event: Event) {
         const customEvent = event as CustomEvent;
-        const { layerIndex, visible } = customEvent.detail;
-        this.toggleLayerVisibility(layerIndex, visible);
+        const { layerId, visible } = customEvent.detail;
+        this.toggleLayerVisibility(layerId, visible);
     }
 
-    public toggleLayerVisibility(layerIndex: number, visible?: boolean) {
-        const currentVisibility = this._layerVisibility.get(layerIndex) ?? true;
+    public toggleLayerVisibility(layerId: string, visible?: boolean) {
+        const currentVisibility = this._layerVisibility.get(layerId) ?? true;
         const newVisibility = visible !== undefined ? visible : !currentVisibility;
         
-        this._layerVisibility.set(layerIndex, newVisibility);
+        this._layerVisibility.set(layerId, newVisibility);
         
         // Persist the change to localStorage
-        this.layerStateManager?.updateLayerVisibility(layerIndex, newVisibility);
+        this.layerStateManager?.updateLayerVisibility(layerId, newVisibility);
         
         // Update CSS variable immediately for smooth visibility toggle
-        this.style.setProperty(`--layer-${layerIndex}-display`, newVisibility ? 'block' : 'none');
+        this.style.setProperty(`--layer-${layerId}-display`, newVisibility ? 'block' : 'none');
         
         // Dispatch event to notify other components
         const event = new CustomEvent('layer-visibility-updated', {
-            detail: { layerIndex, visible: newVisibility },
+            detail: { layerId, visible: newVisibility },
             bubbles: true,
             composed: true
         });
         this.dispatchEvent(event);
     }
 
-    public getLayerVisibility(layerIndex: number): boolean {
-        return this._layerVisibility.get(layerIndex) ?? true;
+    public getLayerVisibility(layerId: string): boolean {
+        return this._layerVisibility.get(layerId) ?? true;
     }
 
     /**
@@ -346,18 +341,43 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             image_height: 849,
             layers: [
                 {
+                    id: "default",
                     name: "Default Layer",
-                    icon: "mdi:layer-group",
+                    icon: "mdi:layers",
                     visible: true,
-                    showInToggles: true,
-                    groups: [
-                        {
-                            group_name: "Living Room",
-                            elements: []
-                        }
-                    ]
+                    showInToggles: true
+                }
+            ],
+            rooms: [
+                {
+                    name: "Living Room",
+                    boundary: [
+                        [100, 100],
+                        [400, 100],
+                        [400, 300],
+                        [100, 300]
+                    ],
+                    elements: []
                 }
             ]
         };
     }
 }
+
+// Register card in window.customCards for Home Assistant
+declare global {
+    interface Window {
+        customCards: Array<{
+            type: string;
+            name: string;
+            description: string;
+        }>;
+    }
+}
+
+window.customCards = window.customCards || [];
+window.customCards.push({
+    type: "scalable-house-plan",
+    name: "Scalable House Plan",
+    description: "A scalable house plan card with room-based organization"
+});
