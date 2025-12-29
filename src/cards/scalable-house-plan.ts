@@ -1,5 +1,5 @@
 import { LitElement, html, svg } from "lit-element"
-import { CreateCardElement, getCreateCardElement } from "../utils"
+import { CreateCardElement, getCreateCardElement, getElementTypeForEntity, mergeElementProperties, ElementDefinition } from "../utils"
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Lovelace, LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
@@ -17,7 +17,7 @@ export interface Layer {
 export interface Room {
     name: string;
     boundary: [number, number][];
-    elements: RoomElement[];
+    entities: EntityConfig[];
     color?: string;  // Optional color for room background (supports rgba)
 }
 
@@ -31,10 +31,11 @@ interface PlanConfig {
     show?: boolean;  // Default true
     layer_id?: string;
     style?: any;
+    element?: ElementConfig;  // Element config with optional type override
 }
 
 interface ElementConfig {
-    type: string;
+    type?: string;  // Optional - auto-detected if not specified
     entity?: string;
     tap_action?: any;
     hold_action?: any;
@@ -42,9 +43,10 @@ interface ElementConfig {
     [key: string]: any;  // Element-specific properties
 }
 
-interface RoomElement {
+// EntityConfig can be a string (entity_id) or an object
+type EntityConfig = string | {
+    entity: string;
     plan?: PlanConfig;
-    element: ElementConfig;
 }
 
 // Legacy interface for internal processing (after transformation)
@@ -238,15 +240,32 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             // Calculate room's bounding box (top-left corner)
             const roomOffset = this._getRoomOffset(room);
             
-            // Transform each element's coordinates from room-relative to absolute
-            const transformedElements = (room.elements || [])
-                .filter((el: RoomElement) => {
-                    // Only include elements with plan section and show !== false
-                    return el.plan && (el.plan.show !== false);
+            // Transform each entity into picture elements
+            const transformedElements = (room.entities || [])
+                .filter((entityConfig: EntityConfig) => {
+                    // String shorthand = detail-only, no plan
+                    if (typeof entityConfig === 'string') return false;
+                    
+                    // Only include entities with plan section and show !== false
+                    return entityConfig.plan && (entityConfig.plan.show !== false);
                 })
-                .map((el: RoomElement) => {
-                    return this._transformRoomElement(el, roomOffset);
-                });
+                .map((entityConfig: EntityConfig) => {
+                    const entity = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
+                    const plan = typeof entityConfig === 'string' ? undefined : entityConfig.plan;
+                    
+                    if (!plan) return null;
+                    
+                    // Get default element definition for this entity
+                    const deviceClass = this.hass?.states[entity]?.attributes?.device_class;
+                    const defaultElement = getElementTypeForEntity(entity, deviceClass, 'plan');
+                    
+                    // Merge default properties with user overrides
+                    const elementConfig = mergeElementProperties(defaultElement, plan.element);
+                    
+                    // Create picture element with entity and merged config
+                    return this._transformEntityToPictureElement(entity, plan, elementConfig, roomOffset);
+                })
+                .filter((el): el is PictureElement => el !== null);
             
             return acc.concat(transformedElements);
         }, []);
@@ -311,14 +330,17 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         };
     }
 
-    private _transformRoomElement(roomElement: RoomElement, roomOffset: { x: number; y: number }): PictureElement {
-        const plan = roomElement.plan!;
-        const element = roomElement.element;
-        
+    private _transformEntityToPictureElement(
+        entityId: string, 
+        plan: PlanConfig, 
+        elementConfig: ElementConfig, 
+        roomOffset: { x: number; y: number }
+    ): PictureElement {
         // Create a flattened element combining plan and element config
         const flattened: PictureElement = {
-            ...element,  // Spread element config (type, entity, actions, etc.)
-            type: element.type,
+            ...elementConfig,  // Spread merged element config
+            type: elementConfig.type!,
+            entity: entityId,
             style: plan.style || {},
             layer_id: plan.layer_id
         };
@@ -522,7 +544,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                         [400, 300],
                         [100, 300]
                     ],
-                    elements: []
+                    entities: []
                 }
             ]
         };

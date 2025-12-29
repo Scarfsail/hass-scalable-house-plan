@@ -5,3 +5,4 @@ export * from "./hass-templates"
 export * from './js-templates'
 export * from "./shortenNumberAndAddPrefixUnits"
 export * from "./handle-action"
+export * from "./element-mappings"

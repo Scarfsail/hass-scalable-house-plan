@@ -123,32 +123,97 @@ The main component is an enhanced version of Home Assistant's picture-elements c
 
 ```yaml
 type: custom:scalable-house-plan
-image: /local/path/to/image.png
-image_width: 1360      # Original image width in pixels
-image_height: 849      # Original image height in pixels
-max_scale: 2.0         # Optional: Maximum scale factor
-min_scale: 0.5         # Optional: Minimum scale factor
-card_size: 1           # Optional: Card size for layout calculation
+title: My House                    # Optional: Card title
+background_image: /local/path/to/image.png
+background_width: 1360            # Original image width in pixels
+background_height: 849            # Original image height in pixels
+max_scale: 2.0                    # Optional: Maximum scale factor
+min_scale: 0.5                    # Optional: Minimum scale factor
+card_size: 1                      # Optional: Card size for layout calculation
 layers_visibility_persistence_id: "unique-id"  # Optional: Custom persistence ID
+
+# Entity-Based Room Structure
+rooms:
+  - name: "Living Room"
+    color: 'rgba(100, 150, 200, 0.2)'  # Optional: Room background color
+    boundary:                           # Room polygon coordinates
+      - [100, 100]
+      - [500, 100]
+      - [500, 400]
+      - [100, 400]
+    entities:
+      # Simple string shorthand (detail-only, no plan display)
+      - binary_sensor.smoke_detector
+      
+      # Entity with plan display (uses default element type from mapping)
+      - entity: binary_sensor.living_room_window
+        plan:
+          left: 100                     # Position relative to room
+          top: 50
+          # Element type auto-selected: door-window-shp
+          # Default properties applied: width: 20, orientation: horizontal
+      
+      # Entity with custom properties (merged with defaults)
+      - entity: binary_sensor.front_door
+        plan:
+          left: 0
+          top: 150
+          element:
+            width: 30                   # Override default width (27)
+            orientation: vertical       # Override default orientation
+      
+      # Entity with explicit element type (no merging)
+      - entity: light.living_ceiling
+        plan:
+          left: 250
+          top: 200
+          element:
+            type: custom:state-icon-trigger-shp  # Explicit type
+            size: 30                    # Custom properties
+      
+      # Camera with plan and detail
+      - entity: camera.living_room
+        plan:
+          left: 300
+          top: 100
+          element:
+            width: 80                   # Override default plan size
+            # Detail view will use larger size from mapping
+
+# Layer System (Optional)
 layers:
-  - name: "Ground Floor"
+  - id: ground_floor
+    name: "Ground Floor"
     icon: "mdi:floor-plan"
-    visible: true        # Default visibility state
-    showInToggles: true  # Show in layer toggle controls
-    groups:
-      - group_name: "Living Room"
-        elements:
-          - type: custom:door-window-element
-            entity: binary_sensor.living_room_window
-            left: 100
-            top: 200
-            width: 50
+    image: /local/ground_floor.png
+    default: true
+    visible: true
+    showInToggles: true
 ```
 
 ### How It Works
 
+**Entity-Based Structure:**
+- Rooms contain entities (not elements directly)
+- Each entity can have an optional `plan` section for overview display
+- Entities without `plan` appear only in room detail view
+- String shorthand supported for detail-only entities
+
+**Default Element Type Mapping:**
+- Element types are automatically selected based on entity domain and device_class
+- Example: `binary_sensor.door` → `door-window-shp` with default properties
+- Property merging: user properties override defaults (unless explicit `type` is specified)
+- Detail view uses separate element types (most default to `tile`)
+
+**Room-Relative Positioning:**
+- Element positions in `plan.left/top` are relative to room's top-left corner
+- Automatic coordinate transformation to absolute positions
+- Supports negative values and positions beyond room boundaries
+
+**Coordinate System:**
 - The card creates a scaled container that transforms all child elements proportionally
 - Elements are positioned using absolute positioning with pixel coordinates
+- Room boundaries define clickable polygon areas
 - CSS variables control layer visibility (`--layer-{index}-display`)
 - Layer states are stored in localStorage using a generated or custom persistence ID
 - The card automatically recalculates scale on viewport or container size changes
@@ -622,214 +687,176 @@ entity: light.living_room
 
 ## Complete Usage Example
 
-Here's a comprehensive example showing how to use the main card with multiple custom elements and layers:
+Here's a comprehensive example showing the entity-based room structure with automatic element type mapping:
 
 ```yaml
 type: custom:scalable-house-plan
-image: /local/floorplan.png
-image_width: 1920
-image_height: 1080
-max_scale: 1.5
-min_scale: 0.3
-layers_visibility_persistence_id: "my-home-floorplan"
+title: My Smart Home
+background_image: /local/floorplan.png
+background_width: 1000
+background_height: 800
+max_scale: 3.0
+min_scale: 0.5
+layers_visibility_persistence_id: "my-house-plan"
+
+rooms:
+  - name: Living Room
+    color: 'rgba(100, 150, 200, 0.2)'
+    boundary:
+      - [100, 100]
+      - [500, 100]
+      - [500, 400]
+      - [100, 400]
+    entities:
+      # Door with custom width
+      - entity: binary_sensor.door_main
+        plan:
+          left: 50
+          top: 150
+          element:
+            width: 30
+      
+      # Window with defaults
+      - entity: binary_sensor.window_living_1
+        plan:
+          left: 200
+          top: 0
+      
+      # Motion sensor
+      - entity: binary_sensor.motion_living
+        plan:
+          left: 250
+          top: 200
+      
+      # Camera
+      - entity: camera.living_room
+        plan:
+          left: 300
+          top: 100
+          element:
+            width: 80
+      
+      # Detail-only entities
+      - light.living_ceiling
+      - light.living_wall
+      - sensor.living_temperature
+      - sensor.living_humidity
+
+  - name: Kitchen
+    color: 'rgba(200, 150, 100, 0.2)'
+    boundary:
+      - [500, 100]
+      - [800, 100]
+      - [800, 400]
+      - [500, 400]
+    entities:
+      # Door with custom element type
+      - entity: binary_sensor.door_kitchen
+        plan:
+          left: 50
+          top: 100
+          element:
+            type: custom:state-icon-trigger-shp
+            size: 25
+      
+      # Battery sensor (analog on plan, bar in detail)
+      - entity: sensor.kitchen_sensor_battery
+        plan:
+          left: 200
+          top: 200
+          element:
+            size: 15
+      
+      # Scripts group
+      - entity: script.kitchen_scenes
+        plan:
+          left: 300
+          top: 250
+          element:
+            type: custom:scripts-buttons-group-shp
+            scripts:
+              - script: script.kitchen_bright
+                icon: mdi:brightness-7
+              - script: script.kitchen_dim
+                icon: mdi:brightness-5
+      
+      # Multiple detail-only lights
+      - light.kitchen_cabinet_1
+      - light.kitchen_cabinet_2
+      - light.kitchen_cabinet_3
+      - switch.dishwasher
+
+  - name: Bedroom
+    color: 'rgba(150, 200, 150, 0.2)'
+    boundary:
+      - [100, 400]
+      - [500, 400]
+      - [500, 700]
+      - [100, 700]
+    entities:
+      # Door with horizontal orientation
+      - entity: binary_sensor.door_bedroom
+        plan:
+          left: 200
+          top: 0
+          element:
+            orientation: horizontal
+      
+      # Windows
+      - entity: binary_sensor.window_bedroom_1
+        plan:
+          left: 0
+          top: 100
+      
+      - entity: binary_sensor.window_bedroom_2
+        plan:
+          left: 0
+          top: 200
+      
+      # Climate
+      - entity: climate.bedroom_ac
+        plan:
+          left: 250
+          top: 150
+      
+      # Hidden sensor (positioned but not shown on plan)
+      - entity: sensor.bedroom_temperature
+        plan:
+          show: false
+          left: 0
+          top: 0
+      
+      # Detail-only
+      - light.bedroom_ceiling
+      - light.bedroom_nightstand_left
+      - light.bedroom_nightstand_right
 
 layers:
-  # Ground Floor Layer
-  - name: "Ground Floor"
-    icon: "mdi:home-floor-0"
+  - id: ground_floor
+    name: Ground Floor
+    icon: mdi:floor-plan
+    image: /local/ground_floor.png
+    default: true
     visible: true
     showInToggles: true
-    groups:
-      - group_name: "Entry"
-        elements:
-          # Front door with open/close indicator
-          - type: custom:door-window-element
-            entity: binary_sensor.front_door
-            left: 150
-            top: 100
-            width: 50
-            height: 8
-            orientation: horizontal
-          
-          # Motion sensor in hallway
-          - type: custom:motion-sensor-element
-            entity: binary_sensor.hallway_motion
-            left: 200
-            top: 150
-
-      - group_name: "Living Room"
-        elements:
-          # Temperature with analog bar
-          - type: custom:analog-bar-element
-            entity: sensor.living_room_temperature
-            left: 300
-            top: 200
-            min: 15
-            max: 30
-            height: 100
-            width: 20
-            border_color: "#555"
-            active_color: "entity.state > 25 ? 'red' : '#4CAF50'"
-            bg_color: "rgba(0, 0, 0, 0.7)"
-            font_size: 11
-            value_position: scaleTop
-            decimals: 1
-          
-          # Window sensors
-          - type: custom:door-window-element
-            entity: binary_sensor.living_room_window_left
-            left: 400
-            top: 180
-            width: 40
-            height: 8
-          
-          - type: custom:door-window-element
-            entity: binary_sensor.living_room_window_right
-            left: 450
-            top: 180
-            width: 40
-            height: 8
-          
-          # Light with trigger indicator
-          - type: custom:state-icon-trigger-element
-            entity: light.living_room_main
-            left: 350
-            top: 250
-
-  # First Floor Layer
-  - name: "First Floor"
-    icon: "mdi:home-floor-1"
+  
+  - id: first_floor
+    name: First Floor
+    icon: mdi:home-floor-1
+    image: /local/first_floor.png
     visible: false
     showInToggles: true
-    groups:
-      - group_name: "Bedrooms"
-        elements:
-          - type: custom:door-window-element
-            entity: binary_sensor.bedroom_window
-            left: 500
-            top: 300
-            width: 50
-            height: 8
-          
-          - type: custom:analog-element
-            entity: sensor.bedroom_temperature
-            left: 520
-            top: 320
-            decimals: 1
-
-  # Cameras Layer
-  - name: "Cameras"
-    icon: "mdi:cctv"
-    visible: true
-    showInToggles: true
-    groups:
-      - group_name: "Surveillance"
-        elements:
-          # Front door camera
-          - type: custom:camera-element
-            entity: camera.front_door
-            left: 50
-            top: 50
-            height: 180
-            width: 240
-          
-          # Driveway camera
-          - type: custom:camera-element
-            entity: camera.driveway
-            left: 300
-            top: 50
-            height: 180
-            width: 240
-
-  # Gates & Doors Layer
-  - name: "Controls"
-    icon: "mdi:gate"
-    visible: true
-    showInToggles: true
-    groups:
-      - group_name: "Gates"
-        elements:
-          # Garage door controls
-          - type: custom:gate-buttons-element
-            entity: cover.garage_door
-            left: 700
-            top: 400
-            orientation: horizontal
-          
-          # Main gate controls
-          - type: custom:gate-buttons-element
-            entity: cover.main_gate
-            left: 700
-            top: 450
-            orientation: horizontal
-
-  # Automation Layer
-  - name: "Automations"
-    icon: "mdi:robot"
-    visible: true
-    showInToggles: true
-    groups:
-      - group_name: "Scripts"
-        elements:
-          # Script buttons
-          - type: custom:scripts-buttons-group-element
-            scripts:
-              - entity: script.morning_routine
-                title: "Morning"
-                left: 10
-                top: 10
-              - entity: script.evening_routine
-                title: "Evening"
-                left: 90
-                top: 10
-              - entity: script.night_mode
-                title: "Night"
-                left: 170
-                top: 10
-              - entity: script.vacation_mode
-                title: "Vacation"
-                left: 250
-                top: 10
-            running_left: 10
-            running_top: 60
-            running_width: 300
-            running_height: 100
-
-  # UI Layer (always visible, not toggleable)
-  - name: "UI Controls"
-    icon: "mdi:monitor-dashboard"
-    visible: true
-    showInToggles: false  # This layer won't appear in toggle controls
-    groups:
-      - group_name: "Controls"
-        elements:
-          # Layer toggle controls
-          - type: custom:scalable-house-plan-layers
-            left: 10
-            top: 850
-          
-          # Person tracker
-          - type: custom:image-last-change-element
-            entity: person.john
-            left: 1700
-            top: 900
-            size: 60
-          
-          # Energy usage badge
-          - type: custom:badge-element
-            entity: sensor.home_energy_usage
-            left: 1600
-            top: 900
 ```
 
 ### Tips for Using This Example
 
-1. **Layer Organization**: Group related elements into logical layers (floors, cameras, controls, etc.)
-2. **showInToggles**: Use `false` for UI layers that should always be visible
-3. **Persistence ID**: Set a unique `layers_visibility_persistence_id` to maintain layer states across page reloads
-4. **Scaling**: Adjust `max_scale` and `min_scale` based on your screen sizes and image dimensions
-5. **Positioning**: Use absolute pixel coordinates that match your background image
-6. **Dynamic Colors**: Use JavaScript templates in properties like `active_color` for dynamic styling
+1. **Entity-Based Structure**: List entities per room, not elements - type is inferred automatically
+2. **String Shorthand**: Use simple strings for detail-only entities (no plan display)
+3. **Property Merging**: Override specific default properties without specifying full element config
+4. **Explicit Types**: Use `element.type` when you need a non-default element (disables merging)
+5. **Room-Relative Positioning**: `plan.left/top` are relative to room's top-left corner
+6. **Persistence ID**: Set unique `layers_visibility_persistence_id` to maintain layer states
+7. **Scaling**: Adjust `max_scale` and `min_scale` based on screen sizes and image dimensions
 
 ---
 
