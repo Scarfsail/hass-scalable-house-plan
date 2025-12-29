@@ -279,14 +279,25 @@ Users of the old `picture-elements-scalable` card will need to:
    - Elements without `plan` section are detail-only (not shown in overview)
    - Updated TypeScript interfaces: PlanConfig, ElementConfig, RoomElement
    - Implemented element filtering based on plan.show flag (default: true)
-5. ⏳ Phase 5: Overview Display Control (Covered by Phase 4)
-6. ⏳ Phase 6: Room Detail View (Next)
+5. ✅ Phase 5: Overview Display Control (Covered by Phase 4)
+6. ✅ Phase 6: Room Detail View - COMPLETE (Dec 29, 2025)
+   - Created three-component architecture: orchestrator + plan + detail
+   - Implemented detail view component (scalable-house-plan-detail.ts) with responsive grid
+   - Created plan view component (scalable-house-plan-plan.ts) with room rendering
+   - Refactored main component as routing orchestrator
+   - Browser history API integration with back button support
+   - Edit mode detection via URL parameter (?edit=1) to avoid conflicts
+   - Entity-based card system with default mappings for plan and detail views
+   - Card caching for performance (Map-based, prevents re-creation on render)
+   - Responsive layout: auto-fit grid, full width on mobile, 300px min columns
+   - Compact header design with sticky positioning
+   - All room entities visible in detail view (respects plan.show for overview only)
 7. ⏳ Phase 7: Testing & Documentation
 
 ---
 *Document created: December 27, 2025*
-*Last updated: December 28, 2025*
-*Current Phase: Phase 2 Complete - Ready for Phase 3*
+*Last updated: December 29, 2025*
+*Current Phase: Phase 6 Complete - Ready for Phase 7 (Testing & Documentation)*
         entity: binary_sensor.living_room_motion
         show_in_overview: true
         position:

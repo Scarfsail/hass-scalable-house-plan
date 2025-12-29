@@ -1,0 +1,216 @@
+import { LitElement, html, css } from "lit-element";
+import { customElement, property } from "lit/decorators.js";
+import type { HomeAssistant } from "../../hass-frontend/src/types";
+import type { Room, EntityConfig } from "./scalable-house-plan";
+import { getElementTypeForEntity, mergeElementProperties } from "../utils";
+
+/**
+ * Room detail view component
+ * Displays all entities from a room as standard HA cards in a responsive grid
+ */
+@customElement("scalable-house-plan-detail")
+export class ScalableHousePlanDetail extends LitElement {
+    @property({ attribute: false }) public hass?: HomeAssistant;
+    @property({ attribute: false }) public room?: Room;
+    @property({ attribute: false }) public onBack?: () => void;
+
+    // Cache for card elements (key: entity_id, value: card element)
+    private _cardElements: Map<string, any> = new Map();
+
+    updated(changedProperties: Map<string, any>) {
+        super.updated(changedProperties);
+        
+        // Clear cache when room changes
+        if (changedProperties.has('room')) {
+            this._cardElements.clear();
+        }
+    }
+
+    static get styles() {
+        return css`
+            :host {
+                display: block;
+                height: 100%;
+                overflow: auto;
+                background: var(--lovelace-background, var(--primary-background-color));
+            }
+
+            .header {
+                display: flex;
+                align-items: center;
+                padding: 8px 12px;
+                background: var(--card-background-color);
+                border-bottom: 1px solid var(--divider-color);
+                position: sticky;
+                top: 0;
+                z-index: 1;
+            }
+
+            .back-button {
+                margin-right: 8px;
+                cursor: pointer;
+                color: var(--primary-text-color);
+                --mdc-icon-button-size: 36px;
+            }
+
+            .room-name {
+                font-size: 18px;
+                font-weight: 500;
+                margin: 0;
+                color: var(--primary-text-color);
+            }
+
+            .cards-container {
+                padding: 16px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 16px;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            @media (max-width: 768px) {
+                .cards-container {
+                    grid-template-columns: 1fr;
+                    padding: 8px;
+                    gap: 8px;
+                }
+
+                .header {
+                    padding: 6px 8px;
+                }
+
+                .room-name {
+                    font-size: 16px;
+                }
+            }
+
+            .entity-card {
+                min-height: 60px;
+            }
+        `;
+    }
+
+    render() {
+        if (!this.room || !this.hass) {
+            return html`<div>Loading...</div>`;
+        }
+
+        return html`
+            <div class="header">
+                <ha-icon-button
+                    class="back-button"
+                    .label=${"Back"}
+                    @click=${this._handleBack}
+                >
+                    <ha-icon icon="mdi:arrow-left"></ha-icon>
+                </ha-icon-button>
+                <h1 class="room-name">${this.room.name}</h1>
+            </div>
+
+            <div class="cards-container">
+                ${this._renderEntityCards()}
+            </div>
+        `;
+    }
+
+    private _renderEntityCards() {
+        if (!this.room || !this.hass) return html``;
+
+        const cards = this.room.entities.map((entityConfig, index) => {
+            const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
+            const plan = typeof entityConfig === 'string' ? undefined : entityConfig.plan;
+            
+            // Get device_class for mapping lookup
+            const deviceClass = this.hass?.states[entityId]?.attributes?.device_class;
+            
+            // Get default detail element definition
+            const defaultElement = getElementTypeForEntity(entityId, deviceClass, 'detail');
+            
+            // Check if user provided custom detail element config in plan.element
+            // If explicit type in plan.element, use it; otherwise merge with detail defaults
+            const elementConfig = plan?.element 
+                ? mergeElementProperties(defaultElement, plan.element)
+                : defaultElement;
+            
+            // Create card element
+            const cardConfig = {
+                type: elementConfig.type,
+                entity: entityId,
+                ...elementConfig
+            };
+
+            return this._getOrCreateCard(entityId, cardConfig);
+        });
+
+        return cards;
+    }
+
+    private _getOrCreateCard(entityId: string, config: any) {
+        // Check if card already exists in cache
+        let cardElement = this._cardElements.get(entityId);
+        
+        if (!cardElement) {
+            // Create new card element
+            try {
+                const elementTag = this._getCardElementTag(config.type);
+                cardElement = document.createElement(elementTag) as any;
+                
+                if (cardElement.setConfig) {
+                    cardElement.setConfig(config);
+                }
+                
+                // Cache the element
+                this._cardElements.set(entityId, cardElement);
+            } catch (e) {
+                console.error('Error creating card:', e);
+                // Create error card as fallback
+                cardElement = document.createElement('hui-error-card') as any;
+                cardElement.setConfig({
+                    type: 'error',
+                    error: `Card type not supported: ${config.type}`,
+                    origConfig: config
+                });
+                this._cardElements.set(entityId, cardElement);
+            }
+        }
+        
+        // Always update hass on the cached element
+        if (cardElement && this.hass) {
+            cardElement.hass = this.hass;
+        }
+
+        return html`
+            <div class="entity-card">
+                ${cardElement}
+            </div>
+        `;
+    }
+
+    private _getCardElementTag(cardType: string): string {
+        // Map card types to element tags
+        const typeMap: Record<string, string> = {
+            'tile': 'hui-tile-card',
+            'button': 'hui-button-card',
+            'entities': 'hui-entities-card',
+            'thermostat': 'hui-thermostat-card',
+            'light': 'hui-light-card',
+            'sensor': 'hui-sensor-card',
+            'gauge': 'hui-gauge-card',
+            'history-graph': 'hui-history-graph-card',
+        };
+
+        // If it's already a custom element tag, return as-is
+        if (cardType.includes(':') || cardType.includes('-')) {
+            return cardType;
+        }
+
+        return typeMap[cardType] || 'hui-error-card';
+    }
+
+    private _handleBack() {
+        if (this.onBack) {
+            this.onBack();
+        }
+    }
+}
