@@ -3,26 +3,14 @@ import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import { DragDropMixin } from "./drag-drop-mixin";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
+import type { EntityConfig } from "../scalable-house-plan";
 import "./editor-element-shp";
 import { CrossContainerCoordinator } from "./cross-container-coordinator";
-
-interface PictureElement {
-    type: string;
-    style: any;
-    entity?: string;
-    tap_action?: any;
-    left?: string | number;
-    right?: string | number;
-    top?: string | number;
-    bottom?: string | number;
-    width?: string | number;
-    height?: string | number;
-}
 
 @customElement("editor-elements-shp")
 export class EditorElementsShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
-    @property({ type: Array }) elements: PictureElement[] = [];
+    @property({ type: Array }) elements: EntityConfig[] = [];
     @property({ attribute: false }) expandedElements: Set<number> = new Set();
     @property({ type: Number }) layerIndex?: number;
     @property({ type: Number }) groupIndex?: number;
@@ -44,11 +32,11 @@ export class EditorElementsShp extends LitElement {
                 <div class="section-header">
                     <div class="section-title">
                         <ha-icon icon="mdi:puzzle"></ha-icon>
-                        Elements (${this.elements.length})
+                        Entities (${this.elements.length})
                     </div>
                     <button class="add-button" @click=${this._addElement}>
                         <ha-icon icon="mdi:plus"></ha-icon>
-                        Add Element
+                        Add Entity
                     </button>
                 </div>
 
@@ -68,7 +56,7 @@ export class EditorElementsShp extends LitElement {
                                 <editor-element-shp
                                     class="element-item"
                                     .hass=${this.hass}
-                                    .element=${element as PictureElement}
+                                    .element=${element}
                                     .index=${index}
                                     .isExpanded=${this.expandedElements.has(index)}
                                     @element-toggle=${this._handleElementToggle}
@@ -87,9 +75,9 @@ export class EditorElementsShp extends LitElement {
         return html`
             <div class="empty-state">
                 <ha-icon icon="mdi:puzzle"></ha-icon>
-                <div class="empty-state-title">No elements created</div>
+                <div class="empty-state-title">No entities created</div>
                 <div class="empty-state-subtitle">
-                    Elements are the interactive components displayed on your picture
+                    Entities are the devices and sensors displayed in this room
                 </div>
             </div>
         `;
@@ -104,17 +92,28 @@ export class EditorElementsShp extends LitElement {
     }
 
     private _handleElementToggle(e: CustomEvent) {
-        const event = new CustomEvent('elements-toggle', {
-            detail: e.detail,
-            bubbles: true,
-            composed: true
-        });
-        this.dispatchEvent(event);
+        const index = e.detail.index;
+        
+        // Toggle the expansion state
+        if (this.expandedElements.has(index)) {
+            this.expandedElements.delete(index);
+        } else {
+            this.expandedElements.add(index);
+        }
+        
+        // Force re-render by creating a new Set
+        this.expandedElements = new Set(this.expandedElements);
+        this.requestUpdate();
     }
 
     private _handleElementUpdate(e: CustomEvent) {
+        // Update a single element at the given index
+        const { index, element } = e.detail;
+        const updatedElements = [...this.elements];
+        updatedElements[index] = element;
+        
         const event = new CustomEvent('elements-update', {
-            detail: e.detail,
+            detail: { index, element },
             bubbles: true,
             composed: true
         });

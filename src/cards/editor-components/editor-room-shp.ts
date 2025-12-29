@@ -125,8 +125,11 @@ export class EditorRoomShp extends LitElement {
 
                         <editor-elements-shp
                             .hass=${this.hass}
-                            .elements=${this.room.elements || []}
+                            .elements=${this.room.entities || []}
+                            @elements-add=${this._handleElementAdd}
                             @elements-update=${this._handleElementsUpdate}
+                            @elements-remove=${this._handleElementRemove}
+                            @elements-reorder=${this._handleElementsReorder}
                         ></editor-elements-shp>
                     </div>
                 ` : ''}
@@ -163,8 +166,34 @@ export class EditorRoomShp extends LitElement {
         this._dispatchUpdate({ ...this.room, boundary });
     }
 
+    private _handleElementAdd(e: CustomEvent) {
+        // Add a new entity to the room
+        const newEntity: string = "";  // Start with empty string (entity_id)
+        const entities = [...(this.room.entities || []), newEntity];
+        this._dispatchUpdate({ ...this.room, entities });
+    }
+
     private _handleElementsUpdate(e: CustomEvent) {
-        this._dispatchUpdate({ ...this.room, elements: e.detail.elements });
+        // Handle single element update
+        const { index, element } = e.detail;
+        if (index !== undefined && element !== undefined) {
+            const entities = [...(this.room.entities || [])];
+            entities[index] = element;
+            this._dispatchUpdate({ ...this.room, entities });
+        } else if (e.detail.elements !== undefined) {
+            // Handle bulk update (for backwards compatibility)
+            this._dispatchUpdate({ ...this.room, entities: e.detail.elements });
+        }
+    }
+
+    private _handleElementRemove(e: CustomEvent) {
+        const entities = [...(this.room.entities || [])];
+        entities.splice(e.detail.index, 1);
+        this._dispatchUpdate({ ...this.room, entities });
+    }
+
+    private _handleElementsReorder(e: CustomEvent) {
+        this._dispatchUpdate({ ...this.room, entities: e.detail.elements });
     }
 
     private _removeRoom(e: Event) {

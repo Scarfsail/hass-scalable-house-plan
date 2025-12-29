@@ -2,24 +2,12 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
-
-interface PictureElement {
-    type: string;
-    style: any;
-    entity?: string;
-    tap_action?: any;
-    left?: string | number;
-    right?: string | number;
-    top?: string | number;
-    bottom?: string | number;
-    width?: string | number;
-    height?: string | number;
-}
+import type { EntityConfig } from "../scalable-house-plan";
 
 @customElement("editor-element-shp")
 export class EditorElementShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
-    @property({ type: Object }) element!: PictureElement;
+    @property({ type: Object }) element!: EntityConfig;
     @property({ type: Number }) index!: number;
     @property({ type: Boolean }) isExpanded: boolean = false;
 
@@ -33,9 +21,9 @@ export class EditorElementShp extends LitElement {
     ];
 
     protected render() {
-        const elementType = this.element.type || 'unknown';
-        const hasPosition = this.element.left !== undefined || this.element.right !== undefined || 
-                           this.element.top !== undefined || this.element.bottom !== undefined;
+        // Extract entity ID and check if it has plan config
+        const entityId = typeof this.element === 'string' ? this.element : this.element.entity;
+        const hasPlan = typeof this.element !== 'string' && this.element.plan !== undefined;
         
         return html`
             <div class="item">
@@ -45,11 +33,11 @@ export class EditorElementShp extends LitElement {
                         class="expand-icon ${this.isExpanded ? 'expanded' : ''}"
                     ></ha-icon>
                     <div class="item-info">
-                        <ha-icon icon="${this._getElementIcon(elementType)}" class="item-icon"></ha-icon>
+                        <ha-icon icon="mdi:home-assistant" class="item-icon"></ha-icon>
                         <div>
-                            <div class="item-name">${this._getElementDisplayName(elementType)}</div>
+                            <div class="item-name">${entityId || 'New Entity'}</div>
                             <div class="item-details">
-                                ${this.element.entity ? html`<span class="item-badge">${this.element.entity}</span>` : ''}
+                                ${hasPlan ? html`<span class="item-badge">On Plan</span>` : html`<span class="item-badge">Detail Only</span>`}
                             </div>
                         </div>
                     </div>
@@ -62,7 +50,7 @@ export class EditorElementShp extends LitElement {
                 </div>
                 
                 <div class="item-content ${this.isExpanded ? 'expanded' : ''}">
-                    <!-- YAML Editor for Element Configuration -->
+                    <!-- YAML Editor for Entity Configuration -->
                     <ha-yaml-editor
                         .hass=${this.hass}
                         .defaultValue=${this.element}
@@ -71,34 +59,6 @@ export class EditorElementShp extends LitElement {
                 </div>
             </div>
         `;
-    }
-
-    private _getElementIcon(type: string): string {
-        const iconMap: { [key: string]: string } = {
-            'state-icon': 'mdi:lightbulb-outline',
-            'state-label': 'mdi:text',
-            'state-badge': 'mdi:circle',
-            'service-button': 'mdi:gesture-tap-button',
-            'icon': 'mdi:shape',
-            'image': 'mdi:image',
-            'conditional': 'mdi:help-rhombus',
-            'custom': 'mdi:code-braces'
-        };
-        return iconMap[type] || 'mdi:puzzle';
-    }
-
-    private _getElementDisplayName(type: string): string {
-        const nameMap: { [key: string]: string } = {
-            'state-icon': 'State Icon',
-            'state-label': 'State Label',
-            'state-badge': 'State Badge',
-            'service-button': 'Service Button',
-            'icon': 'Icon',
-            'image': 'Image',
-            'conditional': 'Conditional',
-            'custom': 'Custom Element'
-        };
-        return nameMap[type] || `${type}`;
     }
 
     private _elementChanged(ev: CustomEvent) {
