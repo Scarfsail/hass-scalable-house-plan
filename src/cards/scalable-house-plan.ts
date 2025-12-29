@@ -1,4 +1,4 @@
-import { LitElement, html } from "lit-element"
+import { LitElement, html, svg } from "lit-element"
 import { CreateCardElement, getCreateCardElement } from "../utils"
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
@@ -18,6 +18,7 @@ export interface Room {
     name: string;
     boundary: [number, number][];
     elements: PictureElement[];
+    color?: string;  // Optional color for room background (supports rgba)
 }
 
 export interface ScalableHousePlanConfig extends LovelaceCardConfig {
@@ -178,10 +179,13 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 ${this.card}
             `
 
+        const roomsOverlay = this._renderRooms();
+
         return html`
             <div style="overflow:none; width:${visibleWidth}px; height:${visibleHeight}px">
-                <div style="transform: scale(${scale.scaleX}, ${scale.scaleY}); transform-origin: 0px 0px; width:${contentWidth}px; height:${contentHeight}px;">
+                <div style="transform: scale(${scale.scaleX}, ${scale.scaleY}); transform-origin: 0px 0px; width:${contentWidth}px; height:${contentHeight}px; position: relative;">
                     ${this.card}
+                    ${roomsOverlay}
                 </div>
             </div>
         `
@@ -299,6 +303,64 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     public getLayerVisibility(layerId: string): boolean {
         return this._layerVisibility.get(layerId) ?? true;
+    }
+
+    private _renderRooms() {
+        if (!this.config?.rooms) return html``;
+
+        const defaultColor = 'rgba(128, 128, 128, 0.2)'; // Subtle gray by default
+
+        return svg`
+            <svg style="position: absolute; top: 0; left: 0; width: ${this.config.image_width}px; height: ${this.config.image_height}px; z-index: 1;" viewBox="0 0 ${this.config.image_width} ${this.config.image_height}" preserveAspectRatio="none">
+                ${this.config.rooms.map((room, index) => {
+                    if (!room.boundary || room.boundary.length < 3) return svg``;
+                    
+                    const fillColor = room.color || defaultColor;
+                    const strokeColor = fillColor.replace(/[\d.]+\)$/, '0.4)'); // Slightly more opaque border
+                    const points = room.boundary.map(p => `${p[0]},${p[1]}`).join(' ');
+                    
+                    return svg`
+                        <polygon 
+                            points="${points}" 
+                            fill="${fillColor}" 
+                            stroke="${strokeColor}"
+                            stroke-width="2"
+                            style="cursor: pointer; transition: fill 0.2s ease;"
+                            @click=${(e: Event) => this._handleRoomClick(room, index, e)}
+                            @mouseenter=${(e: Event) => this._handleRoomHover(room, index, e, true)}
+                            @mouseleave=${(e: Event) => this._handleRoomHover(room, index, e, false)}
+                        />
+                    `;
+                })}
+            </svg>
+        `;
+    }
+
+    private _handleRoomClick(room: Room, index: number, event: Event) {
+        event.stopPropagation();
+        console.log('Room clicked:', room.name, index);
+        // TODO: Open room detail view in Phase 6
+        // Dispatch custom event for room click
+        const customEvent = new CustomEvent('room-clicked', {
+            detail: { room, index },
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(customEvent);
+    }
+
+    private _handleRoomHover(room: Room, index: number, event: Event, isEntering: boolean) {
+        const target = event.target as SVGPolygonElement;
+        if (isEntering) {
+            // Lighten the color on hover
+            const currentFill = target.getAttribute('fill') || 'rgba(128, 128, 128, 0.2)';
+            const hoverFill = currentFill.replace(/[\d.]+\)$/, '0.4)'); // Increase opacity
+            target.setAttribute('fill', hoverFill);
+        } else {
+            // Restore original color
+            const fillColor = room.color || 'rgba(128, 128, 128, 0.2)';
+            target.setAttribute('fill', fillColor);
+        }
     }
 
     /**

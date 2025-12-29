@@ -26,7 +26,16 @@ Transform `hass-picture-elements-scalable` into `hass-scalable-house-plan` - a H
 - Format: `boundary: [[x1, y1], [x2, y2], ...]`
 - Coordinates are in pixels relative to the image dimensions
 - Supports any shape (rectangular, L-shaped, irregular)
-- Used for click detection and room interaction
+- **Rendered as SVG polygons with customizable colors**
+- **Built-in click detection for room interaction**
+- **Hover effects provide visual feedback**
+
+### 4. Room Colors
+- Each room can have an optional `color` property (rgba/rgb/hex)
+- Default: Subtle gray `rgba(128, 128, 128, 0.2)`
+- Colors render as SVG polygon fills over the floor plan
+- Future: Dynamic colors based on sensors (temperature, occupancy, alarm state)
+- Provides visual feedback and room identification
 
 ### 4. Room-Relative Element Positioning
 - **Original**: Elements positioned relative to the entire canvas
@@ -199,10 +208,12 @@ Users of the old `picture-elements-scalable` card will need to:
 
 ### Phase 2 Specifics
 - **Boundary coordinates**: Pixels relative to image dimensions (image_width × image_height)
-- **Click detection**: Implement point-in-polygon algorithm (ray casting method)
+- **Room rendering**: SVG polygons with customizable colors and interactive hover effects
+- **Click detection**: Native SVG polygon hit detection (no point-in-polygon algorithms needed)
 - **Layer visibility**: Continue using CSS variables but now based on layer IDs
-- **Room metadata**: Start minimal (name only), add more in future phases
+- **Room metadata**: Currently includes name, boundary, and color; more in future phases
 - **Editor updates**: Significant restructuring of editor components needed
+- **Important**: Use `svg` template tag for SVG elements, not `html` template
 
 ### Future Enhancements (Beyond Current Phases)
 - Circle/ellipse boundary support
@@ -219,6 +230,11 @@ Users of the old `picture-elements-scalable` card will need to:
      - Renamed: 12 element types, 2 components, 6 editor components
      - Deleted obsolete group-based editor components
      - Ensures both libraries can coexist in Home Assistant without element name collisions
+   - **Additional: Room Color Rendering** (Dec 28-29, 2025)
+     - Implemented SVG-based room boundary rendering with customizable colors
+     - Added interactive room hover effects (visual feedback)
+     - Added click handlers for future room detail navigation
+     - Rooms are now core visual elements with click detection built-in
 3. ⏳ Phase 3: Room-Relative Positioning
 4. ⏳ Phase 4: Room Default Elements  
 5. ⏳ Phase 5: Overview Display Control
