@@ -17,8 +17,50 @@ export interface Layer {
 export interface Room {
     name: string;
     boundary: [number, number][];
-    elements: PictureElement[];
+    elements: RoomElement[];
     color?: string;  // Optional color for room background (supports rgba)
+}
+
+interface PlanConfig {
+    left?: string | number;
+    right?: string | number;
+    top?: string | number;
+    bottom?: string | number;
+    width?: string | number;
+    height?: string | number;
+    show?: boolean;  // Default true
+    layer_id?: string;
+    style?: any;
+}
+
+interface ElementConfig {
+    type: string;
+    entity?: string;
+    tap_action?: any;
+    hold_action?: any;
+    double_tap_action?: any;
+    [key: string]: any;  // Element-specific properties
+}
+
+interface RoomElement {
+    plan?: PlanConfig;
+    element: ElementConfig;
+}
+
+// Legacy interface for internal processing (after transformation)
+interface PictureElement {
+    type: string;
+    style: any;
+    entity?: string;
+    tap_action?: any;
+    layer_id?: string;
+    left?: string | number;
+    right?: string | number;
+    top?: string | number;
+    bottom?: string | number;
+    width?: string | number;
+    height?: string | number;
+    [key: string]: any;
 }
 
 export interface ScalableHousePlanConfig extends LovelaceCardConfig {
@@ -32,21 +74,6 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     min_scale?: number;
     card_size?: number;
     layers_visibility_persistence_id?: string;
-}
-
-interface PictureElement {
-    type: string;
-    style: any;
-    entity?: string;
-    tap_action?: any;
-    layer_id?: string;
-    show_in_overview?: boolean;
-    left?: string | number;
-    right?: string | number;
-    top?: string | number;
-    bottom?: string | number;
-    width?: string | number;
-    height?: string | number;
 }
 
 
@@ -206,9 +233,22 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             `
   */  }
     createPictureCardElement(config: ScalableHousePlanConfig) {
-        // Flatten all rooms into a single elements array
+        // Flatten all rooms into a single elements array with coordinate transformation
         const allElements = (config.rooms || []).reduce((acc: PictureElement[], room: Room) => {
-            return acc.concat(room.elements || []);
+            // Calculate room's bounding box (top-left corner)
+            const roomOffset = this._getRoomOffset(room);
+            
+            // Transform each element's coordinates from room-relative to absolute
+            const transformedElements = (room.elements || [])
+                .filter((el: RoomElement) => {
+                    // Only include elements with plan section and show !== false
+                    return el.plan && (el.plan.show !== false);
+                })
+                .map((el: RoomElement) => {
+                    return this._transformRoomElement(el, roomOffset);
+                });
+            
+            return acc.concat(transformedElements);
         }, []);
 
         // Process elements and add CSS variables for layer visibility
@@ -256,6 +296,69 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
         return this._createCardElement?.(cardConfig);
     }
+
+    private _getRoomOffset(room: Room): { x: number; y: number } {
+        if (!room.boundary || room.boundary.length === 0) {
+            return { x: 0, y: 0 };
+        }
+        
+        const xs = room.boundary.map(p => p[0]);
+        const ys = room.boundary.map(p => p[1]);
+        
+        return {
+            x: Math.min(...xs),
+            y: Math.min(...ys)
+        };
+    }
+
+    private _transformRoomElement(roomElement: RoomElement, roomOffset: { x: number; y: number }): PictureElement {
+        const plan = roomElement.plan!;
+        const element = roomElement.element;
+        
+        // Create a flattened element combining plan and element config
+        const flattened: PictureElement = {
+            ...element,  // Spread element config (type, entity, actions, etc.)
+            type: element.type,
+            style: plan.style || {},
+            layer_id: plan.layer_id
+        };
+        
+        // Transform position coordinates from room-relative to absolute
+        if (typeof plan.left === 'number') {
+            flattened.left = plan.left + roomOffset.x;
+        } else if (plan.left !== undefined) {
+            flattened.left = plan.left;
+        }
+        
+        if (typeof plan.right === 'number') {
+            flattened.right = plan.right + roomOffset.x;
+        } else if (plan.right !== undefined) {
+            flattened.right = plan.right;
+        }
+        
+        if (typeof plan.top === 'number') {
+            flattened.top = plan.top + roomOffset.y;
+        } else if (plan.top !== undefined) {
+            flattened.top = plan.top;
+        }
+        
+        if (typeof plan.bottom === 'number') {
+            flattened.bottom = plan.bottom + roomOffset.y;
+        } else if (plan.bottom !== undefined) {
+            flattened.bottom = plan.bottom;
+        }
+        
+        // Copy dimensions (no transformation needed)
+        if (plan.width !== undefined) {
+            flattened.width = plan.width;
+        }
+        if (plan.height !== undefined) {
+            flattened.height = plan.height;
+        }
+        
+        return flattened;
+    }
+
     connectedCallback() {
         super.connectedCallback();
         const element = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot?.querySelector("partial-panel-resolver")?.querySelector("ha-panel-lovelace")?.shadowRoot?.querySelector("hui-root")?.shadowRoot?.querySelector("div");

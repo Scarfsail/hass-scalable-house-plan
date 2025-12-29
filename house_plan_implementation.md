@@ -39,30 +39,61 @@ Transform `hass-picture-elements-scalable` into `hass-scalable-house-plan` - a H
 
 ### 4. Room-Relative Element Positioning
 - **Original**: Elements positioned relative to the entire canvas
-- **New**: Elements positioned relative to their parent room
+- **New**: Elements positioned relative to their parent room's top-left corner
 - Simplifies layout management when moving/resizing rooms
 - More intuitive for house plan design
+- Coordinates transform: `absolute_position = room_top_left + element_position`
+
+### 5. Element Structure Separation
+Elements are structured with clear separation between plan display and element configuration:
+
+```yaml
+elements:
+  - plan:              # Optional - controls plan display
+      left: 100        # Room-relative coordinates
+      top: 50
+      width: 30        # Optional dimensions
+      height: 30
+      show: true       # Optional, default true
+      layer_id: "lights"  # Optional layer assignment
+      style: {}        # Optional plan-specific styling
+    element:           # Required - element configuration
+      type: custom:door-window-shp
+      entity: binary_sensor.door
+      tap_action: {}   # Actions work in detail view
+      # ... element-specific config
+  
+  - element:           # No plan section = detail-only element
+      type: custom:analog-shp
+      entity: sensor.temperature
+```
+
+**Key principles:**
+- `plan` section is optional - if missing, element only appears in room detail view
+- `plan` contains: all positioning (left/top/width/height/right/bottom), show flag, layer_id, style
+- `element` contains: type, entity, actions, and all element-specific configuration
+- Actions (tap_action, hold_action) only work in detail view
+- Clicking elements on plan opens room detail view
+- All elements in a room appear in detail view by default
 
 ### 5. Room Default Elements
-Each room supports a standard set of elements:
-- Temperature sensor/display
-- Presence/motion detection
-- Air conditioning control
-- Lighting control
-- Humidity sensor
-- Other room-specific elements
+- Each element has a new structure: `plan` (optional) + `element` (required)
+- Elements without `plan` section appear only in room detail view
+- Elements with `plan` section appear on overview (if show: true)
+- Simplifies creating detail-only controls (AC, advanced settings, etc.)
 
-### 6. Overview Display Mode
-- Each element has a new setting: `show_in_overview`
-- When enabled, element appears on the main house plan view
-- When disabled, element only appears in room detail view
-- Allows decluttering the main plan while keeping full control available
+### 7. Overview Display Control (Integrated with Element Structure)
+- Element visibility on plan controlled by presence of `plan` section
+- `plan.show` flag allows temporary hiding while preserving coordinates
+- No separate `show_in_overview` property needed - structural approach is clearer
+- Detail view always shows all room elements regardless of plan visibility
 
 ### 7. Room Detail Navigation
-- **Interaction**: Clicking anywhere on a room opens room detail view
-- Clicking on individual elements within a room also opens room detail
-- Room detail view shows ALL elements for that room (regardless of overview setting)
+- **Interaction**: Clicking room polygon or any element on plan opens room detail view
+- Room detail view shows ALL elements for that room (regardless of plan visibility)
+- Element actions (tap_action, hold_action) only work in detail view
 - Provides full access to all room controls and information
+- Plan view is for navigation and overview only
 
 ## Implementation Phases
 
@@ -82,23 +113,25 @@ Each room supports a standard set of elements:
 - Implement point-in-polygon click detection for rooms
 - Start with minimal room metadata: name and boundary only
 
-### Phase 3: Relative Positioning System
+### Phase 3: Relative Positioning System ✅
 - Implement coordinate transformation system
 - Convert element positions to room-relative coordinates
-- Update editor drag-drop to work with room-relative positioning
-- Maintain backward compatibility during transition
+- Elements positioned relative to room's top-left corner (min x, min y of boundary)
+- Transformation: `absolute_position = room_offset + element.plan.left/top`
+- Supports negative values and coordinates beyond room boundaries
 
-### Phase 4: Room Default Elements
-- Define standard room element templates
-- Create quick-add system for common room elements
-- Implement element type presets (temperature, presence, AC, etc.)
-- Add room template system for common room types
+### Phase 4: Element Structure Restructure
+- Restructure element configuration: `plan` (optional) + `element` (required)
+- Implement `plan` section parsing with positioning, show flag, layer_id, style
+- Update element flattening logic to respect `plan.show` flag
+- Handle elements without `plan` section (detail-only elements)
+- Update coordinate transformation to use `plan.left/top/width/height`
+- Preserve element actions for detail view
 
-### Phase 5: Overview Display Control
-- Add `show_in_overview` property to all elements
-- Update rendering logic to respect overview flag
-- Create toggle in element editor
-- Update UI to indicate which elements are overview-visible
+### Phase 5: Overview Display Control (Covered by Phase 4)
+- Already implemented through `plan` section structure
+- `plan.show` flag provides granular control
+- No additional work needed beyond Phase 4
 
 ### Phase 6: Room Detail View
 - Implement room click handler
@@ -235,10 +268,19 @@ Users of the old `picture-elements-scalable` card will need to:
      - Added interactive room hover effects (visual feedback)
      - Added click handlers for future room detail navigation
      - Rooms are now core visual elements with click detection built-in
-3. ⏳ Phase 3: Room-Relative Positioning
-4. ⏳ Phase 4: Room Default Elements  
-5. ⏳ Phase 5: Overview Display Control
-6. ⏳ Phase 6: Room Detail View
+3. ✅ Phase 3: Room-Relative Positioning - COMPLETE (Dec 29, 2025)
+   - Implemented coordinate transformation system
+   - Elements now positioned relative to room's top-left corner
+   - Automatic transformation: absolute = room_offset + element_position
+4. ✅ Phase 4: Element Structure Restructure - COMPLETE (Dec 29, 2025)
+   - Separated element configuration into `plan` (optional) and `element` (required) sections
+   - `plan`: positioning, visibility, layer assignment, style
+   - `element`: type, entity, actions, element-specific configuration
+   - Elements without `plan` section are detail-only (not shown in overview)
+   - Updated TypeScript interfaces: PlanConfig, ElementConfig, RoomElement
+   - Implemented element filtering based on plan.show flag (default: true)
+5. ⏳ Phase 5: Overview Display Control (Covered by Phase 4)
+6. ⏳ Phase 6: Room Detail View (Next)
 7. ⏳ Phase 7: Testing & Documentation
 
 ---
