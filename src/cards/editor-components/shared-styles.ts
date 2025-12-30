@@ -56,6 +56,50 @@ export const sharedStyles = css`
         --mdc-icon-size: 16px;
     }
 
+    /* Collapsible Section Styles */
+    .collapsible-section .section-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+    }
+
+    .collapsible-section .section-header:hover {
+        opacity: 0.8;
+    }
+
+    .collapsible-section .section-header .expand-icon {
+        --mdc-icon-size: 20px;
+        margin-right: 8px;
+        transition: transform 0.2s ease;
+        color: var(--secondary-text-color);
+    }
+
+    .collapsible-section .section-header .expand-icon.expanded {
+        transform: rotate(90deg);
+    }
+
+    .collapsible-section .section-header ha-icon-button,
+    .collapsible-section .section-header .add-button {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+    }
+
+    .collapsible-section .section-header.expanded ha-icon-button,
+    .collapsible-section .section-header.expanded .add-button {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .collapsible-section .section-content {
+        display: none;
+        padding-top: 16px;
+    }
+
+    .collapsible-section .section-content.expanded {
+        display: block;
+    }
+
     .icon-button {
         background: none;
         border: none;

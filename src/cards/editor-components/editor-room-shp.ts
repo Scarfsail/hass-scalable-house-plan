@@ -11,6 +11,7 @@ export class EditorRoomShp extends LitElement {
     @property({ attribute: false }) room!: Room;
     @property({ type: Number }) roomIndex!: number;
     @state() private _expanded = false;
+    @state() private _expandedSections: Set<string> = new Set(['entities']); // Only entities expanded by default
 
     static styles = [
         sharedStyles,
@@ -80,57 +81,109 @@ export class EditorRoomShp extends LitElement {
 
                 ${this._expanded ? html`
                     <div class="room-content">
-                        <div class="room-field">
-                            <ha-textfield
-                                label="Room Name"
-                                .value=${this.room.name || ""}
-                                @input=${this._nameChanged}
-                            ></ha-textfield>
+                        <!-- Basic Configuration Section -->
+                        <div class="config-section collapsible-section">
+                            <div class="section-header ${this._expandedSections.has('basic') ? 'expanded' : ''}" 
+                                 @click=${() => this._toggleSection('basic')}>
+                                <div class="section-title">
+                                    <ha-icon 
+                                        icon="mdi:chevron-right" 
+                                        class="expand-icon ${this._expandedSections.has('basic') ? 'expanded' : ''}"
+                                    ></ha-icon>
+                                    <ha-icon icon="mdi:cog"></ha-icon>
+                                    Basic Configuration
+                                </div>
+                            </div>
+                            <div class="section-content ${this._expandedSections.has('basic') ? 'expanded' : ''}">
+                                <div class="room-field">
+                                    <ha-textfield
+                                        label="Room Name"
+                                        .value=${this.room.name || ""}
+                                        @input=${this._nameChanged}
+                                    ></ha-textfield>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="room-field">
-                            <div style="margin-bottom: 8px;">
-                                <strong>Boundary Points</strong>
-                                <ha-icon-button
-                                    @click=${this._addBoundaryPoint}
-                                    .label=${"Add point"}
+                        <!-- Boundary Points Section -->
+                        <div class="config-section collapsible-section">
+                            <div class="section-header ${this._expandedSections.has('boundary') ? 'expanded' : ''}" 
+                                 @click=${() => this._toggleSection('boundary')}>
+                                <div class="section-title">
+                                    <ha-icon 
+                                        icon="mdi:chevron-right" 
+                                        class="expand-icon ${this._expandedSections.has('boundary') ? 'expanded' : ''}"
+                                    ></ha-icon>
+                                    <ha-icon icon="mdi:vector-polygon"></ha-icon>
+                                    Boundary Points - ${(this.room.boundary || []).length}
+                                </div>
+                                <button
+                                    class="add-button"
+                                    @click=${(e: Event) => { e.stopPropagation(); this._addBoundaryPoint(); }}
                                 >
                                     <ha-icon icon="mdi:plus"></ha-icon>
-                                </ha-icon-button>
+                                    Add Point
+                                </button>
                             </div>
-                            <div class="boundary-points">
-                                ${(this.room.boundary || []).map((point, index) => html`
-                                    <div class="boundary-point">
-                                        <ha-textfield
-                                            label="X"
-                                            type="number"
-                                            .value=${point[0]}
-                                            @input=${(e: Event) => this._boundaryPointChanged(index, 0, e)}
-                                        ></ha-textfield>
-                                        <ha-textfield
-                                            label="Y"
-                                            type="number"
-                                            .value=${point[1]}
-                                            @input=${(e: Event) => this._boundaryPointChanged(index, 1, e)}
-                                        ></ha-textfield>
-                                        <ha-icon-button
-                                            @click=${() => this._removeBoundaryPoint(index)}
-                                        >
-                                            <ha-icon icon="mdi:close"></ha-icon>
-                                        </ha-icon-button>
-                                    </div>
-                                `)}
+                            <div class="section-content ${this._expandedSections.has('boundary') ? 'expanded' : ''}">
+                                <div class="boundary-points">
+                                    ${(this.room.boundary || []).map((point, index) => html`
+                                        <div class="boundary-point">
+                                            <ha-textfield
+                                                label="X"
+                                                type="number"
+                                                .value=${point[0]}
+                                                @input=${(e: Event) => this._boundaryPointChanged(index, 0, e)}
+                                            ></ha-textfield>
+                                            <ha-textfield
+                                                label="Y"
+                                                type="number"
+                                                .value=${point[1]}
+                                                @input=${(e: Event) => this._boundaryPointChanged(index, 1, e)}
+                                            ></ha-textfield>
+                                            <ha-icon-button
+                                                @click=${() => this._removeBoundaryPoint(index)}
+                                            >
+                                                <ha-icon icon="mdi:close"></ha-icon>
+                                            </ha-icon-button>
+                                        </div>
+                                    `)}
+                                </div>
                             </div>
                         </div>
 
-                        <editor-elements-shp
-                            .hass=${this.hass}
-                            .elements=${this.room.entities || []}
-                            @elements-add=${this._handleElementAdd}
-                            @elements-update=${this._handleElementsUpdate}
-                            @elements-remove=${this._handleElementRemove}
-                            @elements-reorder=${this._handleElementsReorder}
-                        ></editor-elements-shp>
+                        <!-- Entities Section -->
+                        <div class="config-section collapsible-section">
+                            <div class="section-header ${this._expandedSections.has('entities') ? 'expanded' : ''}" 
+                                 @click=${() => this._toggleSection('entities')}>
+                                <div class="section-title">
+                                    <ha-icon 
+                                        icon="mdi:chevron-right" 
+                                        class="expand-icon ${this._expandedSections.has('entities') ? 'expanded' : ''}"
+                                    ></ha-icon>
+                                    <ha-icon icon="mdi:puzzle"></ha-icon>
+                                    Entities - ${(this.room.entities || []).length}
+                                </div>
+                                <button
+                                    class="add-button"
+                                    @click=${(e: Event) => { e.stopPropagation(); this._handleElementAdd(); }}
+                                >
+                                    <ha-icon icon="mdi:plus"></ha-icon>
+                                    Add Entity
+                                </button>
+                            </div>
+                            <div class="section-content ${this._expandedSections.has('entities') ? 'expanded' : ''}">
+                                <editor-elements-shp
+                                    .hass=${this.hass}
+                                    .elements=${this.room.entities || []}
+                                    .hideHeader=${true}
+                                    @elements-add=${this._handleElementAdd}
+                                    @elements-update=${this._handleElementsUpdate}
+                                    @elements-remove=${this._handleElementRemove}
+                                    @elements-reorder=${this._handleElementsReorder}
+                                ></editor-elements-shp>
+                            </div>
+                        </div>
                     </div>
                 ` : ''}
             </div>
@@ -139,6 +192,15 @@ export class EditorRoomShp extends LitElement {
 
     private _toggleExpanded() {
         this._expanded = !this._expanded;
+    }
+
+    private _toggleSection(section: string): void {
+        if (this._expandedSections.has(section)) {
+            this._expandedSections.delete(section);
+        } else {
+            this._expandedSections.add(section);
+        }
+        this.requestUpdate();
     }
 
     private _nameChanged(e: Event) {

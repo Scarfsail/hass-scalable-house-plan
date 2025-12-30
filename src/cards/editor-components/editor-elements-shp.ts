@@ -14,6 +14,7 @@ export class EditorElementsShp extends LitElement {
     @property({ attribute: false }) expandedElements: Set<number> = new Set();
     @property({ type: Number }) layerIndex?: number;
     @property({ type: Number }) groupIndex?: number;
+    @property({ type: Boolean }) hideHeader: boolean = false; // Hide header when embedded
 
     private coordinator = CrossContainerCoordinator.getInstance();
 
@@ -29,16 +30,18 @@ export class EditorElementsShp extends LitElement {
     protected render() {
         return html`
             <div class="elements-section">
-                <div class="section-header">
-                    <div class="section-title">
-                        <ha-icon icon="mdi:puzzle"></ha-icon>
-                        Entities (${this.elements.length})
+                ${!this.hideHeader ? html`
+                    <div class="section-header">
+                        <div class="section-title">
+                            <ha-icon icon="mdi:puzzle"></ha-icon>
+                            Entities (${this.elements.length})
+                        </div>
+                        <button class="add-button" @click=${this._addElement}>
+                            <ha-icon icon="mdi:plus"></ha-icon>
+                            Add Entity
+                        </button>
                     </div>
-                    <button class="add-button" @click=${this._addElement}>
-                        <ha-icon icon="mdi:plus"></ha-icon>
-                        Add Entity
-                    </button>
-                </div>
+                ` : ''}
 
                 <ha-sortable 
                     handle-selector=".handle"

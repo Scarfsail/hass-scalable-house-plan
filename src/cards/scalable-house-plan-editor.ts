@@ -11,6 +11,7 @@ import "./editor-components/editor-rooms-shp";
 export class ScalableHousePlanEditor extends LitElement implements LovelaceCardEditor {
     @property({ attribute: false }) public hass!: HomeAssistant;
     @state() private _config!: ScalableHousePlanConfig;
+    @state() private _expandedSections: Set<string> = new Set();
 
     static styles = [
         sharedStyles,
@@ -48,14 +49,19 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         return html`
             <div class="card-config">
                 <!-- Basic Configuration Section -->
-                <div class="config-section">
-                    <div class="section-header">
+                <div class="config-section collapsible-section">
+                    <div class="section-header ${this._expandedSections.has('basic') ? 'expanded' : ''}" @click=${() => this._toggleSection('basic')}>
                         <div class="section-title">
+                            <ha-icon 
+                                icon="mdi:chevron-right" 
+                                class="expand-icon ${this._expandedSections.has('basic') ? 'expanded' : ''}"
+                            ></ha-icon>
                             <ha-icon icon="mdi:cog"></ha-icon>
                             Basic Configuration
                         </div>
                     </div>
-                    <div class="basic-config">
+                    <div class="section-content ${this._expandedSections.has('basic') ? 'expanded' : ''}">
+                        <div class="basic-config">
                         <ha-textfield
                             label="Image URL"
                             .value=${this._config.image || ""}
@@ -95,28 +101,81 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             placeholder="default (leave empty to share state)"
                             helper-text="Unique ID for layer visibility state. Same ID = shared state across cards."
                         ></ha-textfield>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Layers Section (Optional) -->
-                <editor-layers-shp
-                    .hass=${this.hass}
-                    .layers=${this._config.layers || []}
-                    @layer-add=${this._addLayer}
-                    @layer-update=${this._updateLayer}
-                    @layer-remove=${this._removeLayer}
-                ></editor-layers-shp>
+                <div class="config-section collapsible-section">
+                    <div class="section-header ${this._expandedSections.has('layers') ? 'expanded' : ''}" @click=${() => this._toggleSection('layers')}>
+                        <div class="section-title">
+                            <ha-icon 
+                                icon="mdi:chevron-right" 
+                                class="expand-icon ${this._expandedSections.has('layers') ? 'expanded' : ''}"
+                            ></ha-icon>
+                            <ha-icon icon="mdi:layers-outline"></ha-icon>
+                            Layers (Optional) - ${this._config.layers?.length || 0}
+                        </div>
+                        <button
+                            class="add-button"
+                            @click=${(e: Event) => { e.stopPropagation(); this._addLayer(); }}
+                        >
+                            <ha-icon icon="mdi:plus"></ha-icon>
+                            Add Layer
+                        </button>
+                    </div>
+                    <div class="section-content ${this._expandedSections.has('layers') ? 'expanded' : ''}">
+                                <editor-layers-shp
+                            .hass=${this.hass}
+                            .layers=${this._config.layers || []}
+                            @layer-add=${this._addLayer}
+                            @layer-update=${this._updateLayer}
+                            @layer-remove=${this._removeLayer}
+                        ></editor-layers-shp>
+                    </div>
+                </div>
 
                 <!-- Rooms Section -->
-                <editor-rooms-shp
-                    .hass=${this.hass}
-                    .rooms=${this._config.rooms || []}
-                    @room-add=${this._addRoom}
-                    @room-update=${this._updateRoom}
-                    @room-remove=${this._removeRoom}
-                ></editor-rooms-shp>
+                <div class="config-section collapsible-section">
+                    <div class="section-header ${this._expandedSections.has('rooms') ? 'expanded' : ''}" @click=${() => this._toggleSection('rooms')}>
+                        <div class="section-title">
+                            <ha-icon 
+                                icon="mdi:chevron-right" 
+                                class="expand-icon ${this._expandedSections.has('rooms') ? 'expanded' : ''}"
+                            ></ha-icon>
+                            <ha-icon icon="mdi:floor-plan"></ha-icon>
+                            Rooms - ${this._config.rooms?.length || 0}
+                        </div>
+                        <button
+                            class="add-button"
+                            @click=${(e: Event) => { e.stopPropagation(); this._addRoom(); }}
+                        >
+                            <ha-icon icon="mdi:plus"></ha-icon>
+                            Add Room
+                        </button>
+                    </div>
+                    <div class="section-content ${this._expandedSections.has('rooms') ? 'expanded' : ''}">
+                                <editor-rooms-shp
+                            .hass=${this.hass}
+                            .rooms=${this._config.rooms || []}
+                            @room-add=${this._addRoom}
+                            @room-update=${this._updateRoom}
+                            @room-remove=${this._removeRoom}
+                        ></editor-rooms-shp>
+                    </div>
+                </div>
             </div>
         `;
+    }
+
+    // Section toggle handler
+    private _toggleSection(section: string): void {
+        if (this._expandedSections.has(section)) {
+            this._expandedSections.delete(section);
+        } else {
+            this._expandedSections.add(section);
+        }
+        this.requestUpdate();
     }
 
     // Layer handlers

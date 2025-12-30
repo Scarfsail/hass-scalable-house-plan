@@ -27,46 +27,24 @@ export class EditorRoomsShp extends LitElement {
 
     protected render() {
         return html`
-            <div class="config-section">
-                <div class="section-header">
-                    <div class="section-title">
+            <div class="rooms-container">
+                ${this.rooms.map((room, index) => html`
+                    <editor-room-shp
+                        .hass=${this.hass}
+                        .room=${room}
+                        .roomIndex=${index}
+                        @room-update=${this._handleRoomUpdate}
+                        @room-remove=${this._handleRoomRemove}
+                    ></editor-room-shp>
+                `)}
+                ${this.rooms.length === 0 ? html`
+                    <div class="empty-state">
                         <ha-icon icon="mdi:floor-plan"></ha-icon>
-                        Rooms
+                        <div>No rooms configured. Click + to add a room.</div>
                     </div>
-                    <ha-icon-button
-                        class="add-button"
-                        @click=${this._addRoom}
-                    >
-                        <ha-icon icon="mdi:plus"></ha-icon>
-                    </ha-icon-button>
-                </div>
-                <div class="rooms-container">
-                    ${this.rooms.map((room, index) => html`
-                        <editor-room-shp
-                            .hass=${this.hass}
-                            .room=${room}
-                            .roomIndex=${index}
-                            @room-update=${this._handleRoomUpdate}
-                            @room-remove=${this._handleRoomRemove}
-                        ></editor-room-shp>
-                    `)}
-                    ${this.rooms.length === 0 ? html`
-                        <div class="empty-state">
-                            <ha-icon icon="mdi:floor-plan"></ha-icon>
-                            <div>No rooms configured. Click + to add a room.</div>
-                        </div>
-                    ` : ''}
-                </div>
+                ` : ''}
             </div>
         `;
-    }
-
-    private _addRoom() {
-        const event = new CustomEvent('room-add', {
-            bubbles: true,
-            composed: true
-        });
-        this.dispatchEvent(event);
     }
 
     private _handleRoomUpdate(e: CustomEvent) {
