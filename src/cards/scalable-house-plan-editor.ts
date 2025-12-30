@@ -75,6 +75,13 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             @input=${this._imageHeightChanged}
                         ></ha-textfield>
                         <ha-textfield
+                            label="Min Scale"
+                            type="number"
+                            step="0.1"
+                            .value=${this._config.min_scale || 0.5}
+                            @input=${this._minScaleChanged}
+                        ></ha-textfield>
+                        <ha-textfield
                             label="Max Scale"
                             type="number"
                             step="0.1"
@@ -216,6 +223,11 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     private _imageHeightChanged(ev: any): void {
         this._config = { ...this._config, image_height: parseInt(ev.target.value) || 849 };
+        this._configChanged();
+    }
+
+    private _minScaleChanged(ev: any): void {
+        this._config = { ...this._config, min_scale: parseFloat(ev.target.value) || 0.5 };
         this._configChanged();
     }
 
