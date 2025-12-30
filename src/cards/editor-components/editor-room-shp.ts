@@ -47,8 +47,8 @@ export class EditorRoomShp extends LitElement {
             }
 
             .boundary-points {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                display: flex;
+                flex-direction: column;
                 gap: 8px;
                 margin-top: 8px;
             }
@@ -56,6 +56,7 @@ export class EditorRoomShp extends LitElement {
             .boundary-point {
                 display: flex;
                 gap: 4px;
+                align-items: center;
             }
 
             .boundary-point ha-textfield {
