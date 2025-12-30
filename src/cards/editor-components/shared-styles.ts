@@ -166,16 +166,30 @@ export const sharedStyles = css`
         display: flex;
         align-items: center;
         gap: 12px;
+        min-width: 0; /* Allow flex items to shrink below content size */
+    }
+
+    .item-info > div {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        min-width: 0;
     }
 
     .item-icon {
         --mdc-icon-size: 18px;
         color: var(--primary-color);
+        flex-shrink: 0;
     }
 
     .item-name {
         font-weight: 500;
         color: var(--primary-text-color);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
     }
 
     .item-details {
@@ -184,6 +198,7 @@ export const sharedStyles = css`
         gap: 12px;
         font-size: 12px;
         color: var(--secondary-text-color);
+        flex-shrink: 0;
     }
 
     .item-badge {
