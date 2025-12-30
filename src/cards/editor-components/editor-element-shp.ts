@@ -17,13 +17,28 @@ export class EditorElementShp extends LitElement {
             :host {
                 display: block;
             }
+
+            .entity-picker {
+                margin-bottom: 16px;
+            }
+
+            .plan-section {
+                margin-top: 16px;
+            }
+
+            .plan-label {
+                font-weight: 500;
+                margin-bottom: 8px;
+                color: var(--primary-text-color);
+            }
         `
     ];
 
     protected render() {
-        // Extract entity ID and check if it has plan config
+        // Extract entity ID and plan config
         const entityId = typeof this.element === 'string' ? this.element : this.element.entity;
-        const hasPlan = typeof this.element !== 'string' && this.element.plan !== undefined;
+        const planConfig = typeof this.element !== 'string' ? this.element.plan : undefined;
+        const hasPlan = planConfig !== undefined;
         
         return html`
             <div class="item">
@@ -50,31 +65,69 @@ export class EditorElementShp extends LitElement {
                 </div>
                 
                 <div class="item-content ${this.isExpanded ? 'expanded' : ''}">
-                    <!-- YAML Editor for Entity Configuration -->
-                    <ha-yaml-editor
-                        .hass=${this.hass}
-                        .defaultValue=${this.element}
-                        @value-changed=${this._elementChanged}
-                    ></ha-yaml-editor>
+                    <!-- Entity Picker -->
+                    <div class="entity-picker">
+                        <ha-entity-picker
+                            .hass=${this.hass}
+                            .value=${entityId}
+                            .label=${"Entity"}
+                            @value-changed=${this._entityIdChanged}
+                            allow-custom-entity
+                        ></ha-entity-picker>
+                    </div>
+                    <div class="plan-section">
+                        <div class="plan-label">Plan Configuration (optional - for overview display)</div>
+                        <ha-yaml-editor
+                            .hass=${this.hass}
+                            .defaultValue=${planConfig || {}}
+                            @value-changed=${this._planChanged}
+                        ></ha-yaml-editor>
+                    </div>
                 </div>
             </div>
         `;
     }
 
-    private _elementChanged(ev: CustomEvent) {
-        const newElement = ev.detail.value;
-        if (newElement) {
-            // Dispatch the entire element as the update
-            const event = new CustomEvent('element-update', {
-                detail: { 
-                    index: this.index,
-                    element: newElement
-                },
-                bubbles: true,
-                composed: true
-            });
-            this.dispatchEvent(event);
+    private _entityIdChanged(ev: CustomEvent) {
+        const newEntityId = ev.detail.value;
+        if (newEntityId) {
+            // Update entity ID while preserving plan config
+            const updatedElement = typeof this.element === 'string' 
+                ? { entity: newEntityId }
+                : { ...this.element, entity: newEntityId };
+            
+            this._dispatchUpdate(updatedElement);
         }
+    }
+
+    private _planChanged(ev: CustomEvent) {
+        const newPlan = ev.detail.value;
+        const entityId = typeof this.element === 'string' ? this.element : this.element.entity;
+        
+        // If plan is empty object, create entity-only config
+        const isEmpty = newPlan && Object.keys(newPlan).length === 0;
+        const updatedElement = isEmpty 
+            ? { entity: entityId }
+            : { 
+                entity: entityId, 
+                plan: newPlan,
+                // Preserve other properties if they exist
+                ...(typeof this.element !== 'string' ? { element: this.element.element } : {})
+              };
+        
+        this._dispatchUpdate(updatedElement);
+    }
+
+    private _dispatchUpdate(updatedElement: EntityConfig) {
+        const event = new CustomEvent('element-update', {
+            detail: { 
+                index: this.index,
+                element: updatedElement
+            },
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(event);
     }
 
     private _toggleExpansion() {

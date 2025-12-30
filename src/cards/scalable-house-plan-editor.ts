@@ -4,6 +4,7 @@ import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { ScalableHousePlanConfig, Layer, Room } from "./scalable-house-plan";
 import { sharedStyles } from "./editor-components/shared-styles";
+import { loadHaEntityPicker } from "../utils/load-ha-elements";
 import "./editor-components/editor-layers-shp";
 import "./editor-components/editor-rooms-shp";
 
@@ -12,6 +13,12 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     @property({ attribute: false }) public hass!: HomeAssistant;
     @state() private _config!: ScalableHousePlanConfig;
     @state() private _expandedSections: Set<string> = new Set();
+
+    async connectedCallback() {
+        super.connectedCallback();
+        // Load ha-entity-picker once for all element editors
+        await loadHaEntityPicker();
+    }
 
     static styles = [
         sharedStyles,
