@@ -1,39 +1,23 @@
 import { LitElement, html, css } from "lit-element";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { Layer } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
+import "./editor-layer-shp";
 
 @customElement("editor-layers-shp")
 export class EditorLayersShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
-    @property({ type: Array }) layers: Layer[] = [];
+    @property({ attribute: false }) layers: Layer[] = [];
+    @state() private _expandedLayers: Set<number> = new Set();
 
     static styles = [
         sharedStyles,
         css`
-            .layer-item {
+            .layers-container {
                 display: flex;
-                align-items: center;
+                flex-direction: column;
                 gap: 12px;
-                padding: 12px;
-                background: var(--secondary-background-color);
-                border-radius: 8px;
-                margin-bottom: 8px;
-            }
-
-            .layer-item:hover {
-                background: var(--divider-color);
-            }
-
-            .layer-id {
-                font-family: monospace;
-                color: var(--secondary-text-color);
-                font-size: 12px;
-            }
-
-            .layer-name {
-                flex: 1;
             }
         `
     ];
@@ -54,8 +38,19 @@ export class EditorLayersShp extends LitElement {
                     </ha-icon-button>
                 </div>
 
-                ${this.layers.length === 0 
-                    ? html`
+                <div class="layers-container">
+                    ${this.layers.map((layer, index) => html`
+                        <editor-layer-shp
+                            .hass=${this.hass}
+                            .layer=${layer}
+                            .index=${index}
+                            .isExpanded=${this._expandedLayers.has(index)}
+                            @layer-toggle=${this._handleLayerToggle}
+                            @layer-update=${this._handleLayerUpdate}
+                            @layer-remove=${this._handleLayerRemove}
+                        ></editor-layer-shp>
+                    `)}
+                    ${this.layers.length === 0 ? html`
                         <div class="empty-state">
                             <ha-icon icon="mdi:layers-off-outline"></ha-icon>
                             <div>No layers defined. Layers are optional.</div>
@@ -63,31 +58,8 @@ export class EditorLayersShp extends LitElement {
                                 Elements can reference layers by ID for visibility control.
                             </div>
                         </div>
-                    `
-                    : html`
-                        <div class="layers-list">
-                            ${this.layers.map((layer, index) => html`
-                                <div class="layer-item">
-                                    <ha-icon icon=${layer.icon || "mdi:layers"}></ha-icon>
-                                    <div style="flex: 1;">
-                                        <div class="layer-name">${layer.name}</div>
-                                        <div class="layer-id">ID: ${layer.id}</div>
-                                    </div>
-                                    <ha-icon-button
-                                        @click=${() => this._editLayer(index)}
-                                    >
-                                        <ha-icon icon="mdi:pencil"></ha-icon>
-                                    </ha-icon-button>
-                                    <ha-icon-button
-                                        @click=${() => this._removeLayer(index)}
-                                    >
-                                        <ha-icon icon="mdi:delete"></ha-icon>
-                                    </ha-icon-button>
-                                </div>
-                            `)}
-                        </div>
-                    `
-                }
+                    ` : ''}
+                </div>
             </div>
         `;
     }
@@ -100,12 +72,30 @@ export class EditorLayersShp extends LitElement {
         this.dispatchEvent(event);
     }
 
-    private _editLayer(index: number) {
-        // For now, just log - will implement full editor in later phase
-        console.log('Edit layer', index, this.layers[index]);
+    private _handleLayerToggle(e: CustomEvent) {
+        const { index } = e.detail;
+        if (this._expandedLayers.has(index)) {
+            this._expandedLayers.delete(index);
+        } else {
+            this._expandedLayers.add(index);
+        }
+        this.requestUpdate();
     }
 
-    private _removeLayer(index: number) {
+    private _handleLayerUpdate(e: CustomEvent) {
+        const { index, property, value } = e.detail;
+        const updatedLayer = { ...this.layers[index], [property]: value };
+        
+        const event = new CustomEvent('layer-update', {
+            detail: { layerIndex: index, layer: updatedLayer },
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(event);
+    }
+
+    private _handleLayerRemove(e: CustomEvent) {
+        const { index } = e.detail;
         const event = new CustomEvent('layer-remove', {
             detail: { layerIndex: index },
             bubbles: true,
