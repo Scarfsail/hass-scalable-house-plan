@@ -1,5 +1,4 @@
 import { LitElement, html } from "lit-element"
-import { CreateCardElement, getCreateCardElement } from "../utils"
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
@@ -86,7 +85,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     private config?: ScalableHousePlanConfig;
 
-    @state() private _createCardElement: CreateCardElement = null;
     @state() private _selectedRoomIndex: number | null = null;
 
     @property({ attribute: false }) hass?: HomeAssistant;
@@ -110,13 +108,12 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         this.resizeObserver = new ResizeObserver(this.onResize.bind(this));
     }
 
-    async setConfig(config: ScalableHousePlanConfig) {
+    setConfig(config: ScalableHousePlanConfig) {
         this.config = {
             ...config,
             layers: config.layers || [],
             rooms: config.rooms || [],
         };
-        this._createCardElement = await getCreateCardElement();
     }
 
     public getLayoutOptions() {
@@ -150,7 +147,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             <scalable-house-plan-plan
                 .hass=${this.hass}
                 .config=${this.config}
-                .createCardElement=${this._createCardElement}
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
             ></scalable-house-plan-plan>
         `;

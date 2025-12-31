@@ -3,7 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard } from "../../hass-frontend/src/panels/lovelace/types";
 import type { Room, ScalableHousePlanConfig, EntityConfig } from "./scalable-house-plan";
-import { CreateCardElement, getElementTypeForEntity, mergeElementProperties } from "../utils";
+import { CreateCardElement, getCreateCardElement, getElementTypeForEntity, mergeElementProperties } from "../utils";
 import { LayerStateManager } from "../utils/layer-state-storage";
 
 interface PictureElement {
@@ -29,9 +29,9 @@ interface PictureElement {
 export class ScalableHousePlanPlan extends LitElement {
     @property({ attribute: false }) public hass?: HomeAssistant;
     @property({ attribute: false }) public config?: ScalableHousePlanConfig;
-    @property({ attribute: false }) public createCardElement?: CreateCardElement;
     @property({ attribute: false }) public onRoomClick?: (room: Room, index: number) => void;
 
+    @state() private _createCardElement: CreateCardElement = null;
     @state() private _layerVisibility: Map<string, boolean> = new Map();
     private layerStateManager?: LayerStateManager;
     private card?: LovelaceCard;
@@ -46,8 +46,9 @@ export class ScalableHousePlanPlan extends LitElement {
         `;
     }
 
-    connectedCallback() {
+    async connectedCallback() {
         super.connectedCallback();
+        this._createCardElement = await getCreateCardElement();
         this._initializeLayerState();
     }
 
@@ -253,7 +254,7 @@ export class ScalableHousePlanPlan extends LitElement {
             style: config.style
         };
 
-        return this.createCardElement?.(cardConfig);
+        return this._createCardElement?.(cardConfig);
     }
 
     private _getRoomOffset(room: Room): { x: number; y: number } {
