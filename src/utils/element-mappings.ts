@@ -41,10 +41,14 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
         detail_element: { type: 'tile' }
     },
     'binary_sensor.motion': {
-        plan_element: { type: 'custom:motion-sensor-shp', radius: 15 },
+        plan_element: { type: 'custom:motion-sensor-shp' },
         detail_element: { type: 'tile' }
     },
-    
+    'binary_sensor.occupancy': {
+        plan_element: { type: 'custom:motion-sensor-shp' },
+        detail_element: { type: 'tile' }
+    },
+
     // Sensors - Specific device classes
     'sensor.battery': {
         plan_element: { type: 'custom:analog-shp', size: 20 },
@@ -66,7 +70,7 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
         plan_element: { type: 'custom:analog-shp', size: 20 },
         detail_element: { type: 'tile' }
     },
-    
+
     // Domain-level defaults
     'light': {
         plan_element: { type: 'custom:state-icon-trigger-shp', size: 24 },
@@ -104,7 +108,7 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
         plan_element: { type: 'custom:analog-shp', size: 20 },
         detail_element: { type: 'tile' }
     },
-    
+
     // Wildcard fallback for any unrecognized entity
     '*': {
         plan_element: { type: 'custom:state-icon-trigger-shp', size: 20 },
@@ -120,29 +124,29 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
  * @returns Element definition with type and default properties
  */
 export function getElementTypeForEntity(
-    entityId: string, 
-    deviceClass: string | undefined, 
+    entityId: string,
+    deviceClass: string | undefined,
     context: 'plan' | 'detail' = 'plan'
 ): ElementDefinition {
     const domain = entityId.split('.')[0];
     let mapping: ElementMapping | undefined;
-    
+
     // Try domain.device_class first (most specific)
     if (deviceClass) {
         const key = `${domain}.${deviceClass}`;
         mapping = DEFAULT_ELEMENT_MAPPINGS[key];
     }
-    
+
     // Fall back to domain
     if (!mapping) {
         mapping = DEFAULT_ELEMENT_MAPPINGS[domain];
     }
-    
+
     // Fall back to wildcard
     if (!mapping) {
         mapping = DEFAULT_ELEMENT_MAPPINGS['*'];
     }
-    
+
     const elementDef = context === 'plan' ? mapping?.plan_element : mapping?.detail_element;
     return elementDef || { type: 'custom:state-icon-trigger-shp', size: 20 };
 }
@@ -158,14 +162,14 @@ export function getElementTypeForEntity(
  * - Otherwise, merge defaults with overrides (overrides win)
  */
 export function mergeElementProperties(
-    defaults: ElementDefinition, 
+    defaults: ElementDefinition,
     overrides?: any
 ): any {
     // If explicit type is specified, don't merge - use overrides as-is
     if (overrides?.type) {
         return overrides;
     }
-    
+
     // Merge: defaults + overrides (overrides win)
     return {
         ...defaults,
