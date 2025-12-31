@@ -7,7 +7,7 @@ import type { EntityConfig } from "../scalable-house-plan";
 @customElement("editor-element-shp")
 export class EditorElementShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
-    @property({ type: Object }) element!: EntityConfig;
+    @property({ type: Object }) entity!: EntityConfig;
     @property({ type: Number }) index!: number;
     @property({ type: Boolean }) isExpanded: boolean = false;
 
@@ -36,8 +36,8 @@ export class EditorElementShp extends LitElement {
 
     protected render() {
         // Extract entity ID and plan config
-        const entityId = typeof this.element === 'string' ? this.element : this.element.entity;
-        const planConfig = typeof this.element !== 'string' ? this.element.plan : undefined;
+        const entityId = typeof this.entity === 'string' ? this.entity : this.entity.entity;
+        const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
         const hasPlan = planConfig !== undefined;
         
         return html`
@@ -92,30 +92,25 @@ export class EditorElementShp extends LitElement {
         const newEntityId = ev.detail.value;
         if (newEntityId) {
             // Update entity ID while preserving plan config
-            const updatedElement = typeof this.element === 'string' 
+            const updatedEntity = typeof this.entity === 'string' 
                 ? { entity: newEntityId }
-                : { ...this.element, entity: newEntityId };
+                : { ...this.entity, entity: newEntityId };
             
-            this._dispatchUpdate(updatedElement);
+            this._dispatchUpdate(updatedEntity);
         }
     }
 
     private _planChanged(ev: CustomEvent) {
         const newPlan = ev.detail.value;
-        const entityId = typeof this.element === 'string' ? this.element : this.element.entity;
+        const entityId = typeof this.entity === 'string' ? this.entity : this.entity.entity;
         
         // If plan is empty object, create entity-only config
         const isEmpty = newPlan && Object.keys(newPlan).length === 0;
-        const updatedElement = isEmpty 
+        const updatedEntity = isEmpty 
             ? { entity: entityId }
-            : { 
-                entity: entityId, 
-                plan: newPlan,
-                // Preserve other properties if they exist
-                ...(typeof this.element !== 'string' ? { element: this.element.element } : {})
-              };
+            : { entity: entityId, plan: newPlan };
         
-        this._dispatchUpdate(updatedElement);
+        this._dispatchUpdate(updatedEntity);
     }
 
     private _dispatchUpdate(updatedElement: EntityConfig) {

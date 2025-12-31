@@ -59,7 +59,7 @@ export class EditorElementsShp extends LitElement {
                                 <editor-element-shp
                                     class="element-item"
                                     .hass=${this.hass}
-                                    .element=${element}
+                                    .entity=${element}
                                     .index=${index}
                                     .isExpanded=${this.expandedElements.has(index)}
                                     @element-toggle=${this._handleElementToggle}

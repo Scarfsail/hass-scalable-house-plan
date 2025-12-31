@@ -239,7 +239,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                 [300, 200],
                 [100, 200]
             ],
-            elements: []
+            entities: []
         };
 
         this._config = {
