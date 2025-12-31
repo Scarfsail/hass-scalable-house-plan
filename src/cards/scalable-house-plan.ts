@@ -4,7 +4,6 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { LovelaceCardConfig } from "../../hass-frontend/src/data/lovelace/config/card";
-import { LayerStateManager } from "../utils/layer-state-storage";
 import "./scalable-house-plan-plan";
 import "./scalable-house-plan-detail";
 
@@ -86,10 +85,8 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     private resizeObserver: ResizeObserver;
 
     private config?: ScalableHousePlanConfig;
-    private layerStateManager?: LayerStateManager;
 
     @state() private _createCardElement: CreateCardElement = null;
-    @state() private _layerVisibility: Map<string, boolean> = new Map();
     @state() private _selectedRoomIndex: number | null = null;
 
     @property({ attribute: false }) hass?: HomeAssistant;
@@ -120,32 +117,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             rooms: config.rooms || [],
         };
         this._createCardElement = await getCreateCardElement();
-        
-        // Initialize layer state manager with persistence ID
-        const persistenceId = LayerStateManager.generatePersistenceId(config);
-        this.layerStateManager = new LayerStateManager(persistenceId);
-        
-        // Initialize layer visibility state with persistence
-        this._initializeLayerVisibility();
-    }
-
-    private _initializeLayerVisibility() {
-        this._layerVisibility.clear();
-        
-        // Load persisted layer state from localStorage
-        const persistedState = this.layerStateManager?.loadLayerState() || {};
-        
-        this.config?.layers?.forEach((layer) => {
-            // Use persisted state if available, otherwise fall back to layer config default
-            const visibility = persistedState.hasOwnProperty(layer.id) 
-                ? persistedState[layer.id] 
-                : LayerStateManager.getDefaultVisibility(layer);
-            
-            this._layerVisibility.set(layer.id, visibility);
-            
-            // Set CSS variable immediately for proper initial display
-            this.style.setProperty(`--layer-${layer.id}-display`, visibility ? 'block' : 'none');
-        });
     }
 
     public getLayoutOptions() {
@@ -180,7 +151,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 .hass=${this.hass}
                 .config=${this.config}
                 .createCardElement=${this._createCardElement}
-                .layerVisibility=${this._layerVisibility}
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
             ></scalable-house-plan-plan>
         `;
@@ -229,9 +199,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         if (element)
             this.resizeObserver.observe(element);
 
-        // Listen for layer visibility change events
-        this.addEventListener('layer-visibility-changed', this._handleLayerVisibilityChange as EventListener);
-        
         // Listen for browser back button
         window.addEventListener('popstate', this._handlePopState);
     }
@@ -240,52 +207,8 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         this.resizeObserver.disconnect();
         super.disconnectedCallback();
 
-        // Remove layer visibility change event listener
-        this.removeEventListener('layer-visibility-changed', this._handleLayerVisibilityChange as EventListener);
-        
         // Remove popstate listener
         window.removeEventListener('popstate', this._handlePopState);
-    }
-
-    private _handleLayerVisibilityChange(event: Event) {
-        const customEvent = event as CustomEvent;
-        const { layerId, visible } = customEvent.detail;
-        this.toggleLayerVisibility(layerId, visible);
-    }
-
-    public toggleLayerVisibility(layerId: string, visible?: boolean) {
-        const currentVisibility = this._layerVisibility.get(layerId) ?? true;
-        const newVisibility = visible !== undefined ? visible : !currentVisibility;
-        
-        this._layerVisibility.set(layerId, newVisibility);
-        
-        // Persist the change to localStorage
-        this.layerStateManager?.updateLayerVisibility(layerId, newVisibility);
-        
-        // Update CSS variable immediately for smooth visibility toggle
-        this.style.setProperty(`--layer-${layerId}-display`, newVisibility ? 'block' : 'none');
-        
-        // Dispatch event to notify other components
-        const event = new CustomEvent('layer-visibility-updated', {
-            detail: { layerId, visible: newVisibility },
-            bubbles: true,
-            composed: true
-        });
-        this.dispatchEvent(event);
-    }
-
-    public getLayerVisibility(layerId: string): boolean {
-        return this._layerVisibility.get(layerId) ?? true;
-    }
-
-    /**
-     * Clear persisted layer state and reset to defaults
-     * Useful for debugging or reset functionality
-     */
-    public resetLayerState() {
-        this.layerStateManager?.clearLayerState();
-        this._initializeLayerVisibility();
-        this.requestUpdate();
     }
 
     onResize() {
