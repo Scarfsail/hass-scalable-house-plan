@@ -21,6 +21,7 @@ interface PictureElement {
     [key: string]: any;
 }
 
+
 /**
  * Plan view component
  * Displays the house plan with rooms overlay and positioned elements
