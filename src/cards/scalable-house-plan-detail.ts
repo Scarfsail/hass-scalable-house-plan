@@ -1,8 +1,8 @@
 import { LitElement, html, css } from "lit-element";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig } from "./scalable-house-plan";
-import { getElementTypeForEntity, mergeElementProperties } from "../utils";
+import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities } from "../utils";
 
 /**
  * Room detail view component
@@ -16,14 +16,31 @@ export class ScalableHousePlanDetail extends LitElement {
 
     // Cache for card elements (key: entity_id, value: card element)
     private _cardElements: Map<string, any> = new Map();
+    
+    // Cache for area entities (fetched once per room change)
+    @state() private _areaEntityIds: string[] = [];
 
     updated(changedProperties: Map<string, any>) {
         super.updated(changedProperties);
         
-        // Clear cache when room changes
+        // Clear cache and fetch area entities when room changes
         if (changedProperties.has('room')) {
             this._cardElements.clear();
+            this._fetchAreaEntities();
         }
+    }
+
+    /**
+     * Fetch area entities once when room changes
+     * Cached in _areaEntityIds state property
+     */
+    private _fetchAreaEntities() {
+        if (!this.room || !this.hass || !this.room.area) {
+            this._areaEntityIds = [];
+            return;
+        }
+        
+        this._areaEntityIds = getAreaEntities(this.hass, this.room.area);
     }
 
     static get styles() {
@@ -105,7 +122,7 @@ export class ScalableHousePlanDetail extends LitElement {
                 >
                     <ha-icon icon="mdi:arrow-left"></ha-icon>
                 </ha-icon-button>
-                <h1 class="room-name">${this.room.name}</h1>
+                <h1 class="room-name">${getRoomName(this.hass, this.room)}</h1>
             </div>
 
             <div class="cards-container">
@@ -117,7 +134,22 @@ export class ScalableHousePlanDetail extends LitElement {
     private _renderEntityCards() {
         if (!this.room || !this.hass) return html``;
 
-        const cards = this.room.entities.map((entityConfig, index) => {
+        // Get explicitly configured entity IDs for deduplication
+        const explicitEntityIds = new Set(
+            this.room.entities.map(cfg => 
+                typeof cfg === 'string' ? cfg : cfg.entity
+            )
+        );
+
+        // Combine explicit entities and area entities (deduplicated)
+        const areaEntityConfigs: EntityConfig[] = this._areaEntityIds
+            .filter(entityId => !explicitEntityIds.has(entityId)) // Deduplicate
+            //.filter(entityId => this.hass!.states[entityId]); // Only include existing entities
+
+        const allEntityConfigs: EntityConfig[] = [...this.room.entities, ...areaEntityConfigs];
+
+        // Unified rendering logic for all entities
+        return allEntityConfigs.map((entityConfig) => {
             const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
             const plan = typeof entityConfig === 'string' ? undefined : entityConfig.plan;
             
@@ -135,15 +167,12 @@ export class ScalableHousePlanDetail extends LitElement {
             
             // Create card element
             const cardConfig = {
-                type: elementConfig.type,
                 entity: entityId,
                 ...elementConfig
             };
 
             return this._getOrCreateCard(entityId, cardConfig);
         });
-
-        return cards;
     }
 
     private _getOrCreateCard(entityId: string, config: any) {

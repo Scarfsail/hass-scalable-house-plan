@@ -3,7 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard } from "../../hass-frontend/src/panels/lovelace/types";
 import type { Room, ScalableHousePlanConfig, EntityConfig } from "./scalable-house-plan";
-import { CreateCardElement, getCreateCardElement, getElementTypeForEntity, mergeElementProperties } from "../utils";
+import { CreateCardElement, getCreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomName } from "../utils";
 import { LayerStateManager } from "../utils/layer-state-storage";
 
 interface PictureElement {
@@ -357,7 +357,7 @@ export class ScalableHousePlanPlan extends LitElement {
 
     private _handleRoomClick(room: Room, index: number, event: Event) {
         event.stopPropagation();
-        console.log('Room clicked:', room.name, index);
+        console.log('Room clicked:', getRoomName(this.hass!, room), index);
         
         if (this.onRoomClick) {
             this.onRoomClick(room, index);

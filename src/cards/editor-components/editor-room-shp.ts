@@ -62,6 +62,21 @@ export class EditorRoomShp extends LitElement {
             .boundary-point ha-textfield {
                 flex: 1;
             }
+
+            .info-text {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 12px;
+                background: var(--primary-background-color);
+                border-radius: 4px;
+                color: var(--secondary-text-color);
+                font-size: 14px;
+            }
+
+            .info-text ha-icon {
+                --mdc-icon-size: 18px;
+            }
         `
     ];
 
@@ -97,12 +112,30 @@ export class EditorRoomShp extends LitElement {
                             </div>
                             <div class="section-content ${this._expandedSections.has('basic') ? 'expanded' : ''}">
                                 <div class="room-field">
-                                    <ha-textfield
-                                        label="Room Name"
-                                        .value=${this.room.name || ""}
-                                        @input=${this._nameChanged}
-                                    ></ha-textfield>
+                                    <ha-area-picker
+                                        .hass=${this.hass}
+                                        .value=${this.room.area || ""}
+                                        .label=${"Home Assistant Area (optional)"}
+                                        @value-changed=${this._areaChanged}
+                                        allow-custom-entity
+                                    ></ha-area-picker>
                                 </div>
+                                ${!this.room.area ? html`
+                                    <div class="room-field">
+                                        <ha-textfield
+                                            label="Room Name"
+                                            .value=${this.room.name || ""}
+                                            @input=${this._nameChanged}
+                                        ></ha-textfield>
+                                    </div>
+                                ` : html`
+                                    <div class="room-field">
+                                        <div class="info-text">
+                                            <ha-icon icon="mdi:information-outline"></ha-icon>
+                                            Room name will use area name: <strong>${this.hass.areas?.[this.room.area]?.name || this.room.area}</strong>
+                                        </div>
+                                    </div>
+                                `}
                             </div>
                         </div>
 
@@ -209,6 +242,11 @@ export class EditorRoomShp extends LitElement {
         this._dispatchUpdate({ ...this.room, name: target.value });
     }
 
+    private _areaChanged(e: CustomEvent) {
+        const area = e.detail.value || undefined;
+        this._dispatchUpdate({ ...this.room, area });
+    }
+
     private _addBoundaryPoint() {
         const boundary = [...(this.room.boundary || []), [0, 0] as [number, number]];
         this._dispatchUpdate({ ...this.room, boundary });
@@ -229,7 +267,7 @@ export class EditorRoomShp extends LitElement {
         this._dispatchUpdate({ ...this.room, boundary });
     }
 
-    private _handleElementAdd(e: CustomEvent) {
+    private _handleElementAdd(e?: CustomEvent) {
         // Add a new entity to the room
         const newEntity: string = "";  // Start with empty string (entity_id)
         const entities = [...(this.room.entities || []), newEntity];

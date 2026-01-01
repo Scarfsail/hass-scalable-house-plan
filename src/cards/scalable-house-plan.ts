@@ -16,6 +16,7 @@ export interface Layer {
 
 export interface Room {
     name: string;
+    area?: string;  // Optional Home Assistant area ID
     boundary: [number, number][];
     entities: EntityConfig[];
     color?: string;  // Optional color for room background (supports rgba)
