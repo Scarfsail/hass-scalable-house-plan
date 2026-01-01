@@ -42,6 +42,7 @@ export class ScalableHousePlanPlan extends LitElement {
             :host {
                 display: block;
                 position: relative;
+                height: 100%;
             }
         `;
     }

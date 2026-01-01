@@ -1,4 +1,4 @@
-import { LitElement, html } from "lit-element"
+import { LitElement, html, css } from "lit-element"
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
@@ -88,6 +88,20 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     @state() private _selectedRoomIndex: number | null = null;
 
     @property({ attribute: false }) hass?: HomeAssistant;
+
+    static get styles() {
+        return css`
+            :host {
+                display: block;
+                height: 100%;
+            }
+            scalable-house-plan-plan,
+            scalable-house-plan-detail {
+                display: block;
+                height: 100%;
+            }
+        `;
+    }
 
     getCardSize() {
         return this.config?.card_size ?? 1;
