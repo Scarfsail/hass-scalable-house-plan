@@ -195,15 +195,28 @@ layers:
 
 **Entity-Based Structure:**
 - Rooms contain entities (not elements directly)
-- Each entity can have an optional `plan` section for overview display
-- Entities without `plan` appear only in room detail view
-- String shorthand supported for detail-only entities
+- Each entity can have an optional `plan` section for positioned display
+- Entities without `plan` appear only in entities list view
+- String shorthand supported for entities-only entities
+
+**Three-View Navigation:**
+1. **Overview** - Shows the full house plan with all rooms and positioned elements
+   - Displays entities with `plan` section and `overview: true` (default)
+   - Click a room to open Detail view
+2. **Detail** - Shows the selected room's SVG shape with positioned elements
+   - Displays all entities with `plan` section (both overview: true and false)
+   - Shows room shape with same background color as overview
+   - Click three-dots menu (⋮) to open Entities list
+3. **Entities** - Shows all room entities as standard HA cards
+   - Organized by category (lights, sensors, climate, etc.)
+   - Shows all entities in the room (with or without plan configuration)
+   - Click back to return to Detail view
 
 **Default Element Type Mapping:**
 - Element types are automatically selected based on entity domain and device_class
 - Example: `binary_sensor.door` → `door-window-shp` with default properties
 - Property merging: user properties override defaults (unless explicit `type` is specified)
-- Detail view uses separate element types (most default to `tile`)
+- Detail and entities views use separate element types (most default to `tile`)
 
 **Room-Relative Positioning:**
 - Element positions in `plan.left/top` are relative to room's top-left corner
@@ -819,14 +832,14 @@ rooms:
           left: 250
           top: 150
       
-      # Hidden sensor (positioned but not shown on plan)
+      # Hidden on overview (positioned but only shown on detail)
       - entity: sensor.bedroom_temperature
         plan:
-          show: false
+          overview: false
           left: 0
           top: 0
       
-      # Detail-only
+      # Entities list only
       - light.bedroom_ceiling
       - light.bedroom_nightstand_left
       - light.bedroom_nightstand_right

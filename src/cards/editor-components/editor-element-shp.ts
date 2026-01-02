@@ -54,7 +54,7 @@ export class EditorElementShp extends LitElement {
                         <div>
                             <div class="item-name">${entityId || 'New Entity'}</div>
                             <div class="item-details">
-                                ${hasPlan ? html`<span class="item-badge">On Plan</span>` : html`<span class="item-badge">Detail Only</span>`}
+                                ${hasPlan ? html`<span class="item-badge">On Overview</span>` : html`<span class="item-badge">Entities Only</span>`}
                             </div>
                         </div>
                     </div>
@@ -78,7 +78,7 @@ export class EditorElementShp extends LitElement {
                         ></ha-entity-picker>
                     </div>
                     <div class="plan-section">
-                        <div class="plan-label">Plan Configuration (optional - for overview display)</div>
+                        <div class="plan-label">Plan Configuration (optional - for positioned display)</div>
                         <ha-yaml-editor
                             .hass=${this.hass}
                             .defaultValue=${planConfig || {}}

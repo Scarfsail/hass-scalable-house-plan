@@ -108,6 +108,12 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             placeholder="default (leave empty to share state)"
                             helper-text="Unique ID for layer visibility state. Same ID = shared state across cards."
                         ></ha-textfield>
+                        <ha-formfield label="Show Room Backgrounds">
+                            <ha-switch
+                                .checked=${this._config.show_room_backgrounds || false}
+                                @change=${this._showRoomBackgroundsChanged}
+                            ></ha-switch>
+                        </ha-formfield>
                         </div>
                     </div>
                 </div>
@@ -310,6 +316,11 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         } else {
             this._config = { ...this._config, layers_visibility_persistence_id: value };
         }
+        this._configChanged();
+    }
+
+    private _showRoomBackgroundsChanged(ev: any): void {
+        this._config = { ...this._config, show_room_backgrounds: ev.target.checked };
         this._configChanged();
     }
 

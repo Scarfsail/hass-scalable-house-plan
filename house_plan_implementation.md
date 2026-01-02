@@ -54,7 +54,7 @@ elements:
       top: 50
       width: 30        # Optional dimensions
       height: 30
-      show: true       # Optional, default true
+      overview: true   # Optional, default true - show on overview
       layer_id: "lights"  # Optional layer assignment
       style: {}        # Optional plan-specific styling
     element:           # Required - element configuration
@@ -69,24 +69,24 @@ elements:
 ```
 
 **Key principles:**
-- `plan` section is optional - if missing, element only appears in room detail view
-- `plan` contains: all positioning (left/top/width/height/right/bottom), show flag, layer_id, style
+- `plan` section is optional - if missing, element only appears in entities list view
+- `plan` contains: all positioning (left/top/width/height/right/bottom), overview flag, layer_id, style
 - `element` contains: type, entity, actions, and all element-specific configuration
-- Actions (tap_action, hold_action) only work in detail view
-- Clicking elements on plan opens room detail view
-- All elements in a room appear in detail view by default
+- Actions (tap_action, hold_action) work in all views
+- Clicking elements on overview opens room detail view (SVG)
+- All elements appear in appropriate views based on plan configuration
 
 ### 5. Room Default Elements
 - Each element has a new structure: `plan` (optional) + `element` (required)
-- Elements without `plan` section appear only in room detail view
-- Elements with `plan` section appear on overview (if show: true)
-- Simplifies creating detail-only controls (AC, advanced settings, etc.)
+- Elements without `plan` section appear only in entities list view
+- Elements with `plan` section appear on overview and detail (if overview: true)
+- Simplifies creating entities-only controls (AC, advanced settings, etc.)
 
 ### 7. Overview Display Control (Integrated with Element Structure)
-- Element visibility on plan controlled by presence of `plan` section
-- `plan.show` flag allows temporary hiding while preserving coordinates
-- No separate `show_in_overview` property needed - structural approach is clearer
-- Detail view always shows all room elements regardless of plan visibility
+- Element visibility on overview controlled by presence of `plan` section
+- `plan.overview` flag allows control of overview visibility while preserving coordinates
+- Detail view shows all elements with plan configuration
+- Entities list view shows all elements in the room
 
 ### 7. Room Detail Navigation
 - **Interaction**: Clicking room polygon or any element on plan opens room detail view
@@ -283,7 +283,7 @@ Users of the old `picture-elements-scalable` card will need to:
 6. ✅ Phase 6: Room Detail View - COMPLETE (Dec 29, 2025)
    - Created three-component architecture: orchestrator + plan + detail
    - Implemented detail view component (scalable-house-plan-detail.ts) with responsive grid
-   - Created plan view component (scalable-house-plan-plan.ts) with room rendering
+   - Created overview component (scalable-house-plan-overview.ts) with room rendering
    - Refactored main component as routing orchestrator
    - Browser history API integration with back button support
    - Edit mode detection via URL parameter (?edit=1) to avoid conflicts

@@ -1,33 +1,17 @@
 import { LitElement, html, svg, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { LovelaceCard } from "../../hass-frontend/src/panels/lovelace/types";
 import type { Room, ScalableHousePlanConfig, EntityConfig } from "./scalable-house-plan";
-import { CreateCardElement, getCreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomName } from "../utils";
+import { CreateCardElement, getCreateCardElement, getRoomName } from "../utils";
 import { LayerStateManager } from "../utils/layer-state-storage";
-
-interface PictureElement {
-    type: string;
-    style: any;
-    entity?: string;
-    tap_action?: any;
-    layer_id?: string;
-    left?: string | number;
-    right?: string | number;
-    top?: string | number;
-    bottom?: string | number;
-    width?: string | number;
-    height?: string | number;
-    [key: string]: any;
-}
-
+import { renderElements, getRoomBounds } from "../components/element-renderer-shp";
 
 /**
- * Plan view component
+ * Overview view component
  * Displays the house plan with rooms overlay and positioned elements
  */
-@customElement("scalable-house-plan-plan")
-export class ScalableHousePlanPlan extends LitElement {
+@customElement("scalable-house-plan-overview")
+export class ScalableHousePlanOverview extends LitElement {
     @property({ attribute: false }) public hass?: HomeAssistant;
     @property({ attribute: false }) public config?: ScalableHousePlanConfig;
     @property({ attribute: false }) public onRoomClick?: (room: Room, index: number) => void;
@@ -35,7 +19,8 @@ export class ScalableHousePlanPlan extends LitElement {
     @state() private _createCardElement: CreateCardElement = null;
     @state() private _layerVisibility: Map<string, boolean> = new Map();
     private layerStateManager?: LayerStateManager;
-    private card?: LovelaceCard;
+    // Cache for element cards across all rooms (key: entity_id, value: card element)
+    private _elementCards: Map<string, any> = new Map();
     private previousViewport = { width: 0, height: 0 };
 
     static get styles() {
@@ -44,6 +29,20 @@ export class ScalableHousePlanPlan extends LitElement {
                 display: block;
                 position: relative;
                 height: 100%;
+            }
+
+            .elements-container {
+                position: absolute;
+                top: 0;
+                left: 0;
+                pointer-events: none;
+                width: 100%;
+                height: 100%;
+            }
+
+            .element-wrapper {
+                position: absolute;
+                pointer-events: auto;
             }
         `;
     }
@@ -114,6 +113,10 @@ export class ScalableHousePlanPlan extends LitElement {
             return html`<div>Config is not defined</div>`;
         }
 
+        if (!this.config.image || !this.config.image_width || !this.config.image_height) {
+            return html`<div style="padding: 16px; text-align: center;">Please configure the image URL, width, and height in the card settings.</div>`;
+        }
+
         const clientRect = this.getBoundingClientRect();
         const contentHeight = this.config.image_height;
         const contentWidth = this.config.image_width;
@@ -138,6 +141,12 @@ export class ScalableHousePlanPlan extends LitElement {
             visibleWidth = Math.max(0, Math.min(viewportWidth, clientRect.right) - Math.max(0, clientRect.left));
         }
 
+        // Use fallback dimensions if not visible (e.g., in editor preview)
+        if (visibleHeight === 0 || visibleWidth === 0) {
+            visibleHeight = fitIntoHeight || 400;
+            visibleWidth = fitIntoWidth || 600;
+        }
+
         const scale = this.getScale(fitIntoHeight, fitIntoWidth, contentWidth, contentHeight);
         if (this.config.max_scale) {
             scale.scaleX = Math.min(scale.scaleX, this.config.max_scale);
@@ -156,187 +165,77 @@ export class ScalableHousePlanPlan extends LitElement {
             this.style.setProperty(`--layer-${layer.id}-display`, isVisible ? 'block' : 'none');
         });
 
-        this.card = this.card || this.createPictureCardElement(this.config);
-
-        if (this.card) {
-            this.card.hass = this.hass;
-        }
-
-        if (visibleHeight == 0) {
-            return html`${this.card}`;
-        }
-
         const roomsOverlay = this._renderRooms();
+        const allElements = this._renderAllElements(scale.scaleX);
 
         return html`
             <div style="overflow:none; width:${visibleWidth}px; height:${visibleHeight}px">
                 <div style="transform: scale(${scale.scaleX}, ${scale.scaleY}); transform-origin: 0px 0px; width:${contentWidth}px; height:${contentHeight}px; position: relative;">
-                    ${this.card}
+                    <img src="${this.config.image}" style="width: ${this.config.image_width}px; height: ${this.config.image_height}px; display: block;" />
+                    <div class="elements-container" style="width: ${this.config.image_width}px; height: ${this.config.image_height}px;">
+                        ${allElements}
+                    </div>
                     ${roomsOverlay}
                 </div>
             </div>
         `;
     }
 
-    private createPictureCardElement(config: ScalableHousePlanConfig) {
-        // Flatten all rooms into a single elements array with coordinate transformation
-        const allElements = (config.rooms || []).reduce((acc: PictureElement[], room: Room) => {
-            // Calculate room's bounding box (top-left corner)
-            const roomOffset = this._getRoomOffset(room);
-            
-            // Transform each entity into picture elements
-            const transformedElements = (room.entities || [])
-                .filter((entityConfig: EntityConfig) => {
-                    // String shorthand = detail-only, no plan
+    /**
+     * Render all elements from all rooms onto the overview
+     */
+    private _renderAllElements(scale: number) {
+        if (!this.config || !this.hass) return html``;
+
+        // Render elements for each room
+        return (this.config.rooms || []).map((room: Room) => {
+            const roomBounds = getRoomBounds(room);
+            const roomOffset = {
+                x: roomBounds.minX,
+                y: roomBounds.minY
+            };
+
+            // Filter for overview entities only
+            const overviewRoom = {
+                ...room,
+                entities: (room.entities || []).filter((entityConfig: EntityConfig) => {
+                    // String shorthand = detail-only, no overview
                     if (typeof entityConfig === 'string') return false;
-                    
-                    // Only include entities with plan section and show !== false
-                    return entityConfig.plan && (entityConfig.plan.show !== false);
+                    // Only include entities with plan section and overview !== false
+                    return entityConfig.plan && (entityConfig.plan.overview !== false);
                 })
-                .map((entityConfig: EntityConfig) => {
-                    const entity = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
-                    const plan = typeof entityConfig === 'string' ? undefined : entityConfig.plan;
-                    
-                    if (!plan) return null;
-                    
-                    // Get default element definition for this entity
-                    const deviceClass = this.hass?.states[entity]?.attributes?.device_class;
-                    const defaultElement = getElementTypeForEntity(entity, deviceClass, 'plan');
-                    
-                    // Merge default properties with user overrides
-                    const elementConfig = mergeElementProperties(defaultElement, plan.element);
-                    
-                    // Create picture element with entity and merged config
-                    return this._transformEntityToPictureElement(entity, plan, elementConfig, roomOffset);
-                })
-                .filter((el): el is PictureElement => el !== null);
-            
-            return acc.concat(transformedElements);
-        }, []);
+            };
 
-        // Process elements and add CSS variables for layer visibility
-        const processedElements = allElements.map((el: PictureElement) => {
-            const style = {...el.style};
-            style.transform = "none";
-            if (el.left !== undefined)
-                style.left = typeof el.left === "string" ? el.left : `${el.left}px`;
-            if (el.top !== undefined)
-                style.top = typeof el.top === "string" ? el.top : `${el.top}px`;
-            if (el.right !== undefined)
-                style.right = typeof el.right === "string" ? el.right : `${el.right}px`;
-            if (el.bottom !== undefined)
-                style.bottom = typeof el.bottom === "string" ? el.bottom : `${el.bottom}px`;
-            if (el.height !== undefined)
-                style.height = typeof el.height === "string" ? el.height : `${el.height}px`;
-            if (el.width !== undefined)
-                style.width = typeof el.width === "string" ? el.width : `${el.width}px`;    
-            
-            // Add layer visibility CSS variable if element has layer_id
-            if (el.layer_id) {
-                style.display = `var(--layer-${el.layer_id}-display, block)`;
-            }
-            
-            // If this is a layers element, pass the layers configuration
-            if (el.type === "custom:scalable-house-plan-layers") {
-                return {
-                    ...el, 
-                    style: style,
-                    layers: config.layers || [],
-                    _layerVisibility: this._layerVisibility
-                };
-            }
-            
-            return {...el, style: style};
+            // Create a wrapper div for this room's elements positioned at room offset
+            return html`
+                <div style="position: absolute; left: ${roomOffset.x}px; top: ${roomOffset.y}px; width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
+                    ${renderElements({
+                        hass: this.hass!,
+                        room: overviewRoom,
+                        roomBounds,
+                        createCardElement: this._createCardElement,
+                        elementCards: this._elementCards,
+                        scale
+                    })}
+                </div>
+            `;
         });
-
-        const cardConfig = {
-            type: "picture-elements",
-            image: config.image,
-            elements: processedElements,
-            style: config.style
-        };
-
-        return this._createCardElement?.(cardConfig);
-    }
-
-    private _getRoomOffset(room: Room): { x: number; y: number } {
-        if (!room.boundary || room.boundary.length === 0) {
-            return { x: 0, y: 0 };
-        }
-        
-        const xs = room.boundary.map(p => p[0]);
-        const ys = room.boundary.map(p => p[1]);
-        
-        return {
-            x: Math.min(...xs),
-            y: Math.min(...ys)
-        };
-    }
-
-    private _transformEntityToPictureElement(
-        entityId: string, 
-        plan: any, 
-        elementConfig: any, 
-        roomOffset: { x: number; y: number }
-    ): PictureElement {
-        // Create a flattened element combining plan and element config
-        const flattened: PictureElement = {
-            ...elementConfig,
-            type: elementConfig.type!,
-            entity: entityId,
-            style: plan.style || {},
-            layer_id: plan.layer_id
-        };
-        
-        // Transform position coordinates from room-relative to absolute
-        if (typeof plan.left === 'number') {
-            flattened.left = plan.left + roomOffset.x;
-        } else if (plan.left !== undefined) {
-            flattened.left = plan.left;
-        }
-        
-        if (typeof plan.right === 'number') {
-            flattened.right = plan.right + roomOffset.x;
-        } else if (plan.right !== undefined) {
-            flattened.right = plan.right;
-        }
-        
-        if (typeof plan.top === 'number') {
-            flattened.top = plan.top + roomOffset.y;
-        } else if (plan.top !== undefined) {
-            flattened.top = plan.top;
-        }
-        
-        if (typeof plan.bottom === 'number') {
-            flattened.bottom = plan.bottom + roomOffset.y;
-        } else if (plan.bottom !== undefined) {
-            flattened.bottom = plan.bottom;
-        }
-        
-        // Copy dimensions (no transformation needed)
-        if (plan.width !== undefined) {
-            flattened.width = plan.width;
-        }
-        if (plan.height !== undefined) {
-            flattened.height = plan.height;
-        }
-        
-        return flattened;
     }
 
     private _renderRooms() {
         if (!this.config?.rooms) return html``;
 
         const defaultColor = 'rgba(128, 128, 128, 0.2)';
+        const showBackgrounds = this.config.show_room_backgrounds ?? false;
 
         return svg`
-            <svg style="position: absolute; top: 0; left: 0; width: ${this.config.image_width}px; height: ${this.config.image_height}px; z-index: 1;" viewBox="0 0 ${this.config.image_width} ${this.config.image_height}" preserveAspectRatio="none">
+            <svg style="position: absolute; top: 0; left: 0; width: ${this.config.image_width}px; height: ${this.config.image_height}px; pointer-events: none;" viewBox="0 0 ${this.config.image_width} ${this.config.image_height}" preserveAspectRatio="none">
                 ${this.config.rooms.map((room, index) => {
                     if (!room.boundary || room.boundary.length < 3) return svg``;
                     
-                    const fillColor = room.color || defaultColor;
-                    const strokeColor = fillColor.replace(/[\d.]+\)$/, '0.4)');
                     const points = room.boundary.map(p => `${p[0]},${p[1]}`).join(' ');
+                    const fillColor = showBackgrounds ? (room.color || defaultColor) : 'transparent';
+                    const strokeColor = showBackgrounds ? 'rgba(0, 0, 0, 0.3)' : 'transparent';
                     
                     return svg`
                         <polygon 
@@ -344,7 +243,7 @@ export class ScalableHousePlanPlan extends LitElement {
                             fill="${fillColor}" 
                             stroke="${strokeColor}"
                             stroke-width="2"
-                            style="cursor: pointer; transition: fill 0.2s ease;"
+                            style="cursor: pointer; pointer-events: auto;"
                             @click=${(e: Event) => this._handleRoomClick(room, index, e)}
                             @mouseenter=${(e: Event) => this._handleRoomHover(room, index, e, true)}
                             @mouseleave=${(e: Event) => this._handleRoomHover(room, index, e, false)}
@@ -366,12 +265,17 @@ export class ScalableHousePlanPlan extends LitElement {
 
     private _handleRoomHover(room: Room, index: number, event: Event, isEntering: boolean) {
         const target = event.target as SVGPolygonElement;
+        const showBackgrounds = this.config?.show_room_backgrounds ?? false;
+        const defaultColor = 'rgba(128, 128, 128, 0.2)';
+        
         if (isEntering) {
-            const currentFill = target.getAttribute('fill') || 'rgba(128, 128, 128, 0.2)';
-            const hoverFill = currentFill.replace(/[\d.]+\)$/, '0.4)');
+            // On hover, show a semi-transparent overlay
+            const fillColor = room.color || defaultColor;
+            const hoverFill = fillColor.replace(/[\d.]+\)$/, '0.4)');
             target.setAttribute('fill', hoverFill);
         } else {
-            const fillColor = room.color || 'rgba(128, 128, 128, 0.2)';
+            // On leave, restore based on show_room_backgrounds setting
+            const fillColor = showBackgrounds ? (room.color || defaultColor) : 'transparent';
             target.setAttribute('fill', fillColor);
         }
     }

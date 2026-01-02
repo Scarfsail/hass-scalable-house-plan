@@ -3,8 +3,9 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { LovelaceCardConfig } from "../../hass-frontend/src/data/lovelace/config/card";
-import "./scalable-house-plan-plan";
+import "./scalable-house-plan-overview";
 import "./scalable-house-plan-detail";
+import "./scalable-house-plan-entities";
 
 export interface Layer {
     id: string;
@@ -29,7 +30,7 @@ interface PlanConfig {
     bottom?: string | number;
     width?: string | number;
     height?: string | number;
-    show?: boolean;  // Default true
+    overview?: boolean;  // Default true - show on overview
     layer_id?: string;
     style?: any;
     element?: ElementConfig;  // Element config with optional type override
@@ -77,6 +78,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     min_scale?: number;
     card_size?: number;
     layers_visibility_persistence_id?: string;
+    show_room_backgrounds?: boolean;  // Show room background colors (helpful for editing boundaries)
 }
 
 
@@ -87,6 +89,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     private config?: ScalableHousePlanConfig;
 
     @state() private _selectedRoomIndex: number | null = null;
+    @state() private _currentView: 'overview' | 'detail' | 'entities' = 'overview';
 
     @property({ attribute: false }) hass?: HomeAssistant;
 
@@ -96,8 +99,9 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 display: block;
                 height: 100%;
             }
-            scalable-house-plan-plan,
-            scalable-house-plan-detail {
+            scalable-house-plan-overview,
+            scalable-house-plan-detail,
+            scalable-house-plan-entities {
                 display: block;
                 height: 100%;
             }
@@ -145,30 +149,45 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             return html`<div>Config is not defined</div>`;
         }
 
-        // If room detail is selected, show detail view
-        if (this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex]) {
+        // Show entities list view
+        if (this._currentView === 'entities' && this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex]) {
+            const room = this.config.rooms[this._selectedRoomIndex];
+            return html`
+                <scalable-house-plan-entities
+                    .hass=${this.hass}
+                    .room=${room}
+                    .onBack=${() => this._closeEntitiesView()}
+                ></scalable-house-plan-entities>
+            `;
+        }
+
+        // Show room detail SVG view
+        if (this._currentView === 'detail' && this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex]) {
             const room = this.config.rooms[this._selectedRoomIndex];
             return html`
                 <scalable-house-plan-detail
                     .hass=${this.hass}
                     .room=${room}
+                    .config=${this.config}
                     .onBack=${() => this._closeRoomDetail()}
+                    .onShowEntities=${() => this._openEntitiesView()}
                 ></scalable-house-plan-detail>
             `;
         }
 
-        // Otherwise show plan view
+        // Show overview
         return html`
-            <scalable-house-plan-plan
+            <scalable-house-plan-overview
                 .hass=${this.hass}
                 .config=${this.config}
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
-            ></scalable-house-plan-plan>
+            ></scalable-house-plan-overview>
         `;
     }
 
     private _openRoomDetail(roomIndex: number) {
         this._selectedRoomIndex = roomIndex;
+        this._currentView = 'detail';
         // Only use history API when not in edit mode to avoid conflicts
         if (!this._isEditMode()) {
             history.pushState({ view: 'room-detail', roomIndex }, '', '');
@@ -178,8 +197,27 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     private _closeRoomDetail() {
         this._selectedRoomIndex = null;
+        this._currentView = 'overview';
         // Only pop history when not in edit mode
         if (!this._isEditMode() && window.history.state?.view === 'room-detail') {
+            history.back();
+        }
+        this.requestUpdate();
+    }
+
+    private _openEntitiesView() {
+        this._currentView = 'entities';
+        // Only use history API when not in edit mode
+        if (!this._isEditMode()) {
+            history.pushState({ view: 'room-entities', roomIndex: this._selectedRoomIndex }, '', '');
+        }
+        this.requestUpdate();
+    }
+
+    private _closeEntitiesView() {
+        this._currentView = 'detail';
+        // Only pop history when not in edit mode
+        if (!this._isEditMode() && window.history.state?.view === 'room-entities') {
             history.back();
         }
         this.requestUpdate();
@@ -191,14 +229,18 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             return;
         }
         
-        // Only close detail view if we're going back from room-detail state
-        // This prevents closing when other dialogs (like more-info) close
         const currentState = window.history.state;
         
-        if (this._selectedRoomIndex !== null) {
-            // If the new state is not room-detail, close the detail view
+        // Handle navigation based on current view
+        if (this._currentView === 'entities') {
+            // Going back from entities view -> detail view
+            this._currentView = 'detail';
+            this.requestUpdate();
+        } else if (this._currentView === 'detail') {
+            // Going back from detail view -> overview
             if (!currentState || currentState.view !== 'room-detail') {
                 this._selectedRoomIndex = null;
+                this._currentView = 'overview';
                 this.requestUpdate();
             }
         }
