@@ -2,7 +2,7 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig } from "./scalable-house-plan";
-import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities } from "../utils";
+import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities, getRoomIcon } from "../utils";
 
 /**
  * Room detail view component
@@ -70,6 +70,11 @@ export class ScalableHousePlanDetail extends LitElement {
                 --mdc-icon-button-size: 36px;
             }
 
+            .room-icon {
+                margin-right: 8px;
+                color: var(--primary-text-color);
+            }
+
             .room-name {
                 font-size: 18px;
                 font-weight: 500;
@@ -122,6 +127,7 @@ export class ScalableHousePlanDetail extends LitElement {
                 >
                     <ha-icon icon="mdi:arrow-left"></ha-icon>
                 </ha-icon-button>
+                <ha-icon class="room-icon" icon=${getRoomIcon(this.hass, this.room)}></ha-icon>
                 <h1 class="room-name">${getRoomName(this.hass, this.room)}</h1>
             </div>
 

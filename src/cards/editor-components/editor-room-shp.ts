@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { Room } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
+import { getRoomIcon } from "../../utils";
 import "./editor-elements-shp";
 
 @customElement("editor-room-shp")
@@ -85,7 +86,7 @@ export class EditorRoomShp extends LitElement {
             <div class="room-container">
                 <div class="room-header" @click=${this._toggleExpanded}>
                     <ha-icon icon=${this._expanded ? "mdi:chevron-down" : "mdi:chevron-right"}></ha-icon>
-                    <ha-icon icon="mdi:home"></ha-icon>
+                    <ha-icon icon=${getRoomIcon(this.hass, this.room)}></ha-icon>
                     <div class="room-name">${this.room.name || "Unnamed Room"}</div>
                     <ha-icon-button
                         @click=${this._removeRoom}

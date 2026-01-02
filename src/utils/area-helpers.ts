@@ -12,6 +12,16 @@ export function getAreaName(hass: HomeAssistant, areaId: string): string | undef
 }
 
 /**
+ * Get icon for an area by its area_id
+ * @param hass - HomeAssistant instance
+ * @param areaId - Area registry ID
+ * @returns Area icon or undefined/null if not found
+ */
+export function getAreaIcon(hass: HomeAssistant, areaId: string): string | null | undefined {
+    return hass.areas?.[areaId]?.icon;
+}
+
+/**
  * Get all entity IDs for a given area
  * Includes both direct area entities and entities from devices in the area
  * @param hass - HomeAssistant instance
@@ -60,4 +70,22 @@ export function getRoomName(hass: HomeAssistant, room: Room): string {
         }
     }
     return room.name;
+}
+
+/**
+ * Get icon for a room
+ * Returns area icon if area is set and has icon, otherwise returns default room icon
+ * @param hass - HomeAssistant instance
+ * @param room - Room configuration
+ * @param defaultIcon - Default icon to use if no area icon (default: 'mdi:home')
+ * @returns Icon string
+ */
+export function getRoomIcon(hass: HomeAssistant, room: Room, defaultIcon: string = 'mdi:home'): string {
+    if (room.area) {
+        const areaIcon = getAreaIcon(hass, room.area);
+        if (areaIcon) {
+            return areaIcon;
+        }
+    }
+    return defaultIcon;
 }
