@@ -72,7 +72,6 @@ export class EditorElementShp extends LitElement {
                         <ha-entity-picker
                             .hass=${this.hass}
                             .value=${entityId}
-                            .label=${"Entity"}
                             .includeEntities=${this._getIncludeEntities(entityId)}
                             @value-changed=${this._entityIdChanged}
                             allow-custom-entity
