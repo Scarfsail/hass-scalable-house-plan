@@ -1,4 +1,4 @@
-import { html, nothing } from "lit"
+import { css, html, nothing } from "lit"
 import { customElement } from "lit/decorators.js";
 import "../components/last-change-text-shp";
 
@@ -10,16 +10,37 @@ interface DoorWindowElementConfig extends ElementEntityBaseConfig {
     height: number;
     orientation: "vertical" | "horizontal";
     unobtrusive?: boolean;
+    text_position?: "start" | "end";
 }
 
 
 @customElement("door-window-shp")
 export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElementConfig> {
+    static styles = css`
+        .container {
+            display: flex;
+            align-items: center;
+            line-height: 0;
+            cursor: pointer;
+        }
+        
+        .container.horizontal {
+            flex-direction: column;
+            gap: 7px;
+        }
+        
+        .container.vertical {
+            flex-direction: row;
+            gap: 0px;
+        }
+    `;
+    
     async setConfig(config: DoorWindowElementConfig) {
         await super.setConfig({
             ...config,
             height: config.height ?? 7,
-            orientation: config.orientation ?? "horizontal"
+            orientation: config.orientation ?? "horizontal",
+            text_position: config.text_position ?? "end"
         });
     }
     protected renderEntityContent(entity: HassEntity) {
@@ -46,14 +67,21 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
                 : 
                 'gray';
 
+        const svgElement = html`
+            <div>
+                <svg width="${width}px" height="${height}px">
+                    <path d=${svgPathArea} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
+                </svg>
+            </div>
+        `;
+        
+        const textElement = html`
+            <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5}></last-change-text-shp>
+        `;
+
         return html`
-            <div style="display:flex; align-items:center; gap:5px; flex-direction:${this._config.orientation == 'horizontal' ? 'column' : 'row'}">
-               <div>
-                    <svg width="${width}px" height="${height}px">
-                        <path d=${svgPathArea} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
-                    </svg>
-                </div>
-                <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5}></last-change-text-shp>
+            <div class="container ${this._config.orientation}">
+                ${this._config.text_position === "start" ? html`${textElement}${svgElement}` : html`${svgElement}${textElement}`}
             </div>            
             `
     }
