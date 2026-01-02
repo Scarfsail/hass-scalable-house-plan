@@ -211,6 +211,7 @@ export class EditorRoomShp extends LitElement {
                                 <editor-elements-shp
                                     .hass=${this.hass}
                                     .elements=${this.room.entities || []}
+                                    .areaId=${this.room.area}
                                     .hideHeader=${true}
                                     @elements-add=${this._handleElementAdd}
                                     @elements-update=${this._handleElementsUpdate}

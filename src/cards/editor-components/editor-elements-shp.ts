@@ -15,6 +15,7 @@ export class EditorElementsShp extends LitElement {
     @property({ type: Number }) layerIndex?: number;
     @property({ type: Number }) groupIndex?: number;
     @property({ type: Boolean }) hideHeader: boolean = false; // Hide header when embedded
+    @property({ type: String }) areaId?: string; // Optional area ID for filtering
 
     private coordinator = CrossContainerCoordinator.getInstance();
 
@@ -61,6 +62,7 @@ export class EditorElementsShp extends LitElement {
                                     .hass=${this.hass}
                                     .entity=${element}
                                     .index=${index}
+                                    .areaId=${this.areaId}
                                     .isExpanded=${this.expandedElements.has(index)}
                                     @element-toggle=${this._handleElementToggle}
                                     @element-update=${this._handleElementUpdate}

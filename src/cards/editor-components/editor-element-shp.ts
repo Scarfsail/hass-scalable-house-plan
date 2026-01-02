@@ -3,6 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { EntityConfig } from "../scalable-house-plan";
+import { getAreaEntities } from "../../utils";
 
 @customElement("editor-element-shp")
 export class EditorElementShp extends LitElement {
@@ -10,6 +11,7 @@ export class EditorElementShp extends LitElement {
     @property({ type: Object }) entity!: EntityConfig;
     @property({ type: Number }) index!: number;
     @property({ type: Boolean }) isExpanded: boolean = false;
+    @property({ type: String }) areaId?: string; // Optional area ID for filtering entities
 
     static styles = [
         sharedStyles,
@@ -71,6 +73,7 @@ export class EditorElementShp extends LitElement {
                             .hass=${this.hass}
                             .value=${entityId}
                             .label=${"Entity"}
+                            .includeEntities=${this._getIncludeEntities(entityId)}
                             @value-changed=${this._entityIdChanged}
                             allow-custom-entity
                         ></ha-entity-picker>
@@ -98,6 +101,27 @@ export class EditorElementShp extends LitElement {
             
             this._dispatchUpdate(updatedEntity);
         }
+    }
+
+    /**
+     * Get list of entities to include in picker
+     * If area is set, include area entities + current selection (if different)
+     * If no area, return undefined (show all entities)
+     */
+    private _getIncludeEntities(currentEntityId: string): string[] | undefined {
+        if (!this.areaId) {
+            return undefined; // No filtering when no area is set
+        }
+
+        const areaEntities = getAreaEntities(this.hass, this.areaId);
+        
+        // If current entity is not in area entities, add it to the list
+        // This preserves manually configured entities
+        if (currentEntityId && !areaEntities.includes(currentEntityId)) {
+            return [...areaEntities, currentEntityId];
+        }
+        
+        return areaEntities;
     }
 
     private _planChanged(ev: CustomEvent) {
