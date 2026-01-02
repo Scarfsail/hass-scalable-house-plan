@@ -11,12 +11,14 @@
     "noEmitOnError": true,
     "noEmit": true,
     "experimentalDecorators": true,
+    "resolveJsonModule": true,
     "typeRoots": [
       "node_modules/@types"
     ],
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.tsx"
+    "src/**/*.tsx",
+    "src/**/*.json"
   ],
 }

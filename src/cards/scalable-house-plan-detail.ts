@@ -2,7 +2,8 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig } from "./scalable-house-plan";
-import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities, getRoomIcon } from "../utils";
+import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities, getRoomIcon, groupEntitiesByCategory, getSortedCategories, EntityCategory, CATEGORY_DEFINITIONS } from "../utils";
+import { getLocalizeFunction } from "../localize";
 
 /**
  * Room detail view component
@@ -19,6 +20,9 @@ export class ScalableHousePlanDetail extends LitElement {
     
     // Cache for area entities (fetched once per room change)
     @state() private _areaEntityIds: string[] = [];
+    
+    // Track collapsed state of categories (all expanded by default)
+    @state() private _collapsedCategories: Set<EntityCategory> = new Set();
 
     updated(changedProperties: Map<string, any>) {
         super.updated(changedProperties);
@@ -27,7 +31,21 @@ export class ScalableHousePlanDetail extends LitElement {
         if (changedProperties.has('room')) {
             this._cardElements.clear();
             this._fetchAreaEntities();
+            this._initializeCollapsedCategories();
         }
+    }
+
+    /**
+     * Initialize collapsed categories based on collapsed property
+     */
+    private _initializeCollapsedCategories() {
+        this._collapsedCategories = new Set();
+        
+        Object.values(CATEGORY_DEFINITIONS).forEach(categoryDef => {
+            if (categoryDef.collapsed) {
+                this._collapsedCategories.add(categoryDef.key);
+            }
+        });
     }
 
     /**
@@ -110,6 +128,81 @@ export class ScalableHousePlanDetail extends LitElement {
             .entity-card {
                 min-height: 60px;
             }
+
+            .category-section {
+                margin-bottom: 16px;
+            }
+
+            .category-header {
+                display: flex;
+                align-items: center;
+                padding: 8px 12px;
+                background: var(--card-background-color);
+                border-radius: 8px;
+                margin-bottom: 8px;
+                cursor: pointer;
+                user-select: none;
+                transition: background-color 0.2s;
+            }
+
+            .category-header:hover {
+                background: var(--secondary-background-color);
+            }
+
+            .category-icon {
+                margin-right: 8px;
+                color: var(--primary-color);
+                --mdc-icon-size: 20px;
+            }
+
+            .category-title {
+                flex: 1;
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--primary-text-color);
+                margin: 0;
+            }
+
+            .category-count {
+                font-size: 12px;
+                color: var(--secondary-text-color);
+                margin-right: 8px;
+            }
+
+            .category-expand-icon {
+                color: var(--secondary-text-color);
+                --mdc-icon-size: 20px;
+                transition: transform 0.2s;
+            }
+
+            .category-expand-icon.expanded {
+                transform: rotate(180deg);
+            }
+
+            .category-cards {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 12px;
+            }
+
+            .category-cards.collapsed {
+                display: none;
+            }
+
+            @media (max-width: 768px) {
+                .category-cards {
+                    grid-template-columns: 1fr;
+                    gap: 8px;
+                }
+
+                .category-header {
+                    padding: 6px 10px;
+                }
+
+                .category-title {
+                    font-size: 13px;
+                }
+            }
         `;
     }
 
@@ -132,13 +225,16 @@ export class ScalableHousePlanDetail extends LitElement {
             </div>
 
             <div class="cards-container">
-                ${this._renderEntityCards()}
+                ${this._renderCategorizedCards()}
             </div>
         `;
     }
 
-    private _renderEntityCards() {
+    private _renderCategorizedCards() {
         if (!this.room || !this.hass) return html``;
+
+        // Get localize function
+        const localize = getLocalizeFunction(this.hass);
 
         // Get explicitly configured entity IDs for deduplication
         const explicitEntityIds = new Set(
@@ -149,36 +245,88 @@ export class ScalableHousePlanDetail extends LitElement {
 
         // Combine explicit entities and area entities (deduplicated)
         const areaEntityConfigs: EntityConfig[] = this._areaEntityIds
-            .filter(entityId => !explicitEntityIds.has(entityId)) // Deduplicate
-            //.filter(entityId => this.hass!.states[entityId]); // Only include existing entities
+            .filter(entityId => !explicitEntityIds.has(entityId));
 
         const allEntityConfigs: EntityConfig[] = [...this.room.entities, ...areaEntityConfigs];
 
-        // Unified rendering logic for all entities
-        return allEntityConfigs.map((entityConfig) => {
-            const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
-            const plan = typeof entityConfig === 'string' ? undefined : entityConfig.plan;
-            
-            // Get device_class for mapping lookup
-            const deviceClass = this.hass?.states[entityId]?.attributes?.device_class;
-            
-            // Get default detail element definition
-            const defaultElement = getElementTypeForEntity(entityId, deviceClass, 'detail');
-            
-            // Check if user provided custom detail element config in plan.element
-            // If explicit type in plan.element, use it; otherwise merge with detail defaults
-            const elementConfig = plan?.element 
-                ? mergeElementProperties(defaultElement, plan.element)
-                : defaultElement;
-            
-            // Create card element
-            const cardConfig = {
-                entity: entityId,
-                ...elementConfig
-            };
-
-            return this._getOrCreateCard(entityId, cardConfig);
+        // Create a map of entityId -> EntityConfig for easy lookup
+        const entityConfigMap = new Map<string, EntityConfig>();
+        allEntityConfigs.forEach(cfg => {
+            const entityId = typeof cfg === 'string' ? cfg : cfg.entity;
+            entityConfigMap.set(entityId, cfg);
         });
+
+        // Extract entity IDs for categorization
+        const entityIds = allEntityConfigs.map(cfg => 
+            typeof cfg === 'string' ? cfg : cfg.entity
+        );
+
+        // Group entities by category
+        const groupedEntities = groupEntitiesByCategory(
+            entityIds,
+            (entityId) => this.hass?.states[entityId]?.attributes?.device_class
+        );
+
+        // Get sorted categories (excluding empty ones)
+        const sortedCategories = getSortedCategories(groupedEntities);
+
+        // Render each category with its entities
+        return sortedCategories.map(categoryDef => {
+            const categoryEntities = groupedEntities.get(categoryDef.key) || [];
+            const isCollapsed = this._collapsedCategories.has(categoryDef.key);
+
+            return html`
+                <div class="category-section">
+                    <div 
+                        class="category-header"
+                        @click=${() => this._toggleCategory(categoryDef.key)}
+                    >
+                        <ha-icon class="category-icon" icon="${categoryDef.icon}"></ha-icon>
+                        <h2 class="category-title">${localize(`category.${categoryDef.key}`)}</h2>
+                        <span class="category-count">(${categoryEntities.length})</span>
+                        <ha-icon 
+                            class="category-expand-icon ${isCollapsed ? '' : 'expanded'}"
+                            icon="mdi:chevron-down"
+                        ></ha-icon>
+                    </div>
+                    <div class="category-cards ${isCollapsed ? 'collapsed' : ''}">
+                        ${categoryEntities.map(entityId => this._renderEntityCard(entityId, entityConfigMap.get(entityId)!))}
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    private _renderEntityCard(entityId: string, entityConfig: EntityConfig) {
+        const plan = typeof entityConfig === 'string' ? undefined : entityConfig.plan;
+        
+        // Get device_class for mapping lookup
+        const deviceClass = this.hass?.states[entityId]?.attributes?.device_class;
+        
+        // Get default detail element definition
+        const defaultElement = getElementTypeForEntity(entityId, deviceClass, 'detail');
+        
+        // Check if user provided custom detail element config in plan.element
+        const elementConfig = plan?.element 
+            ? mergeElementProperties(defaultElement, plan.element)
+            : defaultElement;
+        
+        // Create card element
+        const cardConfig = {
+            entity: entityId,
+            ...elementConfig
+        };
+
+        return this._getOrCreateCard(entityId, cardConfig);
+    }
+
+    private _toggleCategory(category: EntityCategory) {
+        if (this._collapsedCategories.has(category)) {
+            this._collapsedCategories.delete(category);
+        } else {
+            this._collapsedCategories.add(category);
+        }
+        this.requestUpdate();
     }
 
     private _getOrCreateCard(entityId: string, config: any) {

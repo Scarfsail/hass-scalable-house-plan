@@ -1,0 +1,14 @@
+{
+  "category": {
+    "electro": "Elektro",
+    "doors_windows": "Dveře a okna",
+    "environment": "Prostředí",
+    "security": "Zabezpečení",
+    "cameras": "Kamery",
+    "climate": "Klimatizace",
+    "covers": "Rolety a žaluzie",
+    "energy": "Energie",
+    "automations": "Automatizace",
+    "other": "Ostatní"
+  }
+}
