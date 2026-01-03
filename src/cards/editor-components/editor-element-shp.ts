@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit-element";
+import { LitElement, html, css, PropertyValues } from "lit-element";
 import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
@@ -13,6 +13,7 @@ export class EditorElementShp extends LitElement {
     @property({ type: Number }) index!: number;
     @property({ type: Boolean }) isExpanded: boolean = false;
     @property({ type: String }) areaId?: string; // Optional area ID for filtering entities
+    @property({ type: Boolean }) filterByArea?: boolean; // Toggle for area filtering (undefined = not initialized)
 
     static styles = [
         sharedStyles,
@@ -23,6 +24,29 @@ export class EditorElementShp extends LitElement {
 
             .entity-picker {
                 margin-bottom: 16px;
+            }
+
+            .entity-picker-row {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .entity-picker-row ha-entity-picker {
+                flex: 1;
+            }
+
+            .area-filter {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+                white-space: nowrap;
+            }
+
+            .area-filter-label {
+                font-size: 12px;
+                color: var(--primary-text-color);
             }
 
             .plan-section {
@@ -38,6 +62,24 @@ export class EditorElementShp extends LitElement {
             }
         `
     ];
+
+    protected willUpdate(changedProperties: PropertyValues) {
+        super.willUpdate(changedProperties);
+        
+        // Initialize filterByArea based on whether the entity is in the area
+        // This only runs once when the component is first loaded
+        if (this.filterByArea === undefined && this.areaId && this.hass) {
+            const entityId = typeof this.entity === 'string' ? this.entity : this.entity.entity;
+            if (entityId) {
+                const areaEntities = getAreaEntities(this.hass, this.areaId);
+                // If entity is NOT in area, default to showing all entities
+                this.filterByArea = areaEntities.includes(entityId);
+            } else {
+                // No entity yet, default to filtering by area
+                this.filterByArea = true;
+            }
+        }
+    }
 
     protected render() {
         // Extract entity ID and plan config
@@ -77,13 +119,24 @@ export class EditorElementShp extends LitElement {
                 <div class="item-content ${this.isExpanded ? 'expanded' : ''}">
                     <!-- Entity Picker -->
                     <div class="entity-picker">
-                        <ha-entity-picker
-                            .hass=${this.hass}
-                            .value=${entityId}
-                            .includeEntities=${this._getIncludeEntities(entityId)}
-                            @value-changed=${this._entityIdChanged}
-                            allow-custom-entity
-                        ></ha-entity-picker>
+                        <div class="entity-picker-row">
+                            <ha-entity-picker
+                                .hass=${this.hass}
+                                .value=${entityId}
+                                .includeEntities=${this._getIncludeEntities(entityId)}
+                                @value-changed=${this._entityIdChanged}
+                                allow-custom-entity
+                            ></ha-entity-picker>
+                            ${this.areaId ? html`
+                                <div class="area-filter">
+                                    <span class="area-filter-label">${getLocalizeFunction(this.hass)('editor.area')}</span>
+                                    <ha-switch
+                                        .checked=${this.filterByArea ?? true}
+                                        @change=${this._toggleAreaFilter}
+                                    ></ha-switch>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
                     <div class="plan-section">
                         <div class="plan-label">${getLocalizeFunction(this.hass)('editor.plan_configuration_optional')}</div>
@@ -145,12 +198,12 @@ export class EditorElementShp extends LitElement {
 
     /**
      * Get list of entities to include in picker
-     * If area is set, include area entities + current selection (if different)
-     * If no area, return undefined (show all entities)
+     * If area is set and filterByArea is true, include area entities + current selection (if different)
+     * Otherwise, return undefined (show all entities)
      */
     private _getIncludeEntities(currentEntityId: string): string[] | undefined {
-        if (!this.areaId) {
-            return undefined; // No filtering when no area is set
+        if (!this.areaId || this.filterByArea === false) {
+            return undefined; // No filtering when no area is set or filter is explicitly disabled
         }
 
         const areaEntities = getAreaEntities(this.hass, this.areaId);
@@ -196,6 +249,10 @@ export class EditorElementShp extends LitElement {
             composed: true
         });
         this.dispatchEvent(event);
+    }
+
+    private _toggleAreaFilter(ev: Event) {
+        this.filterByArea = (ev.target as HTMLInputElement).checked;
     }
 
     private _duplicateElement() {

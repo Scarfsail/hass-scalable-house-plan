@@ -65,6 +65,7 @@
     "no_entities_created": "Nebyly vytvořeny žádné entity",
     "entities_description": "Entity jsou zařízení a senzory zobrazované v této místnosti",
     "new_entity": "Nová entita",
-    "plan_configuration_optional": "Plán (volitelné - pro umístění na plán)"
+    "plan_configuration_optional": "Plán (volitelné - pro umístění na plán)",
+    "area": "Oblast"
   }
 }
