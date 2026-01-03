@@ -21,7 +21,7 @@ export class EditorRoomShp extends LitElement {
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                padding: 12px;
+                padding: 4px 8px;
                 background: var(--secondary-background-color);
                 border-radius: 8px;
                 cursor: pointer;
@@ -88,12 +88,9 @@ export class EditorRoomShp extends LitElement {
                     <ha-icon icon=${this._expanded ? "mdi:chevron-down" : "mdi:chevron-right"}></ha-icon>
                     <ha-icon icon=${getRoomIcon(this.hass, this.room)}></ha-icon>
                     <div class="room-name">${this.room.name || "Unnamed Room"}</div>
-                    <ha-icon-button
-                        @click=${this._removeRoom}
-                        .label=${"Remove room"}
-                    >
+                    <button class="icon-button danger" @click=${this._removeRoom}>
                         <ha-icon icon="mdi:delete"></ha-icon>
-                    </ha-icon-button>
+                    </button>
                 </div>
 
                 ${this._expanded ? html`

@@ -27,10 +27,12 @@ export class EditorElementShp extends LitElement {
             .plan-section {
                 margin-top: 16px;
             }
-
+            .item-header {
+                padding:4px;
+            }
             .plan-label {
                 font-weight: 500;
-                margin-bottom: 8px;
+                margin-bottom: 4px;
                 color: var(--primary-text-color);
             }
         `
@@ -40,7 +42,8 @@ export class EditorElementShp extends LitElement {
         // Extract entity ID and plan config
         const entityId = typeof this.entity === 'string' ? this.entity : this.entity.entity;
         const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
-        const hasPlan = planConfig !== undefined;
+        const placementIndicator = this._getPlacementIndicator(planConfig);
+        const displayName = this._getEntityDisplayName(entityId);
         
         return html`
             <div class="item">
@@ -51,12 +54,13 @@ export class EditorElementShp extends LitElement {
                     ></ha-icon>
                     <div class="item-info">
                         <ha-icon icon="mdi:home-assistant" class="item-icon"></ha-icon>
-                        <div>
-                            <div class="item-name">${entityId || 'New Entity'}</div>
-                            <div class="item-details">
-                                ${hasPlan ? html`<span class="item-badge">On Overview</span>` : html`<span class="item-badge">Entities Only</span>`}
-                            </div>
-                        </div>
+                        <span class="item-name">${displayName}</span>
+                        ${placementIndicator.show ? html`
+                            <ha-icon 
+                                icon="mdi:floor-plan" 
+                                style="--mdc-icon-size: 16px; color: ${placementIndicator.color}; flex-shrink: 0;"
+                            ></ha-icon>
+                        ` : ''}
                     </div>
                     <div class="item-actions" @click=${(e: Event) => e.stopPropagation()}>
                         <button class="icon-button danger" @click=${this._removeElement}>
@@ -88,6 +92,39 @@ export class EditorElementShp extends LitElement {
                 </div>
             </div>
         `;
+    }
+
+    private _getEntityDisplayName(entityId: string): string {
+        if (!entityId) {
+            return 'New Entity';
+        }
+        
+        // Try to get friendly name from hass states
+        const state = this.hass?.states?.[entityId];
+        if (state?.attributes?.friendly_name) {
+            return state.attributes.friendly_name;
+        }
+        
+        // Fall back to entity ID
+        return entityId;
+    }
+
+    private _getPlacementIndicator(planConfig: any): { show: boolean; color: string } {
+        // No plan config = entities only, no indicator
+        if (!planConfig) {
+            return { show: false, color: '' };
+        }
+        
+        // Check if overview is explicitly set to false (detail-only)
+        const overview = planConfig.overview !== false; // Default is true
+        
+        if (overview) {
+            // Green for overview
+            return { show: true, color: 'var(--success-color, #4caf50)' };
+        } else {
+            // Orange for detail-only
+            return { show: true, color: 'var(--warning-color, #ff9800)' };
+        }
     }
 
     private _entityIdChanged(ev: CustomEvent) {

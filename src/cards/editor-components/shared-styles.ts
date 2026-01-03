@@ -5,20 +5,20 @@ export const sharedStyles = css`
     .config-section {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 8px;
     }
 
     .section-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding-bottom: 8px;
-        margin-top: 16px;
+        padding-bottom: 4px;
+        margin-top: 8px;
         border-bottom: 2px solid var(--divider-color);
     }
 
     .section-title {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         color: var(--primary-text-color);
         display: flex;
@@ -27,7 +27,7 @@ export const sharedStyles = css`
     }
 
     .section-title ha-icon {
-        --mdc-icon-size: 20px;
+        --mdc-icon-size: 18px;
         color: var(--primary-color);
     }
 
@@ -93,7 +93,7 @@ export const sharedStyles = css`
 
     .collapsible-section .section-content {
         display: none;
-        padding-top: 16px;
+        padding-top: 8px;
     }
 
     .collapsible-section .section-content.expanded {
