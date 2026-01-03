@@ -51,23 +51,23 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
 
     // Sensors - Specific device classes
     'sensor.battery': {
-        plan_element: { type: 'custom:analog-shp', size: 20 },
+        plan_element: { type: 'custom:analog-shp', style: { "font-size": "20px" } },
         detail_element: { type: 'custom:analog-bar-shp', orientation: 'horizontal' }
     },
     'sensor.temperature': {
-        plan_element: { type: 'custom:analog-shp', size: 25 },
+        plan_element: { type: 'custom:analog-shp', style: { "font-size": "20px" } },
         detail_element: { type: 'tile' }
     },
     'sensor.humidity': {
-        plan_element: { type: 'custom:analog-shp', size: 25 },
+        plan_element: { type: 'custom:analog-shp', style: { "font-size": "20px" } },
         detail_element: { type: 'tile' }
     },
     'sensor.power': {
-        plan_element: { type: 'custom:analog-shp', size: 20 },
+        plan_element: { type: 'custom:analog-shp', style: { "font-size": "20px" } },
         detail_element: { type: 'tile' }
     },
     'sensor.energy': {
-        plan_element: { type: 'custom:analog-shp', size: 20 },
+        plan_element: { type: 'custom:analog-shp', style: { "font-size": "20px" } },
         detail_element: { type: 'tile' }
     },
 
