@@ -4,6 +4,7 @@ import { sharedStyles } from "./shared-styles";
 import { DragDropMixin } from "./drag-drop-mixin";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { EntityConfig } from "../scalable-house-plan";
+import { getLocalizeFunction } from "../../localize";
 import "./editor-element-shp";
 import { CrossContainerCoordinator } from "./cross-container-coordinator";
 
@@ -35,11 +36,11 @@ export class EditorElementsShp extends LitElement {
                     <div class="section-header">
                         <div class="section-title">
                             <ha-icon icon="mdi:puzzle"></ha-icon>
-                            Entities (${this.elements.length})
+                            ${getLocalizeFunction(this.hass)('editor.entities')} (${this.elements.length})
                         </div>
                         <button class="add-button" @click=${this._addElement}>
                             <ha-icon icon="mdi:plus"></ha-icon>
-                            Add Entity
+                            ${getLocalizeFunction(this.hass)('editor.add_entity')}
                         </button>
                     </div>
                 ` : ''}
@@ -80,9 +81,9 @@ export class EditorElementsShp extends LitElement {
         return html`
             <div class="empty-state">
                 <ha-icon icon="mdi:puzzle"></ha-icon>
-                <div class="empty-state-title">No entities created</div>
+                <div class="empty-state-title">${getLocalizeFunction(this.hass)('editor.no_entities_created')}</div>
                 <div class="empty-state-subtitle">
-                    Entities are the devices and sensors displayed in this room
+                    ${getLocalizeFunction(this.hass)('editor.entities_description')}
                 </div>
             </div>
         `;

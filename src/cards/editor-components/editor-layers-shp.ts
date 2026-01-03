@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { Layer } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
+import { getLocalizeFunction } from "../../localize";
 import "./editor-layer-shp";
 
 @customElement("editor-layers-shp")
@@ -39,9 +40,9 @@ export class EditorLayersShp extends LitElement {
                 ${this.layers.length === 0 ? html`
                     <div class="empty-state">
                         <ha-icon icon="mdi:layers-off-outline"></ha-icon>
-                        <div>No layers defined. Layers are optional.</div>
+                        <div>${getLocalizeFunction(this.hass)('editor.no_layers_defined')}</div>
                         <div style="font-size: 12px; color: var(--secondary-text-color); margin-top: 4px;">
-                            Elements can reference layers by ID for visibility control.
+                            ${getLocalizeFunction(this.hass)('editor.elements_can_reference_layers')}
                         </div>
                     </div>
                 ` : ''}

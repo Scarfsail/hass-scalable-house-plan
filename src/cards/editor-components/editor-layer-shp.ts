@@ -3,6 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { Layer } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
+import { getLocalizeFunction } from "../../localize";
 
 @customElement("editor-layer-shp")
 export class EditorLayerShp extends LitElement {
@@ -34,8 +35,8 @@ export class EditorLayerShp extends LitElement {
                             <div class="item-name">${this.layer.name}</div>
                             <div class="item-details">
                                 ID: ${this.layer.id}
-                                ${this.layer.visible ? html`<span class="item-badge">Visible</span>` : html`<span class="item-badge inactive">Hidden</span>`}
-                                ${this.layer.showInToggles ? html`<span class="item-badge">Toggleable</span>` : ''}
+                                ${this.layer.visible ? html`<span class="item-badge">${getLocalizeFunction(this.hass)('editor.visible')}</span>` : html`<span class="item-badge inactive">${getLocalizeFunction(this.hass)('editor.hidden')}</span>`}
+                                ${this.layer.showInToggles ? html`<span class="item-badge">${getLocalizeFunction(this.hass)('editor.toggleable')}</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -50,32 +51,32 @@ export class EditorLayerShp extends LitElement {
                 <div class="item-content ${this.isExpanded ? 'expanded' : ''}">
                     <div class="form-grid">
                         <ha-textfield
-                            label="Layer ID"
+                            label="${getLocalizeFunction(this.hass)('editor.layer_id')}"
                             .value=${this.layer.id}
                             @input=${(e: any) => this._updateProperty('id', e.target.value)}
-                            placeholder="lights"
+                            placeholder="${getLocalizeFunction(this.hass)('editor.layer_id_placeholder')}"
                         ></ha-textfield>
                         <ha-textfield
-                            label="Layer Name"
+                            label="${getLocalizeFunction(this.hass)('editor.layer_name')}"
                             .value=${this.layer.name}
                             @input=${(e: any) => this._updateProperty('name', e.target.value)}
-                            placeholder="Lights"
+                            placeholder="${getLocalizeFunction(this.hass)('editor.layer_name_placeholder')}"
                         ></ha-textfield>
                         <ha-textfield
-                            label="Icon"
+                            label="${getLocalizeFunction(this.hass)('editor.layer_icon')}"
                             .value=${this.layer.icon}
                             @input=${(e: any) => this._updateProperty('icon', e.target.value)}
-                            placeholder="mdi:lightbulb"
+                            placeholder="${getLocalizeFunction(this.hass)('editor.layer_icon_placeholder')}"
                         ></ha-textfield>
 
                         <div class="form-toggles">
-                            <ha-formfield label="Visible by default">
+                            <ha-formfield label="${getLocalizeFunction(this.hass)('editor.visible_by_default')}">
                                 <ha-switch
                                     .checked=${this.layer.visible}
                                     @change=${(e: any) => this._updateProperty('visible', e.target.checked)}
                                 ></ha-switch>
                             </ha-formfield>
-                            <ha-formfield label="Show in Toggles">
+                            <ha-formfield label="${getLocalizeFunction(this.hass)('editor.show_in_toggles')}">
                                 <ha-switch
                                     .checked=${this.layer.showInToggles}
                                     @change=${(e: any) => this._updateProperty('showInToggles', e.target.checked)}

@@ -4,6 +4,7 @@ import { sharedStyles } from "./shared-styles";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { EntityConfig } from "../scalable-house-plan";
 import { getAreaEntities } from "../../utils";
+import { getLocalizeFunction } from "../../localize";
 
 @customElement("editor-element-shp")
 export class EditorElementShp extends LitElement {
@@ -82,7 +83,7 @@ export class EditorElementShp extends LitElement {
                         ></ha-entity-picker>
                     </div>
                     <div class="plan-section">
-                        <div class="plan-label">Plan Configuration (optional - for positioned display)</div>
+                        <div class="plan-label">${getLocalizeFunction(this.hass)('editor.plan_configuration_optional')}</div>
                         <ha-yaml-editor
                             .hass=${this.hass}
                             .defaultValue=${planConfig || {}}
@@ -96,7 +97,7 @@ export class EditorElementShp extends LitElement {
 
     private _getEntityDisplayName(entityId: string): string {
         if (!entityId) {
-            return 'New Entity';
+            return getLocalizeFunction(this.hass)('editor.new_entity');
         }
         
         // Try to get friendly name from hass states

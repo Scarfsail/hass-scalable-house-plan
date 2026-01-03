@@ -4,6 +4,7 @@ import { sharedStyles } from "./shared-styles";
 import type { Room } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import { getRoomIcon } from "../../utils";
+import { getLocalizeFunction } from "../../localize";
 import "./editor-elements-shp";
 
 @customElement("editor-room-shp")
@@ -87,7 +88,7 @@ export class EditorRoomShp extends LitElement {
                 <div class="room-header" @click=${this._toggleExpanded}>
                     <ha-icon icon=${this._expanded ? "mdi:chevron-down" : "mdi:chevron-right"}></ha-icon>
                     <ha-icon icon=${getRoomIcon(this.hass, this.room)}></ha-icon>
-                    <div class="room-name">${this.room.name || "Unnamed Room"}</div>
+                    <div class="room-name">${this.room.name || getLocalizeFunction(this.hass)('editor.unnamed_room')}</div>
                     <button class="icon-button danger" @click=${this._removeRoom}>
                         <ha-icon icon="mdi:delete"></ha-icon>
                     </button>
@@ -105,7 +106,7 @@ export class EditorRoomShp extends LitElement {
                                         class="expand-icon ${this._expandedSections.has('basic') ? 'expanded' : ''}"
                                     ></ha-icon>
                                     <ha-icon icon="mdi:cog"></ha-icon>
-                                    Basic Configuration
+                                    ${getLocalizeFunction(this.hass)('editor.basic_configuration')}
                                 </div>
                             </div>
                             <div class="section-content ${this._expandedSections.has('basic') ? 'expanded' : ''}">
@@ -113,7 +114,7 @@ export class EditorRoomShp extends LitElement {
                                     <ha-area-picker
                                         .hass=${this.hass}
                                         .value=${this.room.area || ""}
-                                        .label=${"Home Assistant Area (optional)"}
+                                        .label=${getLocalizeFunction(this.hass)('editor.home_assistant_area_optional')}
                                         @value-changed=${this._areaChanged}
                                         allow-custom-entity
                                     ></ha-area-picker>
@@ -121,7 +122,7 @@ export class EditorRoomShp extends LitElement {
                                 ${!this.room.area ? html`
                                     <div class="room-field">
                                         <ha-textfield
-                                            label="Room Name"
+                                            label="${getLocalizeFunction(this.hass)('editor.room_name')}"
                                             .value=${this.room.name || ""}
                                             @input=${this._nameChanged}
                                         ></ha-textfield>
@@ -130,7 +131,7 @@ export class EditorRoomShp extends LitElement {
                                     <div class="room-field">
                                         <div class="info-text">
                                             <ha-icon icon="mdi:information-outline"></ha-icon>
-                                            Room name will use area name: <strong>${this.hass.areas?.[this.room.area]?.name || this.room.area}</strong>
+                                            ${getLocalizeFunction(this.hass)('editor.room_name_uses_area')} <strong>${this.hass.areas?.[this.room.area]?.name || this.room.area}</strong>
                                         </div>
                                     </div>
                                 `}
@@ -147,14 +148,14 @@ export class EditorRoomShp extends LitElement {
                                         class="expand-icon ${this._expandedSections.has('boundary') ? 'expanded' : ''}"
                                     ></ha-icon>
                                     <ha-icon icon="mdi:vector-polygon"></ha-icon>
-                                    Boundary Points - ${(this.room.boundary || []).length}
+                                    ${getLocalizeFunction(this.hass)('editor.boundary_points_count').replace('{count}', ((this.room.boundary || []).length).toString())}
                                 </div>
                                 <button
                                     class="add-button"
                                     @click=${(e: Event) => { e.stopPropagation(); this._addBoundaryPoint(); }}
                                 >
                                     <ha-icon icon="mdi:plus"></ha-icon>
-                                    Add Point
+                                    ${getLocalizeFunction(this.hass)('editor.add_point')}
                                 </button>
                             </div>
                             <div class="section-content ${this._expandedSections.has('boundary') ? 'expanded' : ''}">
@@ -162,13 +163,13 @@ export class EditorRoomShp extends LitElement {
                                     ${(this.room.boundary || []).map((point, index) => html`
                                         <div class="boundary-point">
                                             <ha-textfield
-                                                label="X"
+                                                label="${getLocalizeFunction(this.hass)('editor.x_coordinate')}"
                                                 type="number"
                                                 .value=${point[0]}
                                                 @input=${(e: Event) => this._boundaryPointChanged(index, 0, e)}
                                             ></ha-textfield>
                                             <ha-textfield
-                                                label="Y"
+                                                label="${getLocalizeFunction(this.hass)('editor.y_coordinate')}"
                                                 type="number"
                                                 .value=${point[1]}
                                                 @input=${(e: Event) => this._boundaryPointChanged(index, 1, e)}
@@ -194,14 +195,14 @@ export class EditorRoomShp extends LitElement {
                                         class="expand-icon ${this._expandedSections.has('entities') ? 'expanded' : ''}"
                                     ></ha-icon>
                                     <ha-icon icon="mdi:puzzle"></ha-icon>
-                                    Entities - ${(this.room.entities || []).length}
+                                    ${getLocalizeFunction(this.hass)('editor.entities_count').replace('{count}', ((this.room.entities || []).length).toString())}
                                 </div>
                                 <button
                                     class="add-button"
                                     @click=${(e: Event) => { e.stopPropagation(); this._handleElementAdd(); }}
                                 >
                                     <ha-icon icon="mdi:plus"></ha-icon>
-                                    Add Entity
+                                    ${getLocalizeFunction(this.hass)('editor.add_entity')}
                                 </button>
                             </div>
                             <div class="section-content ${this._expandedSections.has('entities') ? 'expanded' : ''}">

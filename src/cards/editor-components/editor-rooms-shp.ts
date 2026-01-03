@@ -3,6 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { Room } from "../scalable-house-plan";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
+import { getLocalizeFunction } from "../../localize";
 import "./editor-room-shp";
 
 @customElement("editor-rooms-shp")
@@ -40,7 +41,7 @@ export class EditorRoomsShp extends LitElement {
                 ${this.rooms.length === 0 ? html`
                     <div class="empty-state">
                         <ha-icon icon="mdi:floor-plan"></ha-icon>
-                        <div>No rooms configured. Click + to add a room.</div>
+                        <div>${getLocalizeFunction(this.hass)('editor.no_rooms_configured')}</div>
                     </div>
                 ` : ''}
             </div>

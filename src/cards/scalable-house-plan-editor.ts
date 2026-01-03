@@ -5,6 +5,7 @@ import type { LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace
 import type { ScalableHousePlanConfig, Layer, Room } from "./scalable-house-plan";
 import { sharedStyles } from "./editor-components/shared-styles";
 import { loadHaEntityPicker } from "../utils/load-ha-elements";
+import { getLocalizeFunction } from "../localize";
 import "./editor-components/editor-layers-shp";
 import "./editor-components/editor-rooms-shp";
 
@@ -50,7 +51,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     protected render() {
         if (!this._config) {
-            return html`<div>Loading...</div>`;
+            return html`<div>${getLocalizeFunction(this.hass)('editor.loading')}</div>`;
         }
 
         return html`
@@ -64,51 +65,51 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                                 class="expand-icon ${this._expandedSections.has('basic') ? 'expanded' : ''}"
                             ></ha-icon>
                             <ha-icon icon="mdi:cog"></ha-icon>
-                            Basic Configuration
+                            ${getLocalizeFunction(this.hass)('editor.basic_configuration')}
                         </div>
                     </div>
                     <div class="section-content ${this._expandedSections.has('basic') ? 'expanded' : ''}">
                         <div class="basic-config">
                         <ha-textfield
-                            label="Image URL"
+                            label="${getLocalizeFunction(this.hass)('editor.image_url')}"
                             .value=${this._config.image || ""}
                             @input=${this._imageChanged}
-                            placeholder="https://example.com/image.png"
+                            placeholder="${getLocalizeFunction(this.hass)('editor.image_url_placeholder')}"
                         ></ha-textfield>
                         <ha-textfield
-                            label="Image Width"
+                            label="${getLocalizeFunction(this.hass)('editor.image_width')}"
                             type="number"
                             .value=${this._config.image_width || 1360}
                             @input=${this._imageWidthChanged}
                         ></ha-textfield>
                         <ha-textfield
-                            label="Image Height"
+                            label="${getLocalizeFunction(this.hass)('editor.image_height')}"
                             type="number"
                             .value=${this._config.image_height || 849}
                             @input=${this._imageHeightChanged}
                         ></ha-textfield>
                         <ha-textfield
-                            label="Min Scale"
+                            label="${getLocalizeFunction(this.hass)('editor.min_scale')}"
                             type="number"
                             step="0.1"
                             .value=${this._config.min_scale || 0.5}
                             @input=${this._minScaleChanged}
                         ></ha-textfield>
                         <ha-textfield
-                            label="Max Scale"
+                            label="${getLocalizeFunction(this.hass)('editor.max_scale')}"
                             type="number"
                             step="0.1"
                             .value=${this._config.max_scale || 3}
                             @input=${this._maxScaleChanged}
                         ></ha-textfield>
                         <ha-textfield
-                            label="Layer State Persistence ID"
+                            label="${getLocalizeFunction(this.hass)('editor.layer_state_persistence_id')}"
                             .value=${this._config.layers_visibility_persistence_id || ""}
                             @input=${this._persistenceIdChanged}
-                            placeholder="default (leave empty to share state)"
-                            helper-text="Unique ID for layer visibility state. Same ID = shared state across cards."
+                            placeholder="${getLocalizeFunction(this.hass)('editor.layer_state_persistence_placeholder')}"
+                            helper-text="${getLocalizeFunction(this.hass)('editor.layer_state_persistence_helper')}"
                         ></ha-textfield>
-                        <ha-formfield label="Show Room Backgrounds">
+                        <ha-formfield label="${getLocalizeFunction(this.hass)('editor.show_room_backgrounds')}">
                             <ha-switch
                                 .checked=${this._config.show_room_backgrounds || false}
                                 @change=${this._showRoomBackgroundsChanged}
@@ -127,14 +128,14 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                                 class="expand-icon ${this._expandedSections.has('layers') ? 'expanded' : ''}"
                             ></ha-icon>
                             <ha-icon icon="mdi:layers-outline"></ha-icon>
-                            Layers (Optional) - ${this._config.layers?.length || 0}
+                            ${getLocalizeFunction(this.hass)('editor.layers_count').replace('{count}', (this._config.layers?.length || 0).toString())}
                         </div>
                         <button
                             class="add-button"
                             @click=${(e: Event) => { e.stopPropagation(); this._addLayer(); }}
                         >
                             <ha-icon icon="mdi:plus"></ha-icon>
-                            Add Layer
+                            ${getLocalizeFunction(this.hass)('editor.add_layer')}
                         </button>
                     </div>
                     <div class="section-content ${this._expandedSections.has('layers') ? 'expanded' : ''}">
@@ -157,14 +158,14 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                                 class="expand-icon ${this._expandedSections.has('rooms') ? 'expanded' : ''}"
                             ></ha-icon>
                             <ha-icon icon="mdi:floor-plan"></ha-icon>
-                            Rooms - ${this._config.rooms?.length || 0}
+                            ${getLocalizeFunction(this.hass)('editor.rooms_count').replace('{count}', (this._config.rooms?.length || 0).toString())}
                         </div>
                         <button
                             class="add-button"
                             @click=${(e: Event) => { e.stopPropagation(); this._addRoom(); }}
                         >
                             <ha-icon icon="mdi:plus"></ha-icon>
-                            Add Room
+                            ${getLocalizeFunction(this.hass)('editor.add_room')}
                         </button>
                     </div>
                     <div class="section-content ${this._expandedSections.has('rooms') ? 'expanded' : ''}">
@@ -195,7 +196,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     private _addLayer(): void {
         const newLayer: Layer = {
             id: `layer_${Date.now()}`,
-            name: "New Layer",
+            name: getLocalizeFunction(this.hass)('editor.new_layer'),
             icon: "mdi:layers",
             visible: true,
             showInToggles: true
@@ -238,7 +239,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     // Room handlers
     private _addRoom(): void {
         const newRoom: Room = {
-            name: "New Room",
+            name: getLocalizeFunction(this.hass)('editor.new_room'),
             boundary: [
                 [100, 100],
                 [300, 100],
