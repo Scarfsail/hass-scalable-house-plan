@@ -87,6 +87,7 @@ export class EditorElementShp extends LitElement {
         const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
         const placementIndicator = this._getPlacementIndicator(planConfig);
         const displayName = this._getEntityDisplayName(entityId);
+        const stateObj = entityId ? this.hass?.states?.[entityId] : undefined;
         
         return html`
             <div class="item">
@@ -96,7 +97,15 @@ export class EditorElementShp extends LitElement {
                         class="expand-icon ${this.isExpanded ? 'expanded' : ''}"
                     ></ha-icon>
                     <div class="item-info">
-                        <ha-icon icon="mdi:home-assistant" class="item-icon"></ha-icon>
+                        ${stateObj ? html`
+                            <ha-state-icon 
+                                .hass=${this.hass}
+                                .stateObj=${stateObj}
+                                class="item-icon"
+                            ></ha-state-icon>
+                        ` : html`
+                            <ha-icon icon="mdi:home-assistant" class="item-icon"></ha-icon>
+                        `}
                         <span class="item-name">${displayName}</span>
                         ${placementIndicator.show ? html`
                             <ha-icon 
