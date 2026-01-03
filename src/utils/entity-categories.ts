@@ -69,8 +69,7 @@ export const CATEGORY_DEFINITIONS: Record<EntityCategory, CategoryDefinition> = 
     [EntityCategory.AUTOMATIONS]: {
         key: EntityCategory.AUTOMATIONS,
         icon: 'mdi:robot',
-        order: 9,
-        collapsed: true
+        order: 9
     },
     [EntityCategory.OTHER]: {
         key: EntityCategory.OTHER,

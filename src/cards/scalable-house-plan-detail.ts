@@ -2,7 +2,7 @@ import { LitElement, html, svg, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, ScalableHousePlanConfig } from "./scalable-house-plan";
-import { CreateCardElement, getCreateCardElement, getRoomName, getRoomIcon } from "../utils";
+import { CreateCardElement, getCreateCardElement, getRoomName, getRoomIcon, getAreaEntities, getEntitiesNotOnDetailCount } from "../utils";
 import { renderElements, getRoomBounds } from "../components/element-renderer-shp";
 
 /**
@@ -23,6 +23,7 @@ export class ScalableHousePlanDetail extends LitElement {
     @property({ attribute: false }) public onShowEntities?: () => void;
 
     @state() private _createCardElement: CreateCardElement = null;
+    @state() private _entitiesNotOnDetailCount: number = 0;
     // Cache for element cards (key: entity_id, value: card element)
     private _elementCards: Map<string, any> = new Map();
     private previousViewport = { width: 0, height: 0 };
@@ -63,14 +64,36 @@ export class ScalableHousePlanDetail extends LitElement {
                 font-size: 18px;
                 font-weight: 500;
                 margin: 0;
-                flex: 1;
                 color: var(--primary-text-color);
             }
 
-            .menu-button {
+            .entity-badge {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 32px;
+                height: 32px;
+                padding: 0 8px;
+                border-radius: 16px;
+                background: var(--primary-color);
+                color: white;
+                font-size: 14px;
+                font-weight: 600;
                 cursor: pointer;
-                color: var(--primary-text-color);
-                --mdc-icon-button-size: 36px;
+                margin-left: 12px;
+                transition: background-color 0.2s, transform 0.1s;
+            }
+
+            .entity-badge.empty {
+                background: var(--disabled-text-color);
+            }
+
+            .entity-badge:hover {
+                transform: scale(1.05);
+            }
+
+            .entity-badge:active {
+                transform: scale(0.95);
             }
 
             .content {
@@ -108,7 +131,21 @@ export class ScalableHousePlanDetail extends LitElement {
         // Clear element cache when room changes
         if (changedProperties.has('room')) {
             this._elementCards.clear();
+            this._calculateEntitiesNotOnDetail();
         }
+    }
+
+    private _calculateEntitiesNotOnDetail() {
+        if (!this.room || !this.hass) {
+            this._entitiesNotOnDetailCount = 0;
+            return;
+        }
+
+        // Get area entities (empty array if no area)
+        const areaEntityIds = this.room.area ? getAreaEntities(this.hass, this.room.area) : [];
+        
+        // Use shared utility function to get count
+        this._entitiesNotOnDetailCount = getEntitiesNotOnDetailCount(this.hass, this.room, areaEntityIds);
     }
 
     render() {
@@ -127,13 +164,10 @@ export class ScalableHousePlanDetail extends LitElement {
                 </ha-icon-button>
                 <ha-icon class="room-icon" icon=${getRoomIcon(this.hass, this.room)}></ha-icon>
                 <h1 class="room-name">${getRoomName(this.hass, this.room)}</h1>
-                <ha-icon-button
-                    class="menu-button"
-                    .label=${"Show all entities"}
-                    @click=${this._handleShowEntities}
-                >
-                    <ha-icon icon="mdi:dots-vertical"></ha-icon>
-                </ha-icon-button>
+                <div class="entity-badge ${this._entitiesNotOnDetailCount === 0 ? 'empty' : ''}" @click=${this._handleShowEntities}>
+                    ${this._entitiesNotOnDetailCount}
+                </div>
+                <div style="flex: 1;"></div>
             </div>
 
             <div class="content">

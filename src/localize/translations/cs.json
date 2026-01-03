@@ -10,5 +10,9 @@
     "energy": "Energie",
     "automations": "Automatizace",
     "other": "Ostatní"
+  },
+  "entities": {
+    "show_all": "Vše",
+    "show_not_on_detail": "Nejsou na detailu"
   }
 }

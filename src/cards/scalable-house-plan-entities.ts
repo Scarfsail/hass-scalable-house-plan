@@ -2,7 +2,7 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig } from "./scalable-house-plan";
-import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities, getRoomIcon, groupEntitiesByCategory, getSortedCategories, EntityCategory, CATEGORY_DEFINITIONS } from "../utils";
+import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities, getRoomIcon, groupEntitiesByCategory, getSortedCategories, EntityCategory, CATEGORY_DEFINITIONS, getRoomEntities } from "../utils";
 import { getLocalizeFunction } from "../localize";
 
 /**
@@ -14,6 +14,8 @@ export class ScalableHousePlanEntities extends LitElement {
     @property({ attribute: false }) public hass?: HomeAssistant;
     @property({ attribute: false }) public room?: Room;
     @property({ attribute: false }) public onBack?: () => void;
+
+    @state() private _showAllEntities: boolean = false; // Default to showing only entities not on detail
 
     // Cache for card elements (key: entity_id, value: card element)
     private _cardElements: Map<string, any> = new Map();
@@ -98,6 +100,26 @@ export class ScalableHousePlanEntities extends LitElement {
                 font-weight: 500;
                 margin: 0;
                 color: var(--primary-text-color);
+            }
+
+            .filter-toggle {
+                display: flex;
+                align-items: center;
+                margin-left: 12px;
+            }
+
+            .toggle-label {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                cursor: pointer;
+                user-select: none;
+            }
+
+            .toggle-text {
+                font-size: 13px;
+                color: var(--secondary-text-color);
+                white-space: nowrap;
             }
 
             .cards-container {
@@ -211,6 +233,8 @@ export class ScalableHousePlanEntities extends LitElement {
             return html`<div>Loading...</div>`;
         }
 
+        const localize = getLocalizeFunction(this.hass);
+
         return html`
             <div class="header">
                 <ha-icon-button
@@ -222,6 +246,16 @@ export class ScalableHousePlanEntities extends LitElement {
                 </ha-icon-button>
                 <ha-icon class="room-icon" icon=${getRoomIcon(this.hass, this.room)}></ha-icon>
                 <h1 class="room-name">${getRoomName(this.hass, this.room)}</h1>
+                <div class="filter-toggle">
+                    <label class="toggle-label">
+                        <span class="toggle-text">${this._showAllEntities ? localize('entities.show_all') : localize('entities.show_not_on_detail')}</span>
+                        <ha-switch
+                            .checked=${this._showAllEntities}
+                            @change=${this._handleFilterToggle}
+                        ></ha-switch>
+                    </label>
+                </div>
+                <div style="flex: 1;"></div>
             </div>
 
             <div class="cards-container">
@@ -236,18 +270,13 @@ export class ScalableHousePlanEntities extends LitElement {
         // Get localize function
         const localize = getLocalizeFunction(this.hass);
 
-        // Get explicitly configured entity IDs for deduplication
-        const explicitEntityIds = new Set(
-            this.room.entities.map(cfg => 
-                typeof cfg === 'string' ? cfg : cfg.entity
-            )
+        // Use shared utility function to get entities (filtered or all)
+        const allEntityConfigs = getRoomEntities(
+            this.hass, 
+            this.room, 
+            this._areaEntityIds, 
+            this._showAllEntities
         );
-
-        // Combine explicit entities and area entities (deduplicated)
-        const areaEntityConfigs: EntityConfig[] = this._areaEntityIds
-            .filter(entityId => !explicitEntityIds.has(entityId));
-
-        const allEntityConfigs: EntityConfig[] = [...this.room.entities, ...areaEntityConfigs];
 
         // Create a map of entityId -> EntityConfig for easy lookup
         const entityConfigMap = new Map<string, EntityConfig>();
@@ -395,5 +424,11 @@ export class ScalableHousePlanEntities extends LitElement {
         if (this.onBack) {
             this.onBack();
         }
+    }
+
+    private _handleFilterToggle(e: Event) {
+        const switchElement = e.target as any;
+        this._showAllEntities = switchElement.checked;
+        this.requestUpdate();
     }
 }
