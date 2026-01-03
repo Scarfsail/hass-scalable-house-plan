@@ -13,7 +13,7 @@ import "./editor-components/editor-rooms-shp";
 export class ScalableHousePlanEditor extends LitElement implements LovelaceCardEditor {
     @property({ attribute: false }) public hass!: HomeAssistant;
     @state() private _config!: ScalableHousePlanConfig;
-    @state() private _expandedSections: Set<string> = new Set();
+    @state() private _expandedSections: Set<string> = new Set(['rooms']);
 
     async connectedCallback() {
         super.connectedCallback();
