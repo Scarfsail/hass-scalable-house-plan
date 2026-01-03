@@ -1,5 +1,6 @@
 import { LitElement, html, css } from "lit-element";
 import { customElement, property } from "lit/decorators.js";
+import { repeat } from "lit/directives/repeat.js";
 import { sharedStyles } from "./shared-styles";
 import { DragDropMixin } from "./drag-drop-mixin";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
@@ -7,6 +8,16 @@ import type { EntityConfig } from "../scalable-house-plan";
 import { getLocalizeFunction } from "../../localize";
 import "./editor-element-shp";
 import { CrossContainerCoordinator } from "./cross-container-coordinator";
+
+/**
+ * Generate a stable key for an entity config
+ * This ensures proper component updates after drag & drop
+ */
+function getEntityKey(element: EntityConfig, index: number): string {
+    const entityId = typeof element === 'string' ? element : element.entity;
+    // Use entity ID as primary key, fallback to index for empty entities
+    return entityId || `empty-${index}`;
+}
 
 @customElement("editor-elements-shp")
 export class EditorElementsShp extends LitElement {
@@ -57,19 +68,23 @@ export class EditorElementsShp extends LitElement {
                     <div class="elements-list">
                         ${this.elements.length === 0 
                             ? html`<div class="empty-drop-zone">${this._renderEmptyState()}</div>`
-                            : this.elements.map((element, index) => html`
-                                <editor-element-shp
-                                    class="element-item"
-                                    .hass=${this.hass}
-                                    .entity=${element}
-                                    .index=${index}
-                                    .areaId=${this.areaId}
-                                    .isExpanded=${this.expandedElements.has(index)}
-                                    @element-toggle=${this._handleElementToggle}
-                                    @element-update=${this._handleElementUpdate}
-                                    @element-remove=${this._handleElementRemove}
-                                ></editor-element-shp>
-                            `)
+                            : repeat(
+                                this.elements,
+                                (element, index) => getEntityKey(element, index),
+                                (element, index) => html`
+                                    <editor-element-shp
+                                        class="element-item"
+                                        .hass=${this.hass}
+                                        .entity=${element}
+                                        .index=${index}
+                                        .areaId=${this.areaId}
+                                        .isExpanded=${this.expandedElements.has(index)}
+                                        @element-toggle=${this._handleElementToggle}
+                                        @element-update=${this._handleElementUpdate}
+                                        @element-remove=${this._handleElementRemove}
+                                    ></editor-element-shp>
+                                `
+                            )
                         }
                     </div>
                 </ha-sortable>
@@ -138,7 +153,31 @@ export class EditorElementsShp extends LitElement {
     private _handleElementsReorder(e: CustomEvent) {
         e.stopPropagation();
         const { oldIndex, newIndex } = e.detail;
+        
         const reorderedElements = DragDropMixin.reorderArray(this.elements, oldIndex, newIndex);
+        
+        // Update expanded elements set to reflect new indices
+        // This ensures expanded states follow the entities when reordered
+        const newExpandedElements = new Set<number>();
+        this.expandedElements.forEach(expandedIndex => {
+            let updatedIndex = expandedIndex;
+            if (expandedIndex === oldIndex) {
+                // This element moved from oldIndex to newIndex
+                updatedIndex = newIndex;
+            } else if (oldIndex < newIndex) {
+                // Item moved down: indices between oldIndex+1 and newIndex shift up by 1
+                if (expandedIndex > oldIndex && expandedIndex <= newIndex) {
+                    updatedIndex = expandedIndex - 1;
+                }
+            } else {
+                // Item moved up: indices between newIndex and oldIndex-1 shift down by 1
+                if (expandedIndex >= newIndex && expandedIndex < oldIndex) {
+                    updatedIndex = expandedIndex + 1;
+                }
+            }
+            newExpandedElements.add(updatedIndex);
+        });
+        this.expandedElements = newExpandedElements;
         
         const event = new CustomEvent('elements-reorder', {
             detail: { elements: reorderedElements },
