@@ -61,6 +61,7 @@
     "entities": "Entity",
     "entities_count": "Entity - {count}",
     "add_entity": "Přidat entitu",
+    "duplicate_entity": "Duplikovat entitu",
     "no_entities_created": "Nebyly vytvořeny žádné entity",
     "entities_description": "Entity jsou zařízení a senzory zobrazované v této místnosti",
     "new_entity": "Nová entita",

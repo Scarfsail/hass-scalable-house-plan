@@ -64,6 +64,9 @@ export class EditorElementShp extends LitElement {
                         ` : ''}
                     </div>
                     <div class="item-actions" @click=${(e: Event) => e.stopPropagation()}>
+                        <button class="icon-button" @click=${this._duplicateElement} title="${getLocalizeFunction(this.hass)('editor.duplicate_entity')}">
+                            <ha-icon icon="mdi:content-duplicate"></ha-icon>
+                        </button>
                         <button class="icon-button danger" @click=${this._removeElement}>
                             <ha-icon icon="mdi:delete"></ha-icon>
                         </button>
@@ -189,6 +192,15 @@ export class EditorElementShp extends LitElement {
     private _toggleExpansion() {
         const event = new CustomEvent('element-toggle', {
             detail: { index: this.index },
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(event);
+    }
+
+    private _duplicateElement() {
+        const event = new CustomEvent('element-duplicate', {
+            detail: { index: this.index, element: this.entity },
             bubbles: true,
             composed: true
         });

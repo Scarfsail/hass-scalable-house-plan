@@ -81,6 +81,7 @@ export class EditorElementsShp extends LitElement {
                                         .isExpanded=${this.expandedElements.has(index)}
                                         @element-toggle=${this._handleElementToggle}
                                         @element-update=${this._handleElementUpdate}
+                                        @element-duplicate=${this._handleElementDuplicate}
                                         @element-remove=${this._handleElementRemove}
                                     ></editor-element-shp>
                                 `
@@ -135,6 +136,48 @@ export class EditorElementsShp extends LitElement {
         
         const event = new CustomEvent('elements-update', {
             detail: { index, element },
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(event);
+    }
+
+    private _handleElementDuplicate(e: CustomEvent) {
+        const { index, element } = e.detail;
+        
+        // Create a deep copy of the element to avoid reference issues
+        let duplicatedElement: EntityConfig;
+        if (typeof element === 'string') {
+            duplicatedElement = element;
+        } else {
+            // Deep clone the element configuration
+            duplicatedElement = {
+                entity: element.entity,
+                ...(element.plan && { plan: JSON.parse(JSON.stringify(element.plan)) })
+            };
+        }
+        
+        // Insert the duplicated element right after the source (at index + 1)
+        const newElements = [...this.elements];
+        newElements.splice(index + 1, 0, duplicatedElement);
+        
+        // Update expanded elements: shift indices after the insertion point
+        const newExpandedElements = new Set<number>();
+        this.expandedElements.forEach(expandedIndex => {
+            if (expandedIndex > index) {
+                // Indices after the duplicated item shift down by 1
+                newExpandedElements.add(expandedIndex + 1);
+            } else {
+                newExpandedElements.add(expandedIndex);
+            }
+        });
+        // Optionally expand the newly duplicated item
+        newExpandedElements.add(index + 1);
+        this.expandedElements = newExpandedElements;
+        
+        // Dispatch event to update parent component
+        const event = new CustomEvent('elements-reorder', {
+            detail: { elements: newElements },
             bubbles: true,
             composed: true
         });
