@@ -5,7 +5,9 @@ const languages: Record<string, any> = {
     cs: cs,
 };
 
-export function getLocalizeFunction(hass: HomeAssistant): (string: string) => string {
+export type LocalizeFunction = (key: string) => string;
+
+export function getLocalizeFunction(hass: HomeAssistant): LocalizeFunction {
     const lang = getLanguage(hass?.language || 'cs');
     return (string: string) => localize(string, lang);
 }

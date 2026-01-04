@@ -3,7 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig } from "./scalable-house-plan";
 import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities, getRoomIcon, groupEntitiesByCategory, getSortedCategories, EntityCategory, CATEGORY_DEFINITIONS, getRoomEntities } from "../utils";
-import { getLocalizeFunction } from "../localize";
+import { getLocalizeFunction, type LocalizeFunction } from "../localize";
 
 /**
  * Room entities view component
@@ -25,6 +25,15 @@ export class ScalableHousePlanEntities extends LitElement {
     
     // Track collapsed state of categories (all expanded by default)
     @state() private _collapsedCategories: Set<EntityCategory> = new Set();
+
+    private _localize?: LocalizeFunction;
+
+    private get localize(): LocalizeFunction {
+        if (!this._localize) {
+            this._localize = getLocalizeFunction(this.hass!);
+        }
+        return this._localize;
+    }
 
     updated(changedProperties: Map<string, any>) {
         super.updated(changedProperties);
@@ -233,8 +242,6 @@ export class ScalableHousePlanEntities extends LitElement {
             return html`<div>Loading...</div>`;
         }
 
-        const localize = getLocalizeFunction(this.hass);
-
         return html`
             <div class="header">
                 <ha-icon-button
@@ -248,7 +255,7 @@ export class ScalableHousePlanEntities extends LitElement {
                 <h1 class="room-name">${getRoomName(this.hass, this.room)}</h1>
                 <div class="filter-toggle">
                     <label class="toggle-label">
-                        <span class="toggle-text">${this._showAllEntities ? localize('entities.show_all') : localize('entities.show_not_on_detail')}</span>
+                        <span class="toggle-text">${this._showAllEntities ? this.localize('entities.show_all') : this.localize('entities.show_not_on_detail')}</span>
                         <ha-switch
                             .checked=${this._showAllEntities}
                             @change=${this._handleFilterToggle}
@@ -266,9 +273,6 @@ export class ScalableHousePlanEntities extends LitElement {
 
     private _renderCategorizedCards() {
         if (!this.room || !this.hass) return html``;
-
-        // Get localize function
-        const localize = getLocalizeFunction(this.hass);
 
         // Use shared utility function to get entities (filtered or all)
         const allEntityConfigs = getRoomEntities(
@@ -311,7 +315,7 @@ export class ScalableHousePlanEntities extends LitElement {
                         @click=${() => this._toggleCategory(categoryDef.key)}
                     >
                         <ha-icon class="category-icon" icon="${categoryDef.icon}"></ha-icon>
-                        <h2 class="category-title">${localize(`category.${categoryDef.key}`)}</h2>
+                        <h2 class="category-title">${this.localize(`category.${categoryDef.key}`)}</h2>
                         <span class="category-count">(${categoryEntities.length})</span>
                         <ha-icon 
                             class="category-expand-icon ${isCollapsed ? '' : 'expanded'}"

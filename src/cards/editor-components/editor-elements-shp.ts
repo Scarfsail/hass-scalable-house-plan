@@ -5,7 +5,7 @@ import { sharedStyles } from "./shared-styles";
 import { DragDropMixin } from "./drag-drop-mixin";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { EntityConfig } from "../scalable-house-plan";
-import { getLocalizeFunction } from "../../localize";
+import { getLocalizeFunction, type LocalizeFunction } from "../../localize";
 import "./editor-element-shp";
 import { CrossContainerCoordinator } from "./cross-container-coordinator";
 
@@ -28,6 +28,14 @@ export class EditorElementsShp extends LitElement {
     @property({ type: Number }) groupIndex?: number;
     @property({ type: Boolean }) hideHeader: boolean = false; // Hide header when embedded
     @property({ type: String }) areaId?: string; // Optional area ID for filtering
+    private _localize?: LocalizeFunction;
+
+    private get localize(): LocalizeFunction {
+        if (!this._localize) {
+            this._localize = getLocalizeFunction(this.hass);
+        }
+        return this._localize;
+    }
 
     private coordinator = CrossContainerCoordinator.getInstance();
 
@@ -47,11 +55,11 @@ export class EditorElementsShp extends LitElement {
                     <div class="section-header">
                         <div class="section-title">
                             <ha-icon icon="mdi:puzzle"></ha-icon>
-                            ${getLocalizeFunction(this.hass)('editor.entities')} (${this.elements.length})
+                            ${this.localize('editor.entities')} (${this.elements.length})
                         </div>
                         <button class="add-button" @click=${this._addElement}>
                             <ha-icon icon="mdi:plus"></ha-icon>
-                            ${getLocalizeFunction(this.hass)('editor.add_entity')}
+                            ${this.localize('editor.add_entity')}
                         </button>
                     </div>
                 ` : ''}
@@ -97,9 +105,9 @@ export class EditorElementsShp extends LitElement {
         return html`
             <div class="empty-state">
                 <ha-icon icon="mdi:puzzle"></ha-icon>
-                <div class="empty-state-title">${getLocalizeFunction(this.hass)('editor.no_entities_created')}</div>
+                <div class="empty-state-title">${this.localize('editor.no_entities_created')}</div>
                 <div class="empty-state-subtitle">
-                    ${getLocalizeFunction(this.hass)('editor.entities_description')}
+                    ${this.localize('editor.entities_description')}
                 </div>
             </div>
         `;

@@ -4,7 +4,7 @@ import { sharedStyles } from "./shared-styles";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { EntityConfig } from "../scalable-house-plan";
 import { getAreaEntities } from "../../utils";
-import { getLocalizeFunction } from "../../localize";
+import { getLocalizeFunction, type LocalizeFunction } from "../../localize";
 
 @customElement("editor-element-shp")
 export class EditorElementShp extends LitElement {
@@ -14,6 +14,14 @@ export class EditorElementShp extends LitElement {
     @property({ type: Boolean }) isExpanded: boolean = false;
     @property({ type: String }) areaId?: string; // Optional area ID for filtering entities
     @property({ type: Boolean }) filterByArea?: boolean; // Toggle for area filtering (undefined = not initialized)
+    private _localize?: LocalizeFunction;
+
+    private get localize(): LocalizeFunction {
+        if (!this._localize) {
+            this._localize = getLocalizeFunction(this.hass);
+        }
+        return this._localize;
+    }
 
     static styles = [
         sharedStyles,
@@ -115,7 +123,7 @@ export class EditorElementShp extends LitElement {
                         ` : ''}
                     </div>
                     <div class="item-actions" @click=${(e: Event) => e.stopPropagation()}>
-                        <button class="icon-button" @click=${this._duplicateElement} title="${getLocalizeFunction(this.hass)('editor.duplicate_entity')}">
+                        <button class="icon-button" @click=${this._duplicateElement} title="${this.localize('editor.duplicate_entity')}">
                             <ha-icon icon="mdi:content-duplicate"></ha-icon>
                         </button>
                         <button class="icon-button danger" @click=${this._removeElement}>
@@ -138,7 +146,7 @@ export class EditorElementShp extends LitElement {
                             ></ha-entity-picker>
                             ${this.areaId ? html`
                                 <div class="area-filter">
-                                    <span class="area-filter-label">${getLocalizeFunction(this.hass)('editor.area')}</span>
+                                    <span class="area-filter-label">${this.localize('editor.area')}</span>
                                     <ha-switch
                                         .checked=${this.filterByArea ?? true}
                                         @change=${this._toggleAreaFilter}
@@ -148,7 +156,7 @@ export class EditorElementShp extends LitElement {
                         </div>
                     </div>
                     <div class="plan-section">
-                        <div class="plan-label">${getLocalizeFunction(this.hass)('editor.plan_configuration_optional')}</div>
+                        <div class="plan-label">${this.localize('editor.plan_configuration_optional')}</div>
                         <ha-yaml-editor
                             .hass=${this.hass}
                             .defaultValue=${planConfig || {}}
@@ -162,7 +170,7 @@ export class EditorElementShp extends LitElement {
 
     private _getEntityDisplayName(entityId: string): string {
         if (!entityId) {
-            return getLocalizeFunction(this.hass)('editor.new_entity');
+            return this.localize('editor.new_entity');
         }
         
         // Try to get friendly name from hass states
