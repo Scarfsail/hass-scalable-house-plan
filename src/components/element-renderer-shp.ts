@@ -106,17 +106,10 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             }
         }
 
-        // Handle size - always use original pixel sizes
-        // Scaling is handled by parent container transform (overview) or container sizing (detail)
-        const originalWidth = plan.width ?? elementConfig.width;
-        const originalHeight = plan.height ?? elementConfig.height;
-        
-        if (originalWidth !== undefined) {
-            style.width = `${originalWidth}px`;
-        }
-        if (originalHeight !== undefined) {
-            style.height = `${originalHeight}px`;
-        }
+        // Note: Width/height are NOT set on the wrapper div.
+        // Elements are responsible for sizing themselves via their internal styles.
+        // This allows elements like door-window to correctly handle orientation swapping
+        // without causing positioning issues with right/bottom alignment.
 
         // Get or create the element card
         const card = getOrCreateElementCard(entity, elementConfig, createCardElement, elementCards);

@@ -17,6 +17,12 @@ interface DoorWindowElementConfig extends ElementEntityBaseConfig {
 @customElement("door-window-shp")
 export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElementConfig> {
     static styles = css`
+        :host {
+            display: block;
+            width: fit-content;
+            height: fit-content;
+        }
+        
         .container {
             display: flex;
             align-items: center;
@@ -43,6 +49,7 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             text_position: config.text_position ?? "end"
         });
     }
+
     protected renderEntityContent(entity: HassEntity) {
         if (!this._config || !this.hass)
             return nothing;
