@@ -73,7 +73,7 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
 
     // Domain-level defaults
     'light': {
-        plan_element: { type: 'custom:state-icon-trigger-shp', size: 24 },
+        plan_element: { type: 'custom:state-icon-trigger-shp' },
         detail_element: { type: 'tile' }
     },
     'camera': {
@@ -81,37 +81,37 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
         detail_element: { type: 'custom:camera-shp', width: 300, height: 225 }
     },
     'cover': {
-        plan_element: { type: 'custom:state-icon-trigger-shp', size: 24 },
+        plan_element: { type: 'custom:hui-state-icon-element' },
         detail_element: { type: 'tile' }
     },
     'climate': {
-        plan_element: { type: 'custom:state-icon-trigger-shp', size: 24 },
+        plan_element: { type: 'custom:hui-state-icon-element' },
         detail_element: { type: 'tile' }
     },
     'switch': {
-        plan_element: { type: 'custom:state-icon-trigger-shp', size: 24 },
+        plan_element: { type: 'custom:hui-state-icon-element' },
         detail_element: { type: 'tile' }
     },
     'fan': {
-        plan_element: { type: 'custom:state-icon-trigger-shp', size: 24 },
+        plan_element: { type: 'custom:hui-state-icon-element' },
         detail_element: { type: 'tile' }
     },
     'lock': {
-        plan_element: { type: 'custom:state-icon-trigger-shp', size: 24 },
+        plan_element: { type: 'custom:hui-state-icon-element' },
         detail_element: { type: 'tile' }
     },
     'binary_sensor': {
-        plan_element: { type: 'custom:state-icon-trigger-shp', size: 20 },
+        plan_element: { type: 'custom:hui-state-icon-element' },
         detail_element: { type: 'tile' }
     },
     'sensor': {
-        plan_element: { type: 'custom:analog-shp', size: 20 },
+        plan_element: { type: 'custom:analog-shp' },
         detail_element: { type: 'tile' }
     },
 
     // Wildcard fallback for any unrecognized entity
     '*': {
-        plan_element: { type: 'custom:state-icon-trigger-shp', size: 20 },
+        plan_element: { type: 'custom:hui-state-icon-element' },
         detail_element: { type: 'tile' }
     }
 };
