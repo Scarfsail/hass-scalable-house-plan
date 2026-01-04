@@ -264,7 +264,7 @@ export class ScalableHousePlanEntities extends LitElement {
                 </div>
                 <div style="flex: 1;"></div>
             </div>
-
+ 
             <div class="cards-container">
                 ${this._renderCategorizedCards()}
             </div>
