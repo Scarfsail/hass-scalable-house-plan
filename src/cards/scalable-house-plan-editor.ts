@@ -103,6 +103,16 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             @input=${this._maxScaleChanged}
                         ></ha-textfield>
                         <ha-textfield
+                            label="${getLocalizeFunction(this.hass)('editor.element_detail_scale_ratio')}"
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            max="1"
+                            .value=${this._config.element_detail_scale_ratio ?? 0.1}
+                            @input=${this._elementDetailScaleRatioChanged}
+                            helper-text="${getLocalizeFunction(this.hass)('editor.element_detail_scale_ratio_helper')}"
+                        ></ha-textfield>
+                        <ha-textfield
                             label="${getLocalizeFunction(this.hass)('editor.layer_state_persistence_id')}"
                             .value=${this._config.layers_visibility_persistence_id || ""}
                             @input=${this._persistenceIdChanged}
@@ -307,6 +317,14 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     private _maxScaleChanged(ev: any): void {
         this._config = { ...this._config, max_scale: parseFloat(ev.target.value) || 3 };
         this._configChanged();
+    }
+
+    private _elementDetailScaleRatioChanged(ev: any): void {
+        const value = parseFloat(ev.target.value);
+        if (!isNaN(value)) {
+            this._config = { ...this._config, element_detail_scale_ratio: Math.max(0, Math.min(1, value)) };
+            this._configChanged();
+        }
     }
 
     private _persistenceIdChanged(ev: any): void {

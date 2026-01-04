@@ -76,6 +76,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     image_height: number;
     max_scale?: number;
     min_scale?: number;
+    element_detail_scale_ratio?: number;  // Proportional element scaling ratio for detail view (0=no scale, 1=full scale, default=0.25)
     card_size?: number;
     layers_visibility_persistence_id?: string;
     show_room_backgrounds?: boolean;  // Show room background colors (helpful for editing boundaries)

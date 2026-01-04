@@ -24,6 +24,8 @@
     "image_height": "Výška obrázku",
     "min_scale": "Minimální měřítko",
     "max_scale": "Maximální měřítko",
+    "element_detail_scale_ratio": "Poměr škálování elementů (detail)",
+    "element_detail_scale_ratio_helper": "0 = bez škálování, 0.25 = výchozí, 1 = plné škálování s plánem",
     "layer_state_persistence_id": "ID perzistence stavu vrstev",
     "layer_state_persistence_placeholder": "výchozí (ponechte prázdné pro sdílení stavu)",
     "layer_state_persistence_helper": "Unikátní ID pro stav viditelnosti vrstev. Stejné ID = sdílený stav mezi kartami.",

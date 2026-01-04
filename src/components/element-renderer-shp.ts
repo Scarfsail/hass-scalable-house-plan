@@ -19,14 +19,24 @@ export interface ElementRendererOptions {
     createCardElement: CreateCardElement | null;
     elementCards: Map<string, any>;
     scale: number;
+    scaleRatio?: number;  // Element scaling ratio (0=no scale, 1=full scale with plan)
 }
 
 /**
  * Renders elements for a room
- * Scaling is handled by parent container - elements keep original pixel sizes
+ * Element scaling is based on scaleRatio: elementScale = 1 + (planScale - 1) * scaleRatio
+ * - scaleRatio = 0: elements keep original size (no scaling)
+ * - scaleRatio = 1: elements scale fully with plan
+ * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
  */
 export function renderElements(options: ElementRendererOptions): TemplateResult[] {
-    const { hass, room, roomBounds, createCardElement, elementCards, scale } = options;
+    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0 } = options;
+    
+    // Calculate element scale: 1 + (planScale - 1) * scaleRatio
+    // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
+    // When scale=5, ratio=0: elementScale = 1 (no scaling)
+    // When scale=5, ratio=1: elementScale = 5 (full scaling)
+    const elementScale = 1 + (scale - 1) * scaleRatio;
 
     // Get all entities with plan config
     const elements = (room.entities || [])
@@ -114,12 +124,26 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             card.hass = hass;
         }
 
+        // Calculate transform-origin based on positioning
+        // Horizontal: use 'left' if left is set, 'right' if right is set, otherwise 'center'
+        const horizontalOrigin = plan.left !== undefined ? 'left' : 
+                                plan.right !== undefined ? 'right' : 'center';
+        
+        // Vertical: use 'top' if top is set, 'bottom' if bottom is set, otherwise 'center'
+        const verticalOrigin = plan.top !== undefined ? 'top' : 
+                              plan.bottom !== undefined ? 'bottom' : 'center';
+        
+        const transformOrigin = `${horizontalOrigin} ${verticalOrigin}`;
+
+        // Apply element scaling via transform
+        const transform = elementScale !== 1 ? `scale(${elementScale})` : '';
+        
         const styleString = Object.entries(style)
             .map(([k, v]) => `${k}: ${v}`)
             .join('; ');
 
         return html`
-            <div class="element-wrapper" style="${styleString}">
+            <div class="element-wrapper" style="${styleString}; transform: ${transform}; transform-origin: ${transformOrigin};">
                 ${card}
             </div>
         `;

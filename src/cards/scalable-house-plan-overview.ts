@@ -215,7 +215,8 @@ export class ScalableHousePlanOverview extends LitElement {
                         roomBounds,
                         createCardElement: this._createCardElement,
                         elementCards: this._elementCards,
-                        scale
+                        scale,
+                        scaleRatio: 0  // Overview: no element scaling - container transform handles it
                     })}
                 </div>
             `;

@@ -219,13 +219,18 @@ export class ScalableHousePlanDetail extends LitElement {
         const scaledHeight = contentHeight * scale;
 
         const roomShape = this._renderRoomShapeScaled(roomBounds, scale);
+        
+        // Use configured element_detail_scale_ratio (default 0.25 for detail view)
+        const scaleRatio = this.config.element_detail_scale_ratio ?? 0.25;
+        
         const elements = renderElements({
             hass: this.hass!,
             room: this.room,
             roomBounds,
             createCardElement: this._createCardElement,
             elementCards: this._elementCards,
-            scale
+            scale,
+            scaleRatio
         });
 
         return html`
