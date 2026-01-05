@@ -21,7 +21,18 @@ export interface ElementRendererOptions {
     scale: number;
     scaleRatio?: number;  // Element scaling ratio (0=no scale, 1=full scale with plan)
 }
-
+/**
+ * Generate unique key for no-entity elements based on type and position
+ * Key format: elementType-left-top-right-bottom
+ */
+function generateElementKey(elementType: string, plan: any): string {
+    const left = plan.left !== undefined ? String(plan.left) : 'undefined';
+    const top = plan.top !== undefined ? String(plan.top) : 'undefined';
+    const right = plan.right !== undefined ? String(plan.right) : 'undefined';
+    const bottom = plan.bottom !== undefined ? String(plan.bottom) : 'undefined';
+    
+    return `${elementType}-${left}-${top}-${right}-${bottom}`;
+}
 /**
  * Renders elements for a room
  * Element scaling is based on scaleRatio: elementScale = 1 + (planScale - 1) * scaleRatio
@@ -50,18 +61,29 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             
             if (!plan) return null;
 
-            // Get default element definition for this entity
-            const deviceClass = hass?.states[entity]?.attributes?.device_class;
-            const defaultElement = getElementTypeForEntity(entity, deviceClass, 'plan');
+            // Validate no-entity elements: must have element.type
+            if (!entity && (!plan.element || !plan.element.type)) {
+                console.warn('No-entity element missing element.type:', plan);
+                return null;
+            }
+
+            // Get default element definition for this entity (or use plan.element.type for no-entity)
+            const deviceClass = entity && hass?.states[entity]?.attributes?.device_class;
+            const defaultElement = entity 
+                ? getElementTypeForEntity(entity, deviceClass, 'plan')
+                : { type: plan.element!.type as string }; // For no-entity, use specified type (! is safe due to validation above)
             
             // Merge default properties with user overrides
-            const elementConfig = mergeElementProperties(defaultElement, plan.element);
+            const elementConfig = mergeElementProperties(defaultElement, plan.element || {});
 
-            return { entity, plan, elementConfig };
+            // Generate unique key: use entity if present, otherwise generate from type+position
+            const uniqueKey = entity || generateElementKey(elementConfig.type, plan);
+
+            return { entity, plan, elementConfig, uniqueKey };
         })
-        .filter((el): el is { entity: string; plan: any; elementConfig: any } => el !== null);
+        .filter((el): el is { entity: string; plan: any; elementConfig: any; uniqueKey: string } => el !== null);
 
-    return elements.map(({ entity, plan, elementConfig }) => {
+    return elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
         // Get position scaling modes (default to "plan" if not specified)
         const horizontalScaling: PositionScalingMode = plan.position_scaling_horizontal || "plan";
         const verticalScaling: PositionScalingMode = plan.position_scaling_vertical || "plan";
@@ -143,8 +165,8 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
         // This allows elements like door-window to correctly handle orientation swapping
         // without causing positioning issues with right/bottom alignment.
 
-        // Get or create the element card
-        const card = getOrCreateElementCard(entity, elementConfig, createCardElement, elementCards);
+        // Get or create the element card using unique key
+        const card = getOrCreateElementCard(uniqueKey, entity, elementConfig, createCardElement, elementCards);
         if (card && hass) {
             card.hass = hass;
         }
@@ -176,26 +198,32 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
 }
 
 /**
- * Get or create a card element for an entity
+ * Get or create a card element for an entity or no-entity element
+ * @param uniqueKey - Unique identifier (entity ID for entities, generated key for no-entity elements)
+ * @param entityId - Entity ID (can be empty string for no-entity elements)
+ * @param elementConfig - Element configuration
+ * @param createCardElement - Function to create card elements
+ * @param elementCards - Cache map for card elements
  */
 function getOrCreateElementCard(
+    uniqueKey: string,
     entityId: string, 
     elementConfig: any, 
     createCardElement: CreateCardElement | null,
     elementCards: Map<string, any>
 ) {
-    let card = elementCards.get(entityId);
+    let card = elementCards.get(uniqueKey);
     
     if (!card && createCardElement) {
         const cardConfig = {
             ...elementConfig,
-            entity: entityId,
+            entity: entityId || undefined,  // Don't pass empty string to card config
         };
         
         try {
             card = createCardElement(cardConfig);
             if (card) {
-                elementCards.set(entityId, card);
+                elementCards.set(uniqueKey, card);
             }
         } catch (e) {
             console.error('Error creating element card:', e);

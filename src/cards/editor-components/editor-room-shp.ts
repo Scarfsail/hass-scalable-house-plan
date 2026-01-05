@@ -203,14 +203,14 @@ export class EditorRoomShp extends LitElement {
                                         class="expand-icon ${this._expandedSections.has('entities') ? 'expanded' : ''}"
                                     ></ha-icon>
                                     <ha-icon icon="mdi:puzzle"></ha-icon>
-                                    ${this.localize('editor.entities_count').replace('{count}', ((this.room.entities || []).length).toString())}
+                                    ${this.localize('editor.entities_elements_count').replace('{count}', ((this.room.entities || []).length).toString())}
                                 </div>
                                 <button
                                     class="add-button"
                                     @click=${(e: Event) => { e.stopPropagation(); this._handleElementAdd(); }}
                                 >
                                     <ha-icon icon="mdi:plus"></ha-icon>
-                                    ${this.localize('editor.add_entity')}
+                                    ${this.localize('editor.add_entity_element')}
                                 </button>
                             </div>
                             <div class="section-content ${this._expandedSections.has('entities') ? 'expanded' : ''}">

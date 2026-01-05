@@ -61,13 +61,19 @@
     "x_coordinate": "X",
     "y_coordinate": "Y",
     "entities": "Entity",
+    "entities_elements": "Entity / Elementy",
     "entities_count": "Entity - {count}",
+    "entities_elements_count": "Entity / Elementy - {count}",
     "add_entity": "Přidat entitu",
+    "add_entity_element": "Přidat entitu / element",
     "duplicate_entity": "Duplikovat entitu",
     "no_entities_created": "Nebyly vytvořeny žádné entity",
     "entities_description": "Entity jsou zařízení a senzory zobrazované v této místnosti",
     "new_entity": "Nová entita",
+    "new_element": "Nový element",
     "plan_configuration_optional": "Plán (volitelné - pro umístění na plán)",
+    "plan_configuration_required": "Plán (povinné - element.type a pozice)",
+    "no_entity": "Bez entity",
     "area": "Oblast"
   }
 }

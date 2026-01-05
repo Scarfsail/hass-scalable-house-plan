@@ -16,6 +16,17 @@ export class EditorElementShp extends LitElement {
     @property({ type: Boolean }) filterByArea?: boolean; // Toggle for area filtering (undefined = not initialized)
     private _localize?: LocalizeFunction;
 
+    // Track if this is a no-entity element
+    // A no-entity element has: empty entity AND plan with element.type defined
+    private get _isNoEntity(): boolean {
+        const entityId = typeof this.entity === 'string' ? this.entity : this.entity.entity;
+        if (entityId && entityId !== '') return false;  // Has entity = not no-entity
+        
+        // Empty entity - check if it's intentional (has plan with element.type)
+        const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
+        return !!(planConfig && planConfig.element && planConfig.element.type);
+    }
+
     private get localize(): LocalizeFunction {
         if (!this._localize) {
             this._localize = getLocalizeFunction(this.hass);
@@ -68,6 +79,40 @@ export class EditorElementShp extends LitElement {
                 margin-bottom: 4px;
                 color: var(--primary-text-color);
             }
+            .plan-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 4px;
+            }
+            .plan-header .plan-label {
+                margin-bottom: 0;
+                flex: 1;
+            }
+            .no-entity-switch {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 12px;
+                color: var(--secondary-text-color);
+                white-space: nowrap;
+            }
+            .plan-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 4px;
+            }
+            .plan-header .plan-label {
+                margin-bottom: 0;
+            }
+            .no-entity-switch {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 12px;
+                color: var(--secondary-text-color);
+            }
         `
     ];
 
@@ -111,6 +156,8 @@ export class EditorElementShp extends LitElement {
                                 .stateObj=${stateObj}
                                 class="item-icon"
                             ></ha-state-icon>
+                        ` : this._isNoEntity ? html`
+                            <ha-icon icon="mdi:shape" class="item-icon" style="color: var(--label-badge-yellow, #f4b400);"></ha-icon>
                         ` : html`
                             <ha-icon icon="mdi:home-assistant" class="item-icon"></ha-icon>
                         `}
@@ -134,29 +181,45 @@ export class EditorElementShp extends LitElement {
                 </div>
                 
                 <div class="item-content ${this.isExpanded ? 'expanded' : ''}">
-                    <!-- Entity Picker -->
-                    <div class="entity-picker">
-                        <div class="entity-picker-row">
-                            <ha-entity-picker
-                                .hass=${this.hass}
-                                .value=${entityId}
-                                .includeEntities=${this._getIncludeEntities(entityId)}
-                                @value-changed=${this._entityIdChanged}
-                                allow-custom-entity
-                            ></ha-entity-picker>
-                            ${this.areaId ? html`
-                                <div class="area-filter">
-                                    <span class="area-filter-label">${this.localize('editor.area')}</span>
-                                    <ha-switch
-                                        .checked=${this.filterByArea ?? true}
-                                        @change=${this._toggleAreaFilter}
-                                    ></ha-switch>
-                                </div>
-                            ` : ''}
+                    <!-- Entity Picker (hidden if no-entity mode) -->
+                    ${!this._isNoEntity ? html`
+                        <div class="entity-picker">
+                            <div class="entity-picker-row">
+                                <ha-entity-picker
+                                    .hass=${this.hass}
+                                    .value=${entityId}
+                                    .includeEntities=${this._getIncludeEntities(entityId)}
+                                    @value-changed=${this._entityIdChanged}
+                                    allow-custom-entity
+                                ></ha-entity-picker>
+                                ${this.areaId ? html`
+                                    <div class="area-filter">
+                                        <span class="area-filter-label">${this.localize('editor.area')}</span>
+                                        <ha-switch
+                                            .checked=${this.filterByArea ?? true}
+                                            @change=${this._toggleAreaFilter}
+                                        ></ha-switch>
+                                    </div>
+                                ` : ''}
+                            </div>
                         </div>
-                    </div>
+                    ` : ''}
+                    
                     <div class="plan-section">
-                        <div class="plan-label">${this.localize('editor.plan_configuration_optional')}</div>
+                        <div class="plan-header">
+                            <div class="plan-label">
+                                ${this._isNoEntity 
+                                    ? this.localize('editor.plan_configuration_required') 
+                                    : this.localize('editor.plan_configuration_optional')}
+                            </div>
+                            <div class="no-entity-switch">
+                                <span>${this.localize('editor.no_entity')}</span>
+                                <ha-switch
+                                    .checked=${this._isNoEntity}
+                                    @change=${this._toggleNoEntity}
+                                ></ha-switch>
+                            </div>
+                        </div>
                         <ha-yaml-editor
                             .hass=${this.hass}
                             .defaultValue=${planConfig || {}}
@@ -170,7 +233,19 @@ export class EditorElementShp extends LitElement {
 
     private _getEntityDisplayName(entityId: string): string {
         if (!entityId) {
-            return this.localize('editor.new_entity');
+            // For no-entity elements, show element type if available
+            const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
+            const elementType = planConfig?.element?.type;
+            
+            // Show element type if it's properly set (not just placeholder)
+            if (elementType && elementType !== 'custom:' && elementType.trim() !== '') {
+                return elementType;
+            }
+            
+            // Show appropriate placeholder
+            return this._isNoEntity 
+                ? this.localize('editor.new_element') || 'New element'
+                : this.localize('editor.new_entity');
         }
         
         // Try to get friendly name from hass states
@@ -266,6 +341,51 @@ export class EditorElementShp extends LitElement {
             composed: true
         });
         this.dispatchEvent(event);
+    }
+
+    private _toggleNoEntity(ev: Event) {
+        const isNoEntity = (ev.target as HTMLInputElement).checked;
+        const currentEntityId = typeof this.entity === 'string' ? this.entity : this.entity.entity;
+        const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
+        
+        if (isNoEntity) {
+            // Switching to no-entity mode: clear entity, add element.type placeholder
+            const updatedPlan = {
+                ...(planConfig || {}),
+                element: {
+                    ...(planConfig?.element || {}),
+                    type: planConfig?.element?.type || 'custom:' // Add placeholder type
+                }
+            };
+            const updatedEntity = {
+                entity: '',
+                plan: updatedPlan
+            };
+            this._dispatchUpdate(updatedEntity);
+        } else {
+            // Switching back to entity mode: keep entity empty, remove element.type if it was just placeholder
+            const updatedPlan = planConfig ? {
+                ...planConfig,
+                element: planConfig.element ? {
+                    ...planConfig.element,
+                    type: undefined  // Remove type to exit no-entity mode
+                } : undefined
+            } : undefined;
+            
+            // Clean up empty element object
+            if (updatedPlan?.element && Object.keys(updatedPlan.element).filter((k: string) => updatedPlan.element![k as keyof typeof updatedPlan.element] !== undefined).length === 0) {
+                delete updatedPlan.element;
+            }
+            
+            const updatedEntity = updatedPlan && Object.keys(updatedPlan).length > 0
+                ? { entity: currentEntityId || '', plan: updatedPlan }
+                : { entity: currentEntityId || '' };
+                
+            this._dispatchUpdate(updatedEntity);
+        }
+        
+        // Force re-render to update UI immediately
+        this.requestUpdate();
     }
 
     private _toggleAreaFilter(ev: Event) {

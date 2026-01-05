@@ -50,8 +50,9 @@ interface ElementConfig {
 }
 
 // EntityConfig can be a string (entity_id) or an object
+// For no-entity elements (decorative), entity can be empty string and plan.element.type is required
 export type EntityConfig = string | {
-    entity: string;
+    entity: string;  // Can be empty string for no-entity elements
     plan?: PlanConfig;
 }
 
