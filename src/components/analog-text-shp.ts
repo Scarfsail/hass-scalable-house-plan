@@ -16,6 +16,11 @@ class AnalogText extends LitElement {
     /* Add component styles here */
         :host {
             white-space: nowrap;
+            display: block;
+            line-height: 1;
+        }
+        span {
+            line-height: 1;
         }
   `;
 
