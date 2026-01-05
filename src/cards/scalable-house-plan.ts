@@ -15,6 +15,8 @@ export interface Layer {
     showInToggles: boolean;
 }
 
+export type PositionScalingMode = "plan" | "element" | "fixed";
+
 export interface Room {
     name: string;
     area?: string;  // Optional Home Assistant area ID
@@ -34,6 +36,8 @@ interface PlanConfig {
     layer_id?: string;
     style?: any;
     element?: ElementConfig;  // Element config with optional type override
+    position_scaling_horizontal?: PositionScalingMode;  // How horizontal position scales in detail view (default: "plan")
+    position_scaling_vertical?: PositionScalingMode;    // How vertical position scales in detail view (default: "plan")
 }
 
 interface ElementConfig {

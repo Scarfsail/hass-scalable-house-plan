@@ -1,6 +1,6 @@
 import { html, TemplateResult } from "lit-element";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, EntityConfig } from "../cards/scalable-house-plan";
+import type { Room, EntityConfig, PositionScalingMode } from "../cards/scalable-house-plan";
 import { CreateCardElement, getElementTypeForEntity, mergeElementProperties } from "../utils";
 
 /**
@@ -62,6 +62,34 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
         .filter((el): el is { entity: string; plan: any; elementConfig: any } => el !== null);
 
     return elements.map(({ entity, plan, elementConfig }) => {
+        // Get position scaling modes (default to "plan" if not specified)
+        const horizontalScaling: PositionScalingMode = plan.position_scaling_horizontal || "plan";
+        const verticalScaling: PositionScalingMode = plan.position_scaling_vertical || "plan";
+        
+        // Calculate position scale factors
+        // When scaleRatio is 0 (overview), always use plan scale (ignore position scaling modes)
+        // When scaleRatio is non-zero (detail), apply custom scaling modes:
+        // "plan": positions scale with the room (current behavior)
+        // "element": positions scale with element size (using scaleRatio)
+        // "fixed": positions don't scale (use absolute values)
+        const getPositionScale = (mode: PositionScalingMode): number => {
+            if (scaleRatio === 0) return scale; // Overview always uses plan scale
+            
+            switch (mode) {
+                case "element":
+                    // Position scales same as element size: 1 + (scale - 1) * scaleRatio
+                    return 1 + (scale - 1) * scaleRatio;
+                case "fixed":
+                    return 1; // No scaling
+                case "plan":
+                default:
+                    return scale; // Full plan scaling
+            }
+        };
+        
+        const horizontalPositionScale = getPositionScale(horizontalScaling);
+        const verticalPositionScale = getPositionScale(verticalScaling);
+        
         // Calculate percentage-based position (maintain relative position in room)
         const style: Record<string, string> = {
             position: 'absolute'
@@ -73,8 +101,9 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
                 // Already a percentage - use directly
                 style.left = plan.left;
             } else if (typeof plan.left === 'number') {
-                // Pixels - convert to percentage relative to room
-                const percentage = (plan.left / roomBounds.width) * 100;
+                // Pixels - apply position scaling then convert to percentage
+                const scaledLeft = plan.left * horizontalPositionScale;
+                const percentage = (scaledLeft / (roomBounds.width * scale)) * 100;
                 style.left = `${percentage}%`;
             }
         }
@@ -83,7 +112,8 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             if (typeof plan.top === 'string' && plan.top.includes('%')) {
                 style.top = plan.top;
             } else if (typeof plan.top === 'number') {
-                const percentage = (plan.top / roomBounds.height) * 100;
+                const scaledTop = plan.top * verticalPositionScale;
+                const percentage = (scaledTop / (roomBounds.height * scale)) * 100;
                 style.top = `${percentage}%`;
             }
         }
@@ -92,7 +122,8 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             if (typeof plan.right === 'string' && plan.right.includes('%')) {
                 style.right = plan.right;
             } else if (typeof plan.right === 'number') {
-                const percentage = (plan.right / roomBounds.width) * 100;
+                const scaledRight = plan.right * horizontalPositionScale;
+                const percentage = (scaledRight / (roomBounds.width * scale)) * 100;
                 style.right = `${percentage}%`;
             }
         }
@@ -101,7 +132,8 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             if (typeof plan.bottom === 'string' && plan.bottom.includes('%')) {
                 style.bottom = plan.bottom;
             } else if (typeof plan.bottom === 'number') {
-                const percentage = (plan.bottom / roomBounds.height) * 100;
+                const scaledBottom = plan.bottom * verticalPositionScale;
+                const percentage = (scaledBottom / (roomBounds.height * scale)) * 100;
                 style.bottom = `${percentage}%`;
             }
         }
