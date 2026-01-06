@@ -1,7 +1,5 @@
 export * from "./shared-styles";
 export * from "./drag-drop-mixin";
-export * from "./editor-layers-shp";
-export * from "./editor-layer-shp";
 export * from "./editor-rooms-shp";
 export * from "./editor-room-shp";
 export * from "./editor-elements-shp";

@@ -7,14 +7,6 @@ import "./scalable-house-plan-overview";
 import "./scalable-house-plan-detail";
 import "./scalable-house-plan-entities";
 
-export interface Layer {
-    id: string;
-    name: string;
-    icon: string;
-    visible: boolean;
-    showInToggles: boolean;
-}
-
 export type PositionScalingMode = "plan" | "element" | "fixed";
 
 export interface Room {
@@ -33,7 +25,6 @@ interface PlanConfig {
     width?: string | number;
     height?: string | number;
     overview?: boolean;  // Default true - show on overview
-    layer_id?: string;
     style?: any;
     element?: ElementConfig;  // Element config with optional type override
     position_scaling_horizontal?: PositionScalingMode;  // How horizontal position scales in detail view (default: "plan")
@@ -62,7 +53,6 @@ interface PictureElement {
     style: any;
     entity?: string;
     tap_action?: any;
-    layer_id?: string;
     left?: string | number;
     right?: string | number;
     top?: string | number;
@@ -74,7 +64,6 @@ interface PictureElement {
 
 export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     rooms: Room[];
-    layers?: Layer[];
     image: string;
     style?: any
     image_width: number;
@@ -83,7 +72,6 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     min_scale?: number;
     element_detail_scale_ratio?: number;  // Proportional element scaling ratio for detail view (0=no scale, 1=full scale, default=0.25)
     card_size?: number;
-    layers_visibility_persistence_id?: string;
     show_room_backgrounds?: boolean;  // Show room background colors (helpful for editing boundaries)
 }
 
@@ -136,7 +124,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     setConfig(config: ScalableHousePlanConfig) {
         this.config = {
             ...config,
-            layers: config.layers || [],
             rooms: config.rooms || [],
         };
     }
@@ -285,15 +272,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             image: "/local/path/to/image.png",
             image_width: 1360,
             image_height: 849,
-            layers: [
-                {
-                    id: "default",
-                    name: "Default Layer",
-                    icon: "mdi:layers",
-                    visible: true,
-                    showInToggles: true
-                }
-            ],
             rooms: [
                 {
                     name: "Living Room",

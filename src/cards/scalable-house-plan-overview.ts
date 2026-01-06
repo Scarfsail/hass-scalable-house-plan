@@ -3,7 +3,6 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, ScalableHousePlanConfig, EntityConfig } from "./scalable-house-plan";
 import { CreateCardElement, getCreateCardElement, getRoomName } from "../utils";
-import { LayerStateManager } from "../utils/layer-state-storage";
 import { renderElements, getRoomBounds } from "../components/element-renderer-shp";
 
 /**
@@ -17,8 +16,6 @@ export class ScalableHousePlanOverview extends LitElement {
     @property({ attribute: false }) public onRoomClick?: (room: Room, index: number) => void;
 
     @state() private _createCardElement: CreateCardElement = null;
-    @state() private _layerVisibility: Map<string, boolean> = new Map();
-    private layerStateManager?: LayerStateManager;
     // Cache for element cards across all rooms (key: entity_id, value: card element)
     private _elementCards: Map<string, any> = new Map();
     private previousViewport = { width: 0, height: 0 };
@@ -50,62 +47,10 @@ export class ScalableHousePlanOverview extends LitElement {
     async connectedCallback() {
         super.connectedCallback();
         this._createCardElement = await getCreateCardElement();
-        this._initializeLayerState();
     }
 
     updated(changedProperties: Map<string, any>) {
         super.updated(changedProperties);
-        
-        // Reinitialize layer state if config changes
-        if (changedProperties.has('config') && this.config) {
-            this._initializeLayerState();
-        }
-    }
-
-    private _initializeLayerState() {
-        if (!this.config) return;
-
-        // Initialize layer state manager with persistence ID
-        const persistenceId = LayerStateManager.generatePersistenceId(this.config);
-        this.layerStateManager = new LayerStateManager(persistenceId);
-        
-        // Initialize layer visibility state with persistence
-        this._layerVisibility.clear();
-        
-        // Load persisted layer state from localStorage
-        const persistedState = this.layerStateManager.loadLayerState() || {};
-        
-        this.config.layers?.forEach((layer) => {
-            // Use persisted state if available, otherwise fall back to layer config default
-            const visibility = persistedState.hasOwnProperty(layer.id) 
-                ? persistedState[layer.id] 
-                : LayerStateManager.getDefaultVisibility(layer);
-            
-            this._layerVisibility.set(layer.id, visibility);
-            
-            // Set CSS variable immediately for proper initial display
-            this.style.setProperty(`--layer-${layer.id}-display`, visibility ? 'block' : 'none');
-        });
-    }
-
-    public toggleLayerVisibility(layerId: string, visible?: boolean) {
-        const currentVisibility = this._layerVisibility.get(layerId) ?? true;
-        const newVisibility = visible !== undefined ? visible : !currentVisibility;
-        
-        this._layerVisibility.set(layerId, newVisibility);
-        
-        // Persist the change to localStorage
-        this.layerStateManager?.updateLayerVisibility(layerId, newVisibility);
-        
-        // Update CSS variable immediately for smooth visibility toggle
-        this.style.setProperty(`--layer-${layerId}-display`, newVisibility ? 'block' : 'none');
-        
-        // Request update to re-render with new layer visibility
-        this.requestUpdate();
-    }
-
-    public getLayerVisibility(layerId: string): boolean {
-        return this._layerVisibility.get(layerId) ?? true;
     }
 
     render() {
@@ -158,12 +103,6 @@ export class ScalableHousePlanOverview extends LitElement {
         }
 
         this.style.setProperty("position", "relative");
-
-        // Set CSS variables for layer visibility
-        this.config?.layers?.forEach((layer) => {
-            const isVisible = this._layerVisibility.get(layer.id) ?? true;
-            this.style.setProperty(`--layer-${layer.id}-display`, isVisible ? 'block' : 'none');
-        });
 
         const roomsOverlay = this._renderRooms();
         const allElements = this._renderAllElements(scale.scaleX);

@@ -2,11 +2,10 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
-import type { ScalableHousePlanConfig, Layer, Room } from "./scalable-house-plan";
+import type { ScalableHousePlanConfig, Room } from "./scalable-house-plan";
 import { sharedStyles } from "./editor-components/shared-styles";
 import { loadHaEntityPicker } from "../utils/load-ha-elements";
 import { getLocalizeFunction, type LocalizeFunction } from "../localize";
-import "./editor-components/editor-layers-shp";
 import "./editor-components/editor-rooms-shp";
 
 @customElement("scalable-house-plan-editor")
@@ -42,18 +41,12 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             .basic-config ha-textfield {
                 width: 100%;
             }
-
-            /* Make persistence ID field span full width for better UX */
-            .basic-config ha-textfield[label="Layer State Persistence ID"] {
-                grid-column: 1 / -1;
-            }
         `
     ];
 
     public setConfig(config: ScalableHousePlanConfig): void {
         this._config = { 
             ...config,
-            layers: config.layers || [],
             rooms: config.rooms || []
         };
     }
@@ -121,13 +114,6 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             @input=${this._elementDetailScaleRatioChanged}
                             helper-text="${this.localize('editor.element_detail_scale_ratio_helper')}"
                         ></ha-textfield>
-                        <ha-textfield
-                            label="${this.localize('editor.layer_state_persistence_id')}"
-                            .value=${this._config.layers_visibility_persistence_id || ""}
-                            @input=${this._persistenceIdChanged}
-                            placeholder="${this.localize('editor.layer_state_persistence_placeholder')}"
-                            helper-text="${this.localize('editor.layer_state_persistence_helper')}"
-                        ></ha-textfield>
                         <ha-formfield label="${this.localize('editor.show_room_backgrounds')}">
                             <ha-switch
                                 .checked=${this._config.show_room_backgrounds || false}
@@ -135,36 +121,6 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             ></ha-switch>
                         </ha-formfield>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Layers Section (Optional) -->
-                <div class="config-section collapsible-section">
-                    <div class="section-header ${this._expandedSections.has('layers') ? 'expanded' : ''}" @click=${() => this._toggleSection('layers')}>
-                        <div class="section-title">
-                            <ha-icon 
-                                icon="mdi:chevron-right" 
-                                class="expand-icon ${this._expandedSections.has('layers') ? 'expanded' : ''}"
-                            ></ha-icon>
-                            <ha-icon icon="mdi:layers-outline"></ha-icon>
-                            ${this.localize('editor.layers_count').replace('{count}', (this._config.layers?.length || 0).toString())}
-                        </div>
-                        <button
-                            class="add-button"
-                            @click=${(e: Event) => { e.stopPropagation(); this._addLayer(); }}
-                        >
-                            <ha-icon icon="mdi:plus"></ha-icon>
-                            ${this.localize('editor.add_layer')}
-                        </button>
-                    </div>
-                    <div class="section-content ${this._expandedSections.has('layers') ? 'expanded' : ''}">
-                                <editor-layers-shp
-                            .hass=${this.hass}
-                            .layers=${this._config.layers || []}
-                            @layer-add=${this._addLayer}
-                            @layer-update=${this._updateLayer}
-                            @layer-remove=${this._removeLayer}
-                        ></editor-layers-shp>
                     </div>
                 </div>
 
@@ -209,50 +165,6 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             this._expandedSections.add(section);
         }
         this.requestUpdate();
-    }
-
-    // Layer handlers
-    private _addLayer(): void {
-        const newLayer: Layer = {
-            id: `layer_${Date.now()}`,
-            name: this.localize('editor.new_layer'),
-            icon: "mdi:layers",
-            visible: true,
-            showInToggles: true
-        };
-
-        this._config = {
-            ...this._config,
-            layers: [...(this._config.layers || []), newLayer]
-        };
-        
-        this._configChanged();
-    }
-
-    private _updateLayer(ev: CustomEvent): void {
-        const { layerIndex, layer } = ev.detail;
-        const layers = [...(this._config.layers || [])];
-        layers[layerIndex] = layer;
-
-        this._config = {
-            ...this._config,
-            layers
-        };
-
-        this._configChanged();
-    }
-
-    private _removeLayer(ev: CustomEvent): void {
-        const { layerIndex } = ev.detail;
-        const layers = [...(this._config.layers || [])];
-        layers.splice(layerIndex, 1);
-
-        this._config = {
-            ...this._config,
-            layers
-        };
-
-        this._configChanged();
     }
 
     // Room handlers
@@ -334,17 +246,6 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             this._config = { ...this._config, element_detail_scale_ratio: Math.max(0, Math.min(1, value)) };
             this._configChanged();
         }
-    }
-
-    private _persistenceIdChanged(ev: any): void {
-        const value = ev.target.value.trim();
-        if (value === '') {
-            const { layers_visibility_persistence_id, ...configWithoutId } = this._config;
-            this._config = configWithoutId;
-        } else {
-            this._config = { ...this._config, layers_visibility_persistence_id: value };
-        }
-        this._configChanged();
     }
 
     private _showRoomBackgroundsChanged(ev: any): void {
