@@ -21,13 +21,9 @@ interface ScriptButtonsGroupElementConfig extends ElementBaseConfig {
 @customElement("scripts-buttons-group-shp")
 export class ScriptButtonsGroupElement extends ElementBase<ScriptButtonsGroupElementConfig> {
     private _runScript(entity: string) {
-        // Implement the script running logic here
-        console.log(`Running script for entity: ${entity}`);
         this.hass?.callService('script', 'turn_on', { entity_id: entity });
     }
     private _stopScript(entity: string) {
-        // Implement the script running logic here
-        console.log(`Stopping script for entity: ${entity}`);
         this.hass?.callService('script', 'turn_off', { entity_id: entity });
     }
 

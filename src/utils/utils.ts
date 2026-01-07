@@ -123,3 +123,57 @@ export class Utils {
         return dateTime.hour(0).minute(0).second(0).millisecond(0);
     }
 }
+
+/**
+ * Apply min and max scale limits from config
+ * @param scale The calculated scale value
+ * @param minScale Optional minimum scale limit
+ * @param maxScale Optional maximum scale limit
+ * @returns The scale value constrained within the limits
+ */
+export function applyScaleLimits(
+    scale: number | { scaleX: number; scaleY: number },
+    minScale?: number,
+    maxScale?: number
+): number | { scaleX: number; scaleY: number } {
+    if (typeof scale === 'number') {
+        let result = scale;
+        if (maxScale !== undefined) {
+            result = Math.min(result, maxScale);
+        }
+        if (minScale !== undefined) {
+            result = Math.max(result, minScale);
+        }
+        return result;
+    } else {
+        let scaleX = scale.scaleX;
+        let scaleY = scale.scaleY;
+        if (maxScale !== undefined) {
+            scaleX = Math.min(scaleX, maxScale);
+            scaleY = Math.min(scaleY, maxScale);
+        }
+        if (minScale !== undefined) {
+            scaleX = Math.max(scaleX, minScale);
+            scaleY = Math.max(scaleY, minScale);
+        }
+        return { scaleX, scaleY };
+    }
+}
+
+/**
+ * Check if viewport dimensions have changed
+ * @param previousViewport Object to track previous viewport dimensions (mutated by this function)
+ * @returns true if viewport changed, false otherwise
+ */
+export function hasViewportChanged(previousViewport: { width: number; height: number }): boolean {
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    if (previousViewport.width !== viewportWidth || previousViewport.height !== viewportHeight) {
+        previousViewport.width = viewportWidth;
+        previousViewport.height = viewportHeight;
+        return true;
+    }
+    
+    return false;
+}

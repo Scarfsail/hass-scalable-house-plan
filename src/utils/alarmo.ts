@@ -35,7 +35,6 @@ export async function getAlarmoAreaEntitiesAndSensors(hass: HomeAssistant) {
 
 export async function getAlarmoSensorToAlarmoEntityMapping(entities: AlarmoAreaEntity[], sensors: AlarmoSensors) {
     const mapping = new Map<string, AlarmoSensorAndArea>();
-    console.log(sensors)
     for (const sensorId in sensors) {
         const sensor = sensors[sensorId];
         const areaEntity = entities.find(e => e.area_id === sensor.area);
@@ -57,7 +56,6 @@ export async function alarmoSensorsToAreas(hass: HomeAssistant) {
 }
 
 export async function getAlarmoSensorAndArea(hass: HomeAssistant, entity_id: string) {
-    console.log("Getting sensor and area for", entity_id);
     const sensors = await alarmoSensorsToAreas(hass);
     const sensor = sensors.get(entity_id)
     return sensor

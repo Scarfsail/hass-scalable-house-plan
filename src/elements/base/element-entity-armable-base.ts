@@ -10,7 +10,6 @@ export abstract class ElementEntityArmableBase<TConfig extends ElementEntityBase
     protected updated(changedProperties: Map<string | number | symbol, unknown>) {
         if (changedProperties.has('hass') && !changedProperties.get('hass')) {
             // hass has been assigned for the first time
-            console.log("hass object assigned for the first time", this.hass);
             if (this._config && this.hass) {
                 getAlarmoSensorAndArea(this.hass, this._config.entity).then((alarmoArea) => this._alarmoArea = alarmoArea);
             }

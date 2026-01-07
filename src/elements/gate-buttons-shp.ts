@@ -59,7 +59,6 @@ export class GateButtonsElement extends ElementEntityBase<GateButtonsElementConf
     }
 
     private performGateAction(action: GateActions, entity_id: string) {
-        console.log(`Performing action: ${action}`);
         this.hass?.callService('cover', `${action}_cover`, { entity_id: entity_id });
     }
 }

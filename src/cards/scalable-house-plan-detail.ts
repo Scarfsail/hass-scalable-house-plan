@@ -1,9 +1,10 @@
-import { LitElement, html, svg, css } from "lit-element";
+import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, ScalableHousePlanConfig } from "./scalable-house-plan";
-import { CreateCardElement, getCreateCardElement, getRoomName, getRoomIcon, getAreaEntities, getEntitiesNotOnDetailCount } from "../utils";
-import { renderElements, getRoomBounds } from "../components/element-renderer-shp";
+import { CreateCardElement, getCreateCardElement, getRoomName, getRoomIcon, getAreaEntities, getEntitiesNotOnDetailCount, applyScaleLimits, hasViewportChanged } from "../utils";
+import { getRoomBounds } from "../components/element-renderer-shp";
+import "../components/scalable-house-plan-room";
 
 /**
  * Room detail SVG view component
@@ -101,22 +102,6 @@ export class ScalableHousePlanDetail extends LitElement {
                 position: relative;
                 overflow: hidden;
             }
-
-            .room-container {
-                position: relative;
-            }
-
-            .elements-container {
-                position: absolute;
-                top: 0;
-                left: 0;
-                pointer-events: none;
-            }
-
-            .element-wrapper {
-                position: absolute;
-                pointer-events: auto;
-            }
         `;
     }
 
@@ -191,89 +176,29 @@ export class ScalableHousePlanDetail extends LitElement {
         const fitIntoHeight = clientRect.height - 60; // Subtract header height
         const fitIntoWidth = clientRect.width;
 
-        // Get the dimensions of the viewport (the visible area)
-        const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
-
-        if (this.previousViewport.width != viewportWidth || this.previousViewport.height != viewportHeight) {
-            this.previousViewport.width = viewportWidth;
-            this.previousViewport.height = viewportHeight;
+        if (hasViewportChanged(this.previousViewport)) {
             this.requestUpdate();
         }
 
         // Calculate uniform scale (maintain aspect ratio)
         const scaleX = fitIntoWidth / contentWidth;
         const scaleY = fitIntoHeight / contentHeight;
-        let scale = Math.min(scaleX, scaleY);
-
-        // Apply scale limits from config
-        if (this.config.max_scale) {
-            scale = Math.min(scale, this.config.max_scale);
-        }
-        if (this.config.min_scale) {
-            scale = Math.max(scale, this.config.min_scale);
-        }
-
-        // Calculate scaled dimensions
-        const scaledWidth = contentWidth * scale;
-        const scaledHeight = contentHeight * scale;
-
-        const roomShape = this._renderRoomShapeScaled(roomBounds, scale);
-        
-        // Use configured element_detail_scale_ratio (default 0.25 for detail view)
-        const scaleRatio = this.config.element_detail_scale_ratio ?? 0.25;
-        
-        const elements = renderElements({
-            hass: this.hass!,
-            room: this.room,
-            roomBounds,
-            createCardElement: this._createCardElement,
-            elementCards: this._elementCards,
-            scale,
-            scaleRatio
-        });
+        const scale = applyScaleLimits(
+            Math.min(scaleX, scaleY),
+            this.config.min_scale,
+            this.config.max_scale
+        ) as number;
 
         return html`
-            <div class="room-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
-                ${roomShape}
-                <div class="elements-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
-                    ${elements}
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Render room shape SVG at scaled dimensions
-     */
-    private _renderRoomShapeScaled(
-        roomBounds: { minX: number; minY: number; width: number; height: number },
-        scale: number
-    ) {
-        if (!this.room) return svg``;
-
-        const scaledWidth = roomBounds.width * scale;
-        const scaledHeight = roomBounds.height * scale;
-        
-        const fillColor = this.room.color || 'rgba(128, 128, 128, 0.2)';
-        const strokeColor = fillColor.replace(/[\d.]+\)$/, '0.4)');
-        
-        // Transform and scale points
-        const points = this.room.boundary
-            .map(p => `${(p[0] - roomBounds.minX) * scale},${(p[1] - roomBounds.minY) * scale}`)
-            .join(' ');
-        
-        return svg`
-            <svg style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px; z-index: 0;" 
-                 viewBox="0 0 ${scaledWidth} ${scaledHeight}" 
-                 preserveAspectRatio="none">
-                <polygon 
-                    points="${points}" 
-                    fill="${fillColor}" 
-                    stroke="${strokeColor}"
-                    stroke-width="2"
-                />
-            </svg>
+            <scalable-house-plan-room
+                .mode=${'detail'}
+                .room=${this.room}
+                .hass=${this.hass!}
+                .config=${this.config}
+                .scale=${scale}
+                .createCardElement=${this._createCardElement}
+                .elementCards=${this._elementCards}
+            ></scalable-house-plan-room>
         `;
     }
 
