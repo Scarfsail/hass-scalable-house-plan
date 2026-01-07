@@ -143,6 +143,16 @@ export class EditorRoomShp extends LitElement {
                                         </div>
                                     </div>
                                 `}
+                                <div class="room-field">
+                                    <ha-formfield
+                                        .label=${this.localize('editor.elements_clickable_on_overview')}
+                                    >
+                                        <ha-switch
+                                            .checked=${this.room.elements_clickable_on_overview ?? false}
+                                            @change=${this._elementsClickableChanged}
+                                        ></ha-switch>
+                                    </ha-formfield>
+                                </div>
                             </div>
                         </div>
 
@@ -248,6 +258,11 @@ export class EditorRoomShp extends LitElement {
     private _nameChanged(e: Event) {
         const target = e.target as HTMLInputElement;
         this._dispatchUpdate({ ...this.room, name: target.value });
+    }
+
+    private _elementsClickableChanged(e: Event) {
+        const target = e.target as HTMLInputElement;
+        this._dispatchUpdate({ ...this.room, elements_clickable_on_overview: target.checked });
     }
 
     private _areaChanged(e: CustomEvent) {

@@ -180,27 +180,35 @@ export class ScalableHousePlanRoom extends LitElement {
 
         const { fillColor, strokeColor } = this._getRoomColors();
 
+        // Check if elements should be clickable on overview
+        const elementsClickable = this.room.elements_clickable_on_overview ?? false;
+        
+        // Build SVG polygon with conditional interactivity
+        const polygonSvg = svg`
+            <svg style="position: absolute; top: 0; left: 0; width: ${roomBounds.width}px; height: ${roomBounds.height}px; pointer-events: none;" 
+                 viewBox="0 0 ${roomBounds.width} ${roomBounds.height}" 
+                 preserveAspectRatio="none">
+                <polygon 
+                    points="${this._cachedRelativePoints}" 
+                    fill="${fillColor}" 
+                    stroke="${strokeColor}"
+                    stroke-width="2"
+                    style="cursor: ${elementsClickable ? 'default' : 'pointer'}; pointer-events: ${elementsClickable ? 'none' : 'auto'};"
+                    @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
+                    @mouseenter=${elementsClickable ? null : (e: Event) => this._handleRoomHover(e, true)}
+                    @mouseleave=${elementsClickable ? null : (e: Event) => this._handleRoomHover(e, false)}
+                />
+            </svg>
+        `;
+
+        // Render with conditional order: elements clickable = SVG below elements
         return html`
             <div class="room-container" style="position: absolute; left: ${roomBounds.minX}px; top: ${roomBounds.minY}px; width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
+                ${elementsClickable ? polygonSvg : html``}
                 <div class="elements-container" style="width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
                     ${elements}
                 </div>
-                ${svg`
-                    <svg style="position: absolute; top: 0; left: 0; width: ${roomBounds.width}px; height: ${roomBounds.height}px; pointer-events: none;" 
-                         viewBox="0 0 ${roomBounds.width} ${roomBounds.height}" 
-                         preserveAspectRatio="none">
-                        <polygon 
-                            points="${this._cachedRelativePoints}" 
-                            fill="${fillColor}" 
-                            stroke="${strokeColor}"
-                            stroke-width="2"
-                            style="cursor: pointer; pointer-events: auto;"
-                            @click=${(e: Event) => this._handleRoomClick(e)}
-                            @mouseenter=${(e: Event) => this._handleRoomHover(e, true)}
-                            @mouseleave=${(e: Event) => this._handleRoomHover(e, false)}
-                        />
-                    </svg>
-                `}
+                ${elementsClickable ? html`` : polygonSvg}
             </div>
         `;
     }

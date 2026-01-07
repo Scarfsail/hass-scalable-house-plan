@@ -56,6 +56,7 @@
     "home_assistant_area_optional": "Home Assistant Oblast (volitelné)",
     "room_name": "Název místnosti",
     "room_name_uses_area": "Název místnosti použije název oblasti:",
+    "elements_clickable_on_overview": "Elementy klikatelné v přehledu",
     "boundary_points_count": "Rozměry a tvar místnosti - {count}",
     "add_point": "Přidat bod",
     "x_coordinate": "X",

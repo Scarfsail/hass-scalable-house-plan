@@ -15,6 +15,7 @@ export interface Room {
     boundary: [number, number][];
     entities: EntityConfig[];
     color?: string;  // Optional color for room background (supports rgba)
+    elements_clickable_on_overview?: boolean;  // Default false - when true, elements are clickable and room is not
 }
 
 interface PlanConfig {
