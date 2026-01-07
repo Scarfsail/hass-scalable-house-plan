@@ -185,9 +185,26 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
         // Apply element scaling via transform
         const transform = elementScale !== 1 ? `scale(${elementScale})` : '';
         
-        const styleString = Object.entries(style)
+        // Build base style string from position styles
+        let styleString = Object.entries(style)
             .map(([k, v]) => `${k}: ${v}`)
             .join('; ');
+        
+        // Apply user-defined custom styles from plan.style if present
+        // Supports both object notation: { 'z-index': '999', opacity: '0.8' }
+        // and string notation: "z-index: 999; opacity: 0.8"
+        // Custom styles are appended to position styles (position, left, top, right, bottom)
+        if (plan.style) {
+            const customStyles = typeof plan.style === 'string' 
+                ? plan.style 
+                : Object.entries(plan.style)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join('; ');
+            
+            if (customStyles) {
+                styleString += `; ${customStyles}`;
+            }
+        }
 
         return html`
             <div class="element-wrapper" style="${styleString}; transform: ${transform}; transform-origin: ${transformOrigin};">

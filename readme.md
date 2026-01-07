@@ -179,6 +179,16 @@ rooms:
           element:
             width: 80                   # Override default plan size
             # Detail view will use larger size from mapping
+      
+      # Element with custom styling
+      - entity: binary_sensor.alarm_sensor
+        plan:
+          left: 400
+          top: 50
+          style:
+            z-index: 999               # Render on top of other elements
+            opacity: 0.8               # Semi-transparent
+          # or as string: style: "z-index: 999; opacity: 0.8"
 
 # Layer System (Optional)
 layers:
@@ -222,6 +232,12 @@ layers:
 - Element positions in `plan.left/top` are relative to room's top-left corner
 - Automatic coordinate transformation to absolute positions
 - Supports negative values and positions beyond room boundaries
+
+**Custom Element Styling:**
+- Use `plan.style` to apply custom CSS styles to the element wrapper
+- Accepts both object notation `{ property: 'value' }` or string notation `"property: value"`
+- Style is applied alongside position properties (left, top, right, bottom)
+- Example uses: z-index, opacity, pointer-events, custom animations, etc.
 
 **Coordinate System:**
 - The card creates a scaled container that transforms all child elements proportionally
