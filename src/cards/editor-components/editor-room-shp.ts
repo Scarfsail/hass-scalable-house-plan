@@ -45,6 +45,12 @@ export class EditorRoomShp extends LitElement {
                 font-weight: 500;
             }
 
+            .room-actions {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+
             .room-content {
                 margin-top: 8px;
                 padding: 12px;
@@ -97,9 +103,15 @@ export class EditorRoomShp extends LitElement {
                     <ha-icon icon=${this._expanded ? "mdi:chevron-down" : "mdi:chevron-right"}></ha-icon>
                     <ha-icon icon=${getRoomIcon(this.hass, this.room)}></ha-icon>
                     <div class="room-name">${getRoomName(this.hass, this.room) || this.localize('editor.unnamed_room')}</div>
-                    <button class="icon-button danger" @click=${this._removeRoom}>
-                        <ha-icon icon="mdi:delete"></ha-icon>
-                    </button>
+                    <div class="room-actions" @click=${(e: Event) => e.stopPropagation()}>
+                        <button class="icon-button" @click=${this._duplicateRoom} title="${this.localize('editor.duplicate_room')}">
+                            <ha-icon icon="mdi:content-duplicate"></ha-icon>
+                        </button>
+                        <button class="icon-button danger" @click=${this._removeRoom}>
+                            <ha-icon icon="mdi:delete"></ha-icon>
+                        </button>
+                        <ha-icon icon="mdi:drag" class="handle" .disabled=${false} @click=${(e: Event) => e.stopPropagation()}></ha-icon>
+                    </div>
                 </div>
 
                 ${this._expanded ? html`
@@ -324,6 +336,16 @@ export class EditorRoomShp extends LitElement {
         e.stopPropagation();
         const event = new CustomEvent('room-remove', {
             detail: { roomIndex: this.roomIndex },
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(event);
+    }
+
+    private _duplicateRoom(e: Event) {
+        e.stopPropagation();
+        const event = new CustomEvent('room-duplicate', {
+            detail: { roomIndex: this.roomIndex, room: this.room },
             bubbles: true,
             composed: true
         });

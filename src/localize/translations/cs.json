@@ -68,6 +68,7 @@
     "add_entity": "Přidat entitu",
     "add_entity_element": "Přidat entitu / element",
     "duplicate_entity": "Duplikovat entitu",
+    "duplicate_room": "Duplikovat místnost",
     "no_entities_created": "Nebyly vytvořeny žádné entity",
     "entities_description": "Entity jsou zařízení a senzory zobrazované v této místnosti",
     "new_entity": "Nová entita",

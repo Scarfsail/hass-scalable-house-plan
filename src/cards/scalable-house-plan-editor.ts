@@ -150,6 +150,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             @room-add=${this._addRoom}
                             @room-update=${this._updateRoom}
                             @room-remove=${this._removeRoom}
+                            @rooms-reorder=${this._reorderRooms}
                         ></editor-rooms-shp>
                     </div>
                 </div>
@@ -205,6 +206,17 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         const { roomIndex } = ev.detail;
         const rooms = [...(this._config.rooms || [])];
         rooms.splice(roomIndex, 1);
+
+        this._config = {
+            ...this._config,
+            rooms
+        };
+
+        this._configChanged();
+    }
+
+    private _reorderRooms(ev: CustomEvent): void {
+        const { rooms } = ev.detail;
 
         this._config = {
             ...this._config,
