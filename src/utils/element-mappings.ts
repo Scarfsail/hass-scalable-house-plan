@@ -108,6 +108,10 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
         plan_element: { type: 'custom:analog-shp' },
         detail_element: { type: 'tile' }
     },
+    'image': {
+        plan_element: { type: 'custom:image-last-change-shp' },
+        detail_element: { type: 'tile' }
+    },
 
     // Wildcard fallback for any unrecognized entity
     '*': {
