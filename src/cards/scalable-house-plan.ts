@@ -16,6 +16,7 @@ export interface Room {
     entities: EntityConfig[];
     color?: string;  // Optional color for room background (supports rgba)
     elements_clickable_on_overview?: boolean;  // Default false - when true, elements are clickable and room is not
+    disable_dynamic_color?: boolean;  // Default false - when true, room is transparent (no dynamic colors)
 }
 
 interface PlanConfig {
@@ -30,6 +31,7 @@ interface PlanConfig {
     element?: ElementConfig;  // Element config with optional type override
     position_scaling_horizontal?: PositionScalingMode;  // How horizontal position scales in detail view (default: "plan")
     position_scaling_vertical?: PositionScalingMode;    // How vertical position scales in detail view (default: "plan")
+    disable_dynamic_color?: boolean;  // Opt-out entity from dynamic color evaluation
 }
 
 interface ElementConfig {
@@ -63,6 +65,13 @@ interface PictureElement {
     [key: string]: any;
 }
 
+export interface DynamicColorsConfig {
+    motion_occupancy?: string;      // Default: 'rgba(135, 206, 250, 0.15)' (light blue)
+    lights?: string;                // Default: 'rgba(255, 240, 100, 0.15)' (bright yellow)
+    default?: string;               // Default: 'rgba(128, 128, 128, 0.05)' (very light gray)
+    motion_delay_seconds?: number;  // Default: 60
+}
+
 export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     rooms: Room[];
     image: string;
@@ -74,6 +83,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     element_detail_scale_ratio?: number;  // Proportional element scaling ratio for detail view (0=no scale, 1=full scale, default=0.25)
     card_size?: number;
     show_room_backgrounds?: boolean;  // Show room background colors (helpful for editing boundaries)
+    dynamic_colors?: DynamicColorsConfig;  // Dynamic room color configuration
 }
 
 

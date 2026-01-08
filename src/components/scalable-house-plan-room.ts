@@ -1,9 +1,17 @@
 import { LitElement, html, svg, css, TemplateResult } from "lit-element";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, ScalableHousePlanConfig, EntityConfig } from "../cards/scalable-house-plan";
 import { CreateCardElement } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
+import { 
+    calculateDynamicRoomColor, 
+    createGradientDefinition, 
+    calculatePolygonCenter,
+    getMotionSensors,
+    type DynamicColorResult,
+    type GradientDefinition
+} from "../utils/room-color-helpers";
 
 /**
  * Type definitions for scale values
@@ -54,6 +62,13 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedRelativePoints?: string;
     private _cachedOverviewRoom?: Room;
 
+    // Dynamic color state
+    @state() private _motionDelayActive: Map<string, boolean> = new Map();
+    private _motionDelayTimers: Map<string, number> = new Map();
+    private _previousMotionStates: Map<string, string> = new Map();
+    @state() private _currentColor?: DynamicColorResult;
+    @state() private _currentGradient?: GradientDefinition;
+
     willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
         super.willUpdate(changedProperties);
         
@@ -76,6 +91,12 @@ export class ScalableHousePlanRoom extends LitElement {
                     return entityConfig.plan && (entityConfig.plan.overview !== false);
                 })
             };
+        }
+        
+        // Update motion delay tracking and dynamic colors when hass or room changes
+        if (changedProperties.has('hass') || changedProperties.has('room')) {
+            this._updateMotionDelayTracking();
+            this._updateDynamicColor();
         }
     }
 
@@ -100,15 +121,103 @@ export class ScalableHousePlanRoom extends LitElement {
                 position: absolute;
                 pointer-events: auto;
             }
+
+            .room-polygon {
+                transition: fill 0.5s ease-in-out;
+            }
         `;
+    }
+
+    /**
+     * Update motion delay tracking when entity states change
+     */
+    private _updateMotionDelayTracking(): void {
+        if (!this.hass || !this.room) return;
+        
+        const motionSensors = getMotionSensors(this.hass, this.room);
+        const delaySeconds = this.config?.dynamic_colors?.motion_delay_seconds ?? 60;
+        
+        for (const entityId of motionSensors) {
+            const currentState = this.hass.states[entityId]?.state;
+            const previousState = this._previousMotionStates.get(entityId);
+            
+            // State changed
+            if (currentState !== previousState) {
+                this._previousMotionStates.set(entityId, currentState || '');
+                
+                if (currentState === 'on') {
+                    // Motion detected - clear any existing delay timer and reset delay state
+                    const existingTimer = this._motionDelayTimers.get(entityId);
+                    if (existingTimer !== undefined) {
+                        window.clearTimeout(existingTimer);
+                        this._motionDelayTimers.delete(entityId);
+                    }
+                    this._motionDelayActive.set(entityId, false);
+                } else if (currentState === 'off' && previousState === 'on') {
+                    // Motion stopped - start delay timer
+                    this._motionDelayActive.set(entityId, true);
+                    
+                    const timer = window.setTimeout(() => {
+                        this._motionDelayActive.set(entityId, false);
+                        this._motionDelayTimers.delete(entityId);
+                        this._updateDynamicColor();
+                        this.requestUpdate();
+                    }, delaySeconds * 1000);
+                    
+                    this._motionDelayTimers.set(entityId, timer);
+                }
+            }
+        }
+    }
+
+    /**
+     * Update dynamic room color based on current entity states
+     */
+    private _updateDynamicColor(): void {
+        if (!this.hass || !this.room || !this._cachedRoomBounds) return;
+        
+        // Calculate color
+        this._currentColor = calculateDynamicRoomColor(
+            this.hass,
+            this.room,
+            this.config,
+            this._motionDelayActive
+        );
+        
+        // Create gradient if not transparent
+        if (this._currentColor.type !== 'transparent') {
+            const center = calculatePolygonCenter(this.room.boundary);
+            const gradientId = `gradient-${this.room.name.replace(/\s+/g, '-')}-${this.mode}`;
+            
+            this._currentGradient = createGradientDefinition(
+                this._currentColor.color,
+                gradientId,
+                center.x,
+                center.y,
+                this._cachedRoomBounds
+            );
+        } else {
+            this._currentGradient = undefined;
+        }
     }
 
     /**
      * Calculate room fill and stroke colors based on mode and settings
      * @param forHover If true, returns hover colors (more opaque)
-     * @returns Object with fillColor and strokeColor
+     * @returns Object with fillColor, strokeColor, and useGradient flag
      */
-    private _getRoomColors(forHover: boolean = false): { fillColor: string; strokeColor: string } {
+    private _getRoomColors(forHover: boolean = false): { fillColor: string; strokeColor: string; useGradient: boolean; gradientId?: string } {
+        // Use dynamic colors if available and not hovering
+        if (!forHover && this._currentColor && this._currentColor.type !== 'transparent' && this._currentGradient) {
+            return {
+                fillColor: `url(#${this._currentGradient.id})`,
+                strokeColor: 'rgba(0, 0, 0, 0.1)',
+                useGradient: true,
+                gradientId: this._currentGradient.id
+            };
+        }
+        
+        // Fallback to original logic
         const roomColor = this.room.color || ScalableHousePlanRoom.DEFAULT_ROOM_COLOR;
         
         if (this.mode === 'detail') {
@@ -117,7 +226,7 @@ export class ScalableHousePlanRoom extends LitElement {
                 ? roomColor.replace(/[\d.]+\)$/, '0.4)')
                 : roomColor;
             const strokeColor = roomColor.replace(/[\d.]+\)$/, '0.4)');
-            return { fillColor, strokeColor };
+            return { fillColor, strokeColor, useGradient: false };
         } else {
             // Overview mode: respect showRoomBackgrounds setting
             const showBackgrounds = this.showRoomBackgrounds ?? false;
@@ -126,13 +235,15 @@ export class ScalableHousePlanRoom extends LitElement {
                 // Hover: always show semi-transparent overlay
                 return {
                     fillColor: roomColor.replace(/[\d.]+\)$/, '0.4)'),
-                    strokeColor: 'rgba(0, 0, 0, 0.3)'
+                    strokeColor: 'rgba(0, 0, 0, 0.3)',
+                    useGradient: false
                 };
             } else {
                 // Normal: transparent or room color based on setting
                 return {
                     fillColor: showBackgrounds ? roomColor : 'transparent',
-                    strokeColor: showBackgrounds ? 'rgba(0, 0, 0, 0.3)' : 'transparent'
+                    strokeColor: showBackgrounds ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
+                    useGradient: false
                 };
             }
         }
@@ -178,21 +289,30 @@ export class ScalableHousePlanRoom extends LitElement {
             scaleRatio: 0  // Overview: no element scaling
         });
 
-        const { fillColor, strokeColor } = this._getRoomColors();
+        const { fillColor, strokeColor, useGradient } = this._getRoomColors();
 
         // Check if elements should be clickable on overview
         const elementsClickable = this.room.elements_clickable_on_overview ?? false;
         
-        // Build SVG polygon with conditional interactivity
+        // Build SVG polygon with conditional interactivity and gradient
         const polygonSvg = svg`
             <svg style="position: absolute; top: 0; left: 0; width: ${roomBounds.width}px; height: ${roomBounds.height}px; pointer-events: none;" 
                  viewBox="0 0 ${roomBounds.width} ${roomBounds.height}" 
                  preserveAspectRatio="none">
+                ${useGradient && this._currentGradient ? svg`
+                    <defs>
+                        <radialGradient id="${this._currentGradient.id}" cx="${this._currentGradient.cx}" cy="${this._currentGradient.cy}" r="70%">
+                            <stop offset="0%" stop-color="${this._currentGradient.innerColor}" />
+                            <stop offset="100%" stop-color="${this._currentGradient.outerColor}" />
+                        </radialGradient>
+                    </defs>
+                ` : ''}
                 <polygon 
                     points="${this._cachedRelativePoints}" 
                     fill="${fillColor}" 
                     stroke="${strokeColor}"
                     stroke-width="2"
+                    class="room-polygon"
                     style="cursor: ${elementsClickable ? 'default' : 'pointer'}; pointer-events: ${elementsClickable ? 'none' : 'auto'};"
                     @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
                     @mouseenter=${elementsClickable ? null : (e: Event) => this._handleRoomHover(e, true)}
@@ -252,7 +372,7 @@ export class ScalableHousePlanRoom extends LitElement {
             scaleRatio
         });
 
-        const { fillColor, strokeColor } = this._getRoomColors();
+        const { fillColor, strokeColor, useGradient } = this._getRoomColors();
         
         // Transform and scale points relative to room bounds
         const points = this.room.boundary
@@ -265,11 +385,20 @@ export class ScalableHousePlanRoom extends LitElement {
                     <svg style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px; z-index: 0;" 
                          viewBox="0 0 ${scaledWidth} ${scaledHeight}" 
                          preserveAspectRatio="none">
+                        ${useGradient && this._currentGradient ? svg`
+                            <defs>
+                                <radialGradient id="${this._currentGradient.id}" cx="${this._currentGradient.cx}" cy="${this._currentGradient.cy}" r="70%">
+                                    <stop offset="0%" stop-color="${this._currentGradient.innerColor}" />
+                                    <stop offset="100%" stop-color="${this._currentGradient.outerColor}" />
+                                </radialGradient>
+                            </defs>
+                        ` : ''}
                         <polygon 
                             points="${points}" 
                             fill="${fillColor}" 
                             stroke="${strokeColor}"
                             stroke-width="2"
+                            class="room-polygon"
                         />
                     </svg>
                 `}
@@ -289,7 +418,35 @@ export class ScalableHousePlanRoom extends LitElement {
 
     private _handleRoomHover(event: Event, isEntering: boolean) {
         const target = event.target as SVGPolygonElement;
-        const { fillColor } = this._getRoomColors(isEntering);
-        target.setAttribute('fill', fillColor);
+        
+        // If using gradient, adjust opacity instead of replacing fill
+        if (this._currentGradient && this._currentColor?.type !== 'transparent') {
+            if (isEntering) {
+                target.style.opacity = '1.5';  // Brighten by increasing opacity
+                target.style.filter = 'brightness(1.3)';  // Additional brightness boost
+            } else {
+                target.style.opacity = '';  // Reset to default
+                target.style.filter = '';
+            }
+        } else {
+            // Fallback to solid color for non-gradient backgrounds
+            const { fillColor } = this._getRoomColors(isEntering);
+            target.setAttribute('fill', fillColor);
+        }
+    }
+
+    /**
+     * Clean up timers on disconnect
+     */
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        
+        // Clear all motion delay timers
+        for (const timer of this._motionDelayTimers.values()) {
+            window.clearTimeout(timer);
+        }
+        this._motionDelayTimers.clear();
+        this._motionDelayActive.clear();
+        this._previousMotionStates.clear();
     }
 }

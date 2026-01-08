@@ -165,6 +165,16 @@ export class EditorRoomShp extends LitElement {
                                         ></ha-switch>
                                     </ha-formfield>
                                 </div>
+                                <div class="room-field">
+                                    <ha-formfield
+                                        .label=${this.localize('editor.disable_dynamic_color')}
+                                    >
+                                        <ha-switch
+                                            .checked=${this.room.disable_dynamic_color ?? false}
+                                            @change=${this._disableDynamicColorChanged}
+                                        ></ha-switch>
+                                    </ha-formfield>
+                                </div>
                             </div>
                         </div>
 
@@ -275,6 +285,11 @@ export class EditorRoomShp extends LitElement {
     private _elementsClickableChanged(e: Event) {
         const target = e.target as HTMLInputElement;
         this._dispatchUpdate({ ...this.room, elements_clickable_on_overview: target.checked });
+    }
+
+    private _disableDynamicColorChanged(e: Event) {
+        const target = e.target as HTMLInputElement;
+        this._dispatchUpdate({ ...this.room, disable_dynamic_color: target.checked });
     }
 
     private _areaChanged(e: CustomEvent) {

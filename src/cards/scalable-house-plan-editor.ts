@@ -124,6 +124,50 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                     </div>
                 </div>
 
+                <!-- Dynamic Room Colors Section -->
+                <div class="config-section collapsible-section">
+                    <div class="section-header ${this._expandedSections.has('dynamicColors') ? 'expanded' : ''}" @click=${() => this._toggleSection('dynamicColors')}>
+                        <div class="section-title">
+                            <ha-icon 
+                                icon="mdi:chevron-right" 
+                                class="expand-icon ${this._expandedSections.has('dynamicColors') ? 'expanded' : ''}"
+                            ></ha-icon>
+                            <ha-icon icon="mdi:palette"></ha-icon>
+                            ${this.localize('editor.dynamic_room_colors')}
+                        </div>
+                    </div>
+                    <div class="section-content ${this._expandedSections.has('dynamicColors') ? 'expanded' : ''}">
+                        <div class="basic-config">
+                            <ha-textfield
+                                label="${this.localize('editor.motion_occupancy_color')}"
+                                .value=${this._config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)'}
+                                @input=${this._motionOccupancyColorChanged}
+                                placeholder="rgba(135, 206, 250, 0.15)"
+                            ></ha-textfield>
+                            <ha-textfield
+                                label="${this.localize('editor.lights_color')}"
+                                .value=${this._config.dynamic_colors?.lights || 'rgba(255, 240, 100, 0.15)'}
+                                @input=${this._lightsColorChanged}
+                                placeholder="rgba(255, 240, 100, 0.15)"
+                            ></ha-textfield>
+                            <ha-textfield
+                                label="${this.localize('editor.default_color')}"
+                                .value=${this._config.dynamic_colors?.default || 'rgba(128, 128, 128, 0.05)'}
+                                @input=${this._defaultColorChanged}
+                                placeholder="rgba(128, 128, 128, 0.05)"
+                            ></ha-textfield>
+                            <ha-textfield
+                                label="${this.localize('editor.motion_delay_seconds')}"
+                                type="number"
+                                min="0"
+                                step="1"
+                                .value=${this._config.dynamic_colors?.motion_delay_seconds ?? 60}
+                                @input=${this._motionDelaySecondsChanged}
+                            ></ha-textfield>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Rooms Section -->
                 <div class="config-section collapsible-section">
                     <div class="section-header ${this._expandedSections.has('rooms') ? 'expanded' : ''}" @click=${() => this._toggleSection('rooms')}>
@@ -263,6 +307,54 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     private _showRoomBackgroundsChanged(ev: any): void {
         this._config = { ...this._config, show_room_backgrounds: ev.target.checked };
         this._configChanged();
+    }
+
+    // Dynamic colors change handlers
+    private _motionOccupancyColorChanged(ev: any): void {
+        this._config = { 
+            ...this._config, 
+            dynamic_colors: {
+                ...this._config.dynamic_colors,
+                motion_occupancy: ev.target.value
+            }
+        };
+        this._configChanged();
+    }
+
+    private _lightsColorChanged(ev: any): void {
+        this._config = { 
+            ...this._config, 
+            dynamic_colors: {
+                ...this._config.dynamic_colors,
+                lights: ev.target.value
+            }
+        };
+        this._configChanged();
+    }
+
+    private _defaultColorChanged(ev: any): void {
+        this._config = { 
+            ...this._config, 
+            dynamic_colors: {
+                ...this._config.dynamic_colors,
+                default: ev.target.value
+            }
+        };
+        this._configChanged();
+    }
+
+    private _motionDelaySecondsChanged(ev: any): void {
+        const value = parseInt(ev.target.value);
+        if (!isNaN(value) && value >= 0) {
+            this._config = { 
+                ...this._config, 
+                dynamic_colors: {
+                    ...this._config.dynamic_colors,
+                    motion_delay_seconds: value
+                }
+            };
+            this._configChanged();
+        }
     }
 
     private _configChanged(): void {
