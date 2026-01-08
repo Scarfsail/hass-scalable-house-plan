@@ -113,19 +113,6 @@ export class EditorElementShp extends LitElement {
                 font-size: 12px;
                 color: var(--secondary-text-color);
             }
-            .plan-options {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-                margin-bottom: 8px;
-            }
-            .plan-option {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                font-size: 12px;
-                color: var(--secondary-text-color);
-            }
         `
     ];
 
@@ -230,15 +217,6 @@ export class EditorElementShp extends LitElement {
                                 <ha-switch
                                     .checked=${this._isNoEntity}
                                     @change=${this._toggleNoEntity}
-                                ></ha-switch>
-                            </div>
-                        </div>
-                        <div class="plan-options">
-                            <div class="plan-option">
-                                <span>${this.localize('editor.disable_dynamic_color_entity')}</span>
-                                <ha-switch
-                                    .checked=${planConfig?.disable_dynamic_color ?? false}
-                                    @change=${this._toggleDisableDynamicColor}
                                 ></ha-switch>
                             </div>
                         </div>
@@ -412,27 +390,6 @@ export class EditorElementShp extends LitElement {
 
     private _toggleAreaFilter(ev: Event) {
         this.filterByArea = (ev.target as HTMLInputElement).checked;
-    }
-
-    private _toggleDisableDynamicColor(ev: Event) {
-        const isDisabled = (ev.target as HTMLInputElement).checked;
-        const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
-        
-        const updatedPlan = {
-            ...(planConfig || {}),
-            disable_dynamic_color: isDisabled || undefined  // Remove if false
-        };
-        
-        // Clean up undefined values
-        if (!updatedPlan.disable_dynamic_color) {
-            delete updatedPlan.disable_dynamic_color;
-        }
-        
-        const updatedEntity = typeof this.entity === 'string'
-            ? { entity: this.entity, plan: updatedPlan }
-            : { ...this.entity, plan: updatedPlan };
-        
-        this._dispatchUpdate(updatedEntity);
     }
 
     private _duplicateElement() {
