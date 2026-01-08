@@ -181,8 +181,8 @@ export function calculateDynamicRoomColor(
     
     // Get configured colors with defaults
     const motionColor = config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)';
-    const lightsColor = config.dynamic_colors?.lights || 'rgba(255, 240, 100, 0.15)';
-    const defaultColor = config.dynamic_colors?.default || 'rgba(128, 128, 128, 0.05)';
+    const lightsColor = config.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.17)';
+    const defaultColor = config.dynamic_colors?.default || 'rgba(100, 100, 100, 0.05)';
     
     // Check motion/occupancy (highest priority)
     if (hasActiveMotionOrOccupancy(hass, room, motionDelayActive)) {

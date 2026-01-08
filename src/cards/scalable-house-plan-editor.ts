@@ -146,9 +146,9 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             ></ha-textfield>
                             <ha-textfield
                                 label="${this.localize('editor.lights_color')}"
-                                .value=${this._config.dynamic_colors?.lights || 'rgba(255, 240, 100, 0.15)'}
+                                .value=${this._config.dynamic_colors?.lights || 'rgba(255, 250, 250, 0.18)'}
                                 @input=${this._lightsColorChanged}
-                                placeholder="rgba(255, 240, 100, 0.15)"
+                                placeholder="rgba(255, 250, 220, 0.18)"
                             ></ha-textfield>
                             <ha-textfield
                                 label="${this.localize('editor.default_color')}"

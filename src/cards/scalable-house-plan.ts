@@ -66,9 +66,9 @@ interface PictureElement {
 }
 
 export interface DynamicColorsConfig {
-    motion_occupancy?: string;      // Default: 'rgba(135, 206, 250, 0.15)' (light blue)
-    lights?: string;                // Default: 'rgba(255, 240, 100, 0.15)' (bright yellow)
-    default?: string;               // Default: 'rgba(128, 128, 128, 0.05)' (very light gray)
+    motion_occupancy?: string;      // Default: (light blue)
+    lights?: string;                // Default: (warm white light)
+    default?: string;               // Default: (very light gray)
     motion_delay_seconds?: number;  // Default: 60
 }
 
