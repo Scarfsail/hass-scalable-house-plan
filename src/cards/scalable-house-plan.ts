@@ -9,6 +9,29 @@ import "./scalable-house-plan-entities";
 
 export type PositionScalingMode = "plan" | "element" | "fixed";
 
+export interface InfoBoxPosition {
+    top?: number;    // Pixels from top edge of room
+    bottom?: number; // Pixels from bottom edge (mutually exclusive with top)
+    left?: number;   // Pixels from left edge of room
+    right?: number;  // Pixels from right edge (mutually exclusive with left)
+}
+
+export interface InfoBoxTypeConfig {
+    show?: boolean;  // Default: true
+    size?: string;   // Default: "100%" - percentage scale (e.g., "200%" for double size)
+}
+
+export interface InfoBoxConfig {
+    show?: boolean;             // Default: true
+    position?: InfoBoxPosition; // Default: { top: 5, left: 5 }
+    types?: {
+        motion?: InfoBoxTypeConfig;
+        occupancy?: InfoBoxTypeConfig;
+        temperature?: InfoBoxTypeConfig;
+        humidity?: InfoBoxTypeConfig;
+    }
+}
+
 export interface Room {
     name: string;
     area?: string;  // Optional Home Assistant area ID
@@ -17,6 +40,7 @@ export interface Room {
     color?: string;  // Optional color for room background (supports rgba)
     elements_clickable_on_overview?: boolean;  // Default false - when true, elements are clickable and room is not
     disable_dynamic_color?: boolean;  // Default false - when true, room is transparent (no dynamic colors)
+    info_box?: InfoBoxConfig;  // Info box configuration for this room
 }
 
 interface PlanConfig {
@@ -32,6 +56,7 @@ interface PlanConfig {
     position_scaling_horizontal?: PositionScalingMode;  // How horizontal position scales in detail view (default: "plan")
     position_scaling_vertical?: PositionScalingMode;    // How vertical position scales in detail view (default: "plan")
     disable_dynamic_color?: boolean;  // Opt-out entity from dynamic color evaluation
+    exclude_from_info_box?: boolean;  // Opt-out entity from info box display
 }
 
 interface ElementConfig {
@@ -84,6 +109,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     card_size?: number;
     show_room_backgrounds?: boolean;  // Show room background colors (helpful for editing boundaries)
     dynamic_colors?: DynamicColorsConfig;  // Dynamic room color configuration
+    info_box_defaults?: InfoBoxConfig;  // Default info box configuration for all rooms
 }
 
 

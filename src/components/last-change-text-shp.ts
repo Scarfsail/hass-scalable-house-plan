@@ -21,8 +21,8 @@ class LastChangeText extends LitElement {
         }
         
         div {
-            padding-left: 5px;
-            padding-right: 5px;
+            padding-left: 2px;
+            padding-right: 2px;
             border-radius: 6px;
             font-size: 11px;
             text-align: center;

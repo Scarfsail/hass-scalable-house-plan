@@ -178,6 +178,28 @@ export class EditorRoomShp extends LitElement {
                             </div>
                         </div>
 
+                        <!-- Info Box Section -->
+                        <div class="config-section collapsible-section">
+                            <div class="section-header ${this._expandedSections.has('info_box') ? 'expanded' : ''}" 
+                                 @click=${() => this._toggleSection('info_box')}>
+                                <div class="section-title">
+                                    <ha-icon 
+                                        icon="mdi:chevron-right" 
+                                        class="expand-icon ${this._expandedSections.has('info_box') ? 'expanded' : ''}"
+                                    ></ha-icon>
+                                    <ha-icon icon="mdi:information-box"></ha-icon>
+                                    ${this.localize('editor.info_box')}
+                                </div>
+                            </div>
+                            <div class="section-content ${this._expandedSections.has('info_box') ? 'expanded' : ''}">
+                                <ha-yaml-editor
+                                    .hass=${this.hass}
+                                    .defaultValue=${this.room.info_box || {}}
+                                    @value-changed=${this._infoBoxConfigChanged}
+                                ></ha-yaml-editor>
+                            </div>
+                        </div>
+
                         <!-- Boundary Points Section -->
                         <div class="config-section collapsible-section">
                             <div class="section-header ${this._expandedSections.has('boundary') ? 'expanded' : ''}" 
@@ -290,6 +312,11 @@ export class EditorRoomShp extends LitElement {
     private _disableDynamicColorChanged(e: Event) {
         const target = e.target as HTMLInputElement;
         this._dispatchUpdate({ ...this.room, disable_dynamic_color: target.checked });
+    }
+
+    private _infoBoxConfigChanged(e: CustomEvent) {
+        const config = e.detail.value;
+        this._dispatchUpdate({ ...this.room, info_box: config });
     }
 
     private _areaChanged(e: CustomEvent) {

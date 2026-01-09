@@ -286,7 +286,9 @@ export class ScalableHousePlanRoom extends LitElement {
             createCardElement: this.createCardElement,
             elementCards: this.elementCards,
             scale: scale.scaleX,
-            scaleRatio: 0  // Overview: no element scaling
+            scaleRatio: 0,  // Overview: no element scaling
+            config: this.config,
+            originalRoom: this.room  // Pass original room for info box entity detection
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
@@ -369,7 +371,8 @@ export class ScalableHousePlanRoom extends LitElement {
             createCardElement: this.createCardElement,
             elementCards: this.elementCards,
             scale,
-            scaleRatio
+            scaleRatio,
+            config: this.config
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
