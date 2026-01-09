@@ -302,6 +302,8 @@ function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undef
     const codeDefault: InfoBoxConfig = {
         show: true,
         position: { top: 5, left: 5 },
+        show_background_detail: true,
+        show_background_overview: true,
         types: {}
     };
     
@@ -312,6 +314,8 @@ function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undef
     const merged: InfoBoxConfig = {
         show: roomConfig.show !== undefined ? roomConfig.show : (houseDefaults.show !== undefined ? houseDefaults.show : codeDefault.show),
         position: roomConfig.position || houseDefaults.position || codeDefault.position,
+        show_background_detail: roomConfig.show_background_detail ?? houseDefaults.show_background_detail ?? codeDefault.show_background_detail,
+        show_background_overview: roomConfig.show_background_overview ?? houseDefaults.show_background_overview ?? codeDefault.show_background_overview,
         types: {
             ...codeDefault.types,
             ...houseDefaults.types,
@@ -323,6 +327,9 @@ function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undef
     if (merged.show === false) {
         return null;
     }
+    
+    // Determine if background should be shown for current mode
+    const showBackground = mode === 'overview' ? merged.show_background_overview : merged.show_background_detail;
     
     // Get all entity IDs in room (including both explicit and area entities)
     const allRoomEntities = getRoomEntities(hass, room, null, true);
@@ -356,6 +363,7 @@ function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undef
                 type: 'custom:info-box-shp',
                 room_entities: roomEntityIds,
                 mode: mode,  // Pass current mode
+                show_background: showBackground,  // Pass mode-specific background visibility
                 types: merged.types,
                 room_id: room.name  // Unique identifier per room
             }

@@ -27,6 +27,8 @@ export interface InfoBoxTypeConfig {
 export interface InfoBoxConfig {
     show?: boolean;             // Default: true
     position?: InfoBoxPosition; // Default: { top: 5, left: 5 }
+    show_background_detail?: boolean;  // Default: true - show background in detail view
+    show_background_overview?: boolean;  // Default: true - show background in overview
     types?: {
         motion?: InfoBoxTypeConfig;
         occupancy?: InfoBoxTypeConfig;

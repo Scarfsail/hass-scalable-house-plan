@@ -10,6 +10,7 @@ import "../components/last-change-text-shp";
 export interface InfoBoxElementConfig extends ElementBaseConfig {
     room_entities: string[];  // All entity IDs in the room
     mode?: 'overview' | 'detail';  // Current view mode (default: 'detail')
+    show_background?: boolean;  // Whether to show background (mode-specific)
     types?: {
         motion?: InfoBoxTypeConfig;
         occupancy?: InfoBoxTypeConfig;
@@ -52,6 +53,10 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
         .info-box-container.overview {
             padding-left: 0;
             padding-right: 0;
+        }
+
+        .info-box-container.no-background {
+            background: transparent;
         }
 
         .info-item {
@@ -97,7 +102,12 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
         }
 
         const mode = this._config.mode || 'detail';
-        const containerClass = mode === 'overview' ? 'info-box-container overview' : 'info-box-container';
+        const showBackground = this._config.show_background ?? true;
+        
+        const classes = ['info-box-container'];
+        if (mode === 'overview') classes.push('overview');
+        if (!showBackground) classes.push('no-background');
+        const containerClass = classes.join(' ');
 
         return html`
             <div class="${containerClass}">
