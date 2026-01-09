@@ -48,6 +48,11 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             white-space: nowrap;
         }
 
+        .info-box-container.overview {
+            padding-left: 0;
+            padding-right: 0;
+        }
+
         .info-item {
             display: flex;
             align-items: center;
@@ -80,8 +85,11 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             return nothing;  // Don't render if no data
         }
 
+        const mode = this._config.mode || 'detail';
+        const containerClass = mode === 'overview' ? 'info-box-container overview' : 'info-box-container';
+
         return html`
-            <div class="info-box-container">
+            <div class="${containerClass}">
                 ${items.map(item => {
                     const scale = parseFloat(item.size) / 100;
                     const isMotionOrOccupancy = item.type === 'motion' || item.type === 'occupancy';
@@ -124,7 +132,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
         // Get config for each type
         const getTypeConfig = (type: string): { show: boolean; size: string } => {
             const config = typesConfig[type as keyof typeof typesConfig];
-            const mode = this._config.mode || 'detail';
+            const mode = this._config?.mode || 'detail';
             
             // Check mode-specific visibility (new) or fallback to legacy show (deprecated)
             let show: boolean;
