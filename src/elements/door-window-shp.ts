@@ -40,7 +40,7 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             gap: 5px;
         }
     `;
-    
+     
     async setConfig(config: DoorWindowElementConfig) {
         await super.setConfig({
             ...config,
