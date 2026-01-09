@@ -9,6 +9,7 @@ import "../components/last-change-text-shp";
 
 export interface InfoBoxElementConfig extends ElementBaseConfig {
     room_entities: string[];  // All entity IDs in the room
+    mode?: 'overview' | 'detail';  // Current view mode (default: 'detail')
     types?: {
         motion?: InfoBoxTypeConfig;
         occupancy?: InfoBoxTypeConfig;
@@ -120,11 +121,21 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
         const typesConfig = this._config.types || {};
         const supportedTypes = ['motion', 'occupancy', 'temperature', 'humidity'];
 
-        // Get config for each type (default: show=true, size="100%")
+        // Get config for each type
         const getTypeConfig = (type: string): { show: boolean; size: string } => {
             const config = typesConfig[type as keyof typeof typesConfig];
+            const mode = this._config.mode || 'detail';
+            
+            // Check mode-specific visibility (new) or fallback to legacy show (deprecated)
+            let show: boolean;
+            if (mode === 'overview') {
+                show = config?.visible_overview ?? config?.show ?? true;
+            } else {
+                show = config?.visible_detail ?? config?.show ?? true;
+            }
+            
             return {
-                show: config?.show ?? true,
+                show,
                 size: config?.size ?? "100%"
             };
         };

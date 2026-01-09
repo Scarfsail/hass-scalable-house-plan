@@ -56,8 +56,11 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
 
     // Add info box element if enabled
     // Use originalRoom if provided (for overview mode), otherwise use room
+    // Determine mode: if originalRoom is provided, we're in overview
+    const isOverview = !!originalRoom;
+    const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
     const roomForInfoBox = originalRoom || room;
-    const infoBoxEntity = createInfoBoxEntity(roomForInfoBox, config, hass);
+    const infoBoxEntity = createInfoBoxEntity(roomForInfoBox, config, hass, mode);
     const allEntities = infoBoxEntity ? [...(room.entities || []), infoBoxEntity] : (room.entities || []);
 
     // Get all entities with plan config
@@ -294,7 +297,7 @@ export function getRoomBounds(room: Room): { minX: number; minY: number; maxX: n
  * @param hass - Home Assistant instance
  * @returns EntityConfig for info box or null if disabled
  */
-function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undefined, hass: HomeAssistant): EntityConfig | null {
+function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undefined, hass: HomeAssistant, mode: 'overview' | 'detail'): EntityConfig | null {
     // Merge defaults: code default -> house config -> room config
     const codeDefault: InfoBoxConfig = {
         show: true,
@@ -352,6 +355,7 @@ function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undef
             element: {
                 type: 'custom:info-box-shp',
                 room_entities: roomEntityIds,
+                mode: mode,  // Pass current mode
                 types: merged.types,
                 room_id: room.name  // Unique identifier per room
             }

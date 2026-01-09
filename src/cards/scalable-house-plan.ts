@@ -17,7 +17,9 @@ export interface InfoBoxPosition {
 }
 
 export interface InfoBoxTypeConfig {
-    show?: boolean;  // Default: true
+    show?: boolean;  // Default: true (deprecated - use visible_detail/visible_overview)
+    visible_detail?: boolean;  // Default: true - show in detail view
+    visible_overview?: boolean;  // Default: true - show in overview
     size?: string;   // Default: "100%" - percentage scale (e.g., "200%" for double size)
 }
 
