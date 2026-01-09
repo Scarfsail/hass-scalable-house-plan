@@ -38,6 +38,7 @@
     "disable_dynamic_color": "Zakázat dynamickou barvu",
     "disable_dynamic_color_entity": "Vyloučit z dynamické barvy",
     "info_box": "Informační box",
+    "info_box_defaults": "Výchozí nastavení informačního boxu (celý dům)",
     "show_info_box": "Zobrazit informační box",
     "info_box_left": "Pozice zleva (pixely)",
     "info_box_top": "Pozice shora (pixely)",
