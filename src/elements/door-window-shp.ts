@@ -37,7 +37,7 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
         
         .container.vertical {
             flex-direction: row;
-            gap: 0px;
+            gap: 5px;
         }
     `;
     
@@ -82,8 +82,9 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             </div>
         `;
         
+        const isVertical = this._config.orientation === 'vertical';
         const textElement = html`
-            <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5}></last-change-text-shp>
+            <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5} .vertical=${isVertical}></last-change-text-shp>
         `;
 
         return html`

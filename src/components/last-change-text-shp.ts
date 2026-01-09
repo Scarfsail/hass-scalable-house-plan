@@ -9,6 +9,7 @@ class LastChangeText extends LitElement {
 
   @property({ attribute: false }) public entity?: HassEntity;
   @property({ attribute: false }) public secondsForSuperHighlight?: number;
+  @property({ attribute: false, type: Boolean }) public vertical?: boolean;
 
   @state() private _currentTime = new Date(); // State to force re-renders
   private _timer?: number;
@@ -27,6 +28,11 @@ class LastChangeText extends LitElement {
             font-size: 11px;
             text-align: center;
             opacity: 0.6;
+        }
+        
+        div.vertical {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
         }
   `;
 
@@ -79,7 +85,8 @@ class LastChangeText extends LitElement {
     const backgroundColor = `rgba(${backgroundRgb.red},${backgroundRgb.green},${backgroundRgb.blue},${backgroundRgb.alpha})`;
 
     return html`
-      <div style="color: ${textColor}; 
+      <div class="${this.vertical ? 'vertical' : ''}" 
+           style="color: ${textColor}; 
                   background-color: ${backgroundColor}; 
                   box-shadow: 0px 0px 7px 3px ${backgroundColor};">
         ${Utils.formatDurationFromTo(lastChanged, undefined, 2)}
