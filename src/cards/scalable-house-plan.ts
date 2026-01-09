@@ -21,6 +21,7 @@ export interface InfoBoxTypeConfig {
     visible_detail?: boolean;  // Default: true - show in detail view
     visible_overview?: boolean;  // Default: true - show in overview
     size?: string;   // Default: "100%" - percentage scale (e.g., "200%" for double size)
+    icon_position?: 'inline' | 'separate';  // Default: "inline" - icon on same line or separate line
 }
 
 export interface InfoBoxConfig {

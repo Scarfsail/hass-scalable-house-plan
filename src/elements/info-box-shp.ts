@@ -24,6 +24,7 @@ interface InfoBoxItem {
     entity: HassEntity;
     type: string;
     size: string;  // Percentage scale (e.g., "100%", "200%")
+    icon_position: 'inline' | 'separate';  // Icon layout
 }
 
 @customElement("info-box-shp")
@@ -61,6 +62,16 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             transition: opacity 0.2s;
         }
 
+        .info-item.separate {
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .info-item.separate last-change-text-shp {
+            display: block;
+        }
+
         .info-item:hover {
             opacity: 0.7;
         }
@@ -93,10 +104,13 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 ${items.map(item => {
                     const scale = parseFloat(item.size) / 100;
                     const isMotionOrOccupancy = item.type === 'motion' || item.type === 'occupancy';
+                    const isSeparate = item.icon_position === 'separate';
+                    const itemClass = isSeparate ? 'info-item separate' : 'info-item';
+                    const transformOrigin = isSeparate ? 'center center' : 'left center';
                     return html`
                         <div 
-                            class="info-item" 
-                            style="transform: scale(${scale}); transform-origin: left center;"
+                            class="${itemClass}" 
+                            style="transform: scale(${scale}); transform-origin: ${transformOrigin};"
                             @click=${() => this._showMoreInfo(item.entity.entity_id)}
                         >
                             <ha-icon icon="${item.icon}"></ha-icon>
@@ -130,7 +144,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
         const supportedTypes = ['motion', 'occupancy', 'temperature', 'humidity'];
 
         // Get config for each type
-        const getTypeConfig = (type: string): { show: boolean; size: string } => {
+        const getTypeConfig = (type: string): { show: boolean; size: string; icon_position: 'inline' | 'separate' } => {
             const config = typesConfig[type as keyof typeof typesConfig];
             const mode = this._config?.mode || 'detail';
             
@@ -144,7 +158,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             
             return {
                 show,
-                size: config?.size ?? "100%"
+                size: config?.size ?? "100%",
+                icon_position: config?.icon_position ?? 'inline'
             };
         };
 
@@ -163,7 +178,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                         icon: 'mdi:motion-sensor',
                         entity: entity,
                         type: 'motion',
-                        size: config.size
+                        size: config.size,
+                        icon_position: config.icon_position
                     });
                 }
             }
@@ -176,7 +192,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                         icon: 'mdi:motion-sensor',
                         entity: entity,
                         type: 'occupancy',
-                        size: config.size
+                        size: config.size,
+                        icon_position: config.icon_position
                     });
                 }
             }
@@ -193,7 +210,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                             value: `${temp.toFixed(1)}<span style="font-size:50%">${unit}</span>`,
                             entity: entity,
                             type: 'temperature',
-                            size: config.size
+                            size: config.size,
+                            icon_position: config.icon_position
                         });
                     }
                 }
@@ -211,7 +229,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                             value: `${humidity.toFixed(0)}<span style="font-size:50%">${unit}</span>`,
                             entity: entity,
                             type: 'humidity',
-                            size: config.size
+                            size: config.size,
+                            icon_position: config.icon_position
                         });
                     }
                 }
