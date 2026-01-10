@@ -152,6 +152,10 @@ export class ScalableHousePlanRoom extends LitElement {
 
             .room-svg {
                 pointer-events: none;  /* SVG container is transparent to pointer events */
+                backface-visibility: hidden;  /* Stabilize GPU rendering */
+                -webkit-backface-visibility: hidden;
+                transform: translateZ(0);  /* Force GPU compositing layer to prevent artifacts */
+                -webkit-transform: translateZ(0);
             }
         `;
     }
