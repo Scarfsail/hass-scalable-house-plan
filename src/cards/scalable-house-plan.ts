@@ -149,7 +149,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 left: 0;
                 width: 100%;
                 height: 100%;
-                z-index: 10;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -165,12 +164,10 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 -webkit-backdrop-filter: blur(8px) brightness(0.7);
                 background: rgba(0, 0, 0, 0.3);
                 cursor: pointer;
-                z-index: 1;
             }
             
             .detail-content {
                 position: relative;
-                z-index: 2;
                 width: 100%;
                 height: 100%;
             }

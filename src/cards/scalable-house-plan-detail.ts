@@ -46,7 +46,6 @@ export class ScalableHousePlanDetail extends LitElement {
                 border-bottom: 1px solid var(--divider-color);
                 position: sticky;
                 top: 0;
-                z-index: 2;
             }
 
             .back-button {

@@ -466,7 +466,7 @@ export class ScalableHousePlanRoom extends LitElement {
         return html`
             <div class="room-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
                 ${svg`
-                    <svg style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px; z-index: 0;" 
+                    <svg style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px;" 
                          viewBox="0 0 ${scaledWidth} ${scaledHeight}" 
                          preserveAspectRatio="none">
                         ${useGradient && this._currentGradient ? svg`
