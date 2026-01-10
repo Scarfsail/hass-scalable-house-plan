@@ -207,6 +207,7 @@ export class ScalableHousePlanRoom extends LitElement {
         };
     }
 
+    
     /**
      * Update dynamic room color based on current entity states
      */
