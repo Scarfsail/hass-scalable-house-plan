@@ -92,24 +92,35 @@ function isEntityExcluded(entityConfig: EntityConfig): boolean {
 /**
  * Check if any motion/occupancy sensors are active using cached entity IDs
  * This is the optimized version that avoids calling getRoomEntities
+ * Uses timestamp-based delay checking instead of timers
  */
 export function hasActiveMotionOrOccupancy(
     hass: HomeAssistant,
     cachedIds: CachedEntityIds,
-    motionDelayActive: Map<string, boolean>
+    delaySeconds: number
 ): boolean {
-    // Check motion sensors (active if on OR in delay period after turning off)
+    const now = Date.now();
+    
+    // Check motion sensors (active if on OR changed to off within delay period)
     for (const entityId of cachedIds.motionSensors) {
-        const state = hass.states[entityId]?.state;
+        const stateObj = hass.states[entityId];
+        if (!stateObj) continue;
+        
+        const state = stateObj.state;
         
         // Motion detected: sensor is currently on
         if (state === 'on') {
             return true;
         }
         
-        // Motion delay: sensor is off but still in delay period
-        if (motionDelayActive.get(entityId)) {
-            return true;
+        // Motion delay: sensor is off but changed recently (within delay period)
+        if (state === 'off') {
+            const lastChanged = new Date(stateObj.last_changed).getTime();
+            const secondsSinceChange = (now - lastChanged) / 1000;
+            
+            if (secondsSinceChange < delaySeconds) {
+                return true;
+            }
         }
     }
     
@@ -151,7 +162,6 @@ export function calculateDynamicRoomColor(
     hass: HomeAssistant,
     room: Room,
     config: ScalableHousePlanConfig | undefined,
-    motionDelayActive: Map<string, boolean>,
     cachedIds: CachedEntityIds
 ): DynamicColorResult {
     // Check if room has dynamic colors disabled
@@ -168,9 +178,10 @@ export function calculateDynamicRoomColor(
     const motionColor = config?.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)';
     const lightsColor = config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.17)';
     const defaultColor = config?.dynamic_colors?.default || 'rgba(100, 100, 100, 0.05)';
+    const delaySeconds = config?.dynamic_colors?.motion_delay_seconds ?? 60;
     
-    // Check motion/occupancy (highest priority) - using cached IDs
-    if (hasActiveMotionOrOccupancy(hass, cachedIds, motionDelayActive)) {
+    // Check motion/occupancy (highest priority) - using cached IDs and timestamp-based delay
+    if (hasActiveMotionOrOccupancy(hass, cachedIds, delaySeconds)) {
         return { color: motionColor, type: 'motion' };
     }
     

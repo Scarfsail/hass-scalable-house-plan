@@ -72,9 +72,6 @@ export class ScalableHousePlanRoom extends LitElement {
     };
 
     // Dynamic color state
-    @state() private _motionDelayActive: Map<string, boolean> = new Map();
-    private _motionDelayTimers: Map<string, number> = new Map();
-    private _previousMotionStates: Map<string, string> = new Map();
     @state() private _currentColor?: DynamicColorResult;
     @state() private _currentGradient?: GradientDefinition;
 
@@ -106,9 +103,8 @@ export class ScalableHousePlanRoom extends LitElement {
             this._computeEntityIdCache();
         }
         
-        // Update motion delay tracking and dynamic colors when hass changes
+        // Update dynamic colors when hass changes
         if (changedProperties.has('hass')) {
-            this._updateMotionDelayTracking();
             this._updateDynamicColor();
         }
     }
@@ -212,59 +208,16 @@ export class ScalableHousePlanRoom extends LitElement {
     }
 
     /**
-     * Update motion delay tracking when entity states change
-     */
-    private _updateMotionDelayTracking(): void {
-        if (!this.hass || !this.room || !this._cachedEntityIds) return;
-        
-        const motionSensors = this._cachedEntityIds.motionSensors;
-        const delaySeconds = this.config?.dynamic_colors?.motion_delay_seconds ?? 60;
-        
-        for (const entityId of motionSensors) {
-            const currentState = this.hass.states[entityId]?.state;
-            const previousState = this._previousMotionStates.get(entityId);
-            
-            // State changed
-            if (currentState !== previousState) {
-                this._previousMotionStates.set(entityId, currentState || '');
-                
-                if (currentState === 'on') {
-                    // Motion detected - clear any existing delay timer and reset delay state
-                    const existingTimer = this._motionDelayTimers.get(entityId);
-                    if (existingTimer !== undefined) {
-                        window.clearTimeout(existingTimer);
-                        this._motionDelayTimers.delete(entityId);
-                    }
-                    this._motionDelayActive.set(entityId, false);
-                } else if (currentState === 'off' && previousState === 'on') {
-                    // Motion stopped - start delay timer
-                    this._motionDelayActive.set(entityId, true);
-                    
-                    const timer = window.setTimeout(() => {
-                        this._motionDelayActive.set(entityId, false);
-                        this._motionDelayTimers.delete(entityId);
-                        this._updateDynamicColor();
-                        this.requestUpdate();
-                    }, delaySeconds * 1000);
-                    
-                    this._motionDelayTimers.set(entityId, timer);
-                }
-            }
-        }
-    }
-
-    /**
      * Update dynamic room color based on current entity states
      */
     private _updateDynamicColor(): void {
         if (!this.hass || !this.room || !this._cachedRoomBounds || !this._cachedEntityIds) return;
         
-        // Calculate color using cached entity IDs (optimized - no expensive getRoomEntities call)
+        // Calculate color using cached entity IDs and timestamp-based delay checking
         this._currentColor = calculateDynamicRoomColor(
             this.hass,
             this.room,
             this.config,
-            this._motionDelayActive,
             this._cachedEntityIds
         );
         
@@ -523,18 +476,5 @@ export class ScalableHousePlanRoom extends LitElement {
         }
     }
 
-    /**
-     * Clean up timers on disconnect
-     */
-    disconnectedCallback() {
-        super.disconnectedCallback();
-        
-        // Clear all motion delay timers
-        for (const timer of this._motionDelayTimers.values()) {
-            window.clearTimeout(timer);
-        }
-        this._motionDelayTimers.clear();
-        this._motionDelayActive.clear();
-        this._previousMotionStates.clear();
-    }
+
 }
