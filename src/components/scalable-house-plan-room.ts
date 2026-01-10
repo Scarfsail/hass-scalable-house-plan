@@ -2,15 +2,15 @@ import { LitElement, html, svg, css, TemplateResult } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, ScalableHousePlanConfig, EntityConfig } from "../cards/scalable-house-plan";
-import { CreateCardElement } from "../utils";
+import { CreateCardElement, getRoomEntities } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
 import { 
-    calculateDynamicRoomColor, 
     createGradientDefinition, 
     calculatePolygonCenter,
-    getMotionSensors,
     type DynamicColorResult,
-    type GradientDefinition
+    type GradientDefinition,
+    type CachedEntityIds,
+    calculateDynamicRoomColor
 } from "../utils/room-color-helpers";
 
 /**
@@ -62,6 +62,14 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedRelativePoints?: string;
     private _cachedOverviewRoom?: Room;
     private _infoBoxCache: Map<string, any> = new Map();  // Cache for info box entity config
+    
+    // Cached entity IDs (computed once when room changes, used with fresh hass.states lookups)
+    private _cachedEntityIds?: {
+        all: string[];              // All entity IDs (explicit + area entities)
+        motionSensors: string[];    // Motion sensor entity IDs
+        lights: string[];           // Light entity IDs
+        occupancySensors: string[]; // Occupancy sensor entity IDs
+    };
 
     // Dynamic color state
     @state() private _motionDelayActive: Map<string, boolean> = new Map();
@@ -92,10 +100,14 @@ export class ScalableHousePlanRoom extends LitElement {
                     return entityConfig.plan && (entityConfig.plan.overview !== false);
                 })
             };
+            
+            // Compute entity IDs once when room changes (includes initial connection)
+            // These IDs are then used to look up fresh state from hass.states on each render
+            this._computeEntityIdCache();
         }
         
-        // Update motion delay tracking and dynamic colors when hass or room changes
-        if (changedProperties.has('hass') || changedProperties.has('room')) {
+        // Update motion delay tracking and dynamic colors when hass changes
+        if (changedProperties.has('hass')) {
             this._updateMotionDelayTracking();
             this._updateDynamicColor();
         }
@@ -145,12 +157,63 @@ export class ScalableHousePlanRoom extends LitElement {
     }
 
     /**
+     * Compute and cache entity IDs when room configuration changes
+     * This expensive operation (getAreaEntities, filtering) runs once per room config
+     * Then we use the cached IDs to look up fresh states from hass.states on each render
+     */
+    private _computeEntityIdCache(): void {
+        if (!this.hass) return;
+        
+        // Get all entity configs (this is expensive - called once per room)
+        const allEntityConfigs = getRoomEntities(this.hass, this.room, null, true);
+        
+        // Extract entity IDs and categorize them
+        const allIds: string[] = [];
+        const motionSensorIds: string[] = [];
+        const lightIds: string[] = [];
+        const occupancySensorIds: string[] = [];
+        
+        for (const entityConfig of allEntityConfigs) {
+            // Skip excluded entities
+            if (typeof entityConfig !== 'string' && entityConfig.plan?.disable_dynamic_color) {
+                continue;
+            }
+            
+            const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
+            if (!entityId) continue;
+            
+            allIds.push(entityId);
+            
+            const domain = entityId.split('.')[0];
+            
+            // Categorize by domain and device class
+            if (domain === 'light') {
+                lightIds.push(entityId);
+            } else if (domain === 'binary_sensor') {
+                const deviceClass = this.hass.states[entityId]?.attributes?.device_class;
+                if (deviceClass === 'motion') {
+                    motionSensorIds.push(entityId);
+                } else if (deviceClass === 'occupancy') {
+                    occupancySensorIds.push(entityId);
+                }
+            }
+        }
+        
+        this._cachedEntityIds = {
+            all: allIds,
+            motionSensors: motionSensorIds,
+            lights: lightIds,
+            occupancySensors: occupancySensorIds
+        };
+    }
+
+    /**
      * Update motion delay tracking when entity states change
      */
     private _updateMotionDelayTracking(): void {
-        if (!this.hass || !this.room) return;
+        if (!this.hass || !this.room || !this._cachedEntityIds) return;
         
-        const motionSensors = getMotionSensors(this.hass, this.room);
+        const motionSensors = this._cachedEntityIds.motionSensors;
         const delaySeconds = this.config?.dynamic_colors?.motion_delay_seconds ?? 60;
         
         for (const entityId of motionSensors) {
@@ -190,14 +253,15 @@ export class ScalableHousePlanRoom extends LitElement {
      * Update dynamic room color based on current entity states
      */
     private _updateDynamicColor(): void {
-        if (!this.hass || !this.room || !this._cachedRoomBounds) return;
+        if (!this.hass || !this.room || !this._cachedRoomBounds || !this._cachedEntityIds) return;
         
-        // Calculate color
+        // Calculate color using cached entity IDs (optimized - no expensive getRoomEntities call)
         this._currentColor = calculateDynamicRoomColor(
             this.hass,
             this.room,
             this.config,
-            this._motionDelayActive
+            this._motionDelayActive,
+            this._cachedEntityIds
         );
         
         // Create gradient if not transparent

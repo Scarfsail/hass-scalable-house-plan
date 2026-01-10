@@ -1,6 +1,5 @@
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, ScalableHousePlanConfig, EntityConfig } from "../cards/scalable-house-plan";
-import { getRoomEntities } from "./room-entity-helpers";
 
 /**
  * Result of dynamic color calculation
@@ -19,6 +18,16 @@ export interface GradientDefinition {
     cy: string;
     innerColor: string;
     outerColor: string;
+}
+
+/**
+ * Cached entity IDs for performance optimization
+ */
+export interface CachedEntityIds {
+    motionSensors: string[];
+    occupancySensors: string[];
+    lights: string[];
+    all: string[];
 }
 
 /**
@@ -81,51 +90,33 @@ function isEntityExcluded(entityConfig: EntityConfig): boolean {
 }
 
 /**
- * Get entity state from Home Assistant
- */
-function getEntityState(hass: HomeAssistant, entityId: string): string | undefined {
-    return hass.states[entityId]?.state;
-}
-
-/**
- * Get device class from entity attributes
- */
-function getDeviceClass(hass: HomeAssistant, entityId: string): string | undefined {
-    return hass.states[entityId]?.attributes?.device_class;
-}
-
-/**
- * Check if any motion/occupancy sensors are active (considering delay state)
- * Checks both explicit room entities and area entities
+ * Check if any motion/occupancy sensors are active using cached entity IDs
+ * This is the optimized version that avoids calling getRoomEntities
  */
 export function hasActiveMotionOrOccupancy(
     hass: HomeAssistant,
-    room: Room,
+    cachedIds: CachedEntityIds,
     motionDelayActive: Map<string, boolean>
 ): boolean {
-    // Get all entities for room (including area entities)
-    const allEntities = getRoomEntities(hass, room, null, true);
-    if (!allEntities.length) return false;
+    // Check motion sensors (active if on OR in delay period after turning off)
+    for (const entityId of cachedIds.motionSensors) {
+        const state = hass.states[entityId]?.state;
+        
+        // Motion detected: sensor is currently on
+        if (state === 'on') {
+            return true;
+        }
+        
+        // Motion delay: sensor is off but still in delay period
+        if (motionDelayActive.get(entityId)) {
+            return true;
+        }
+    }
     
-    for (const entityConfig of allEntities) {
-        // Skip excluded entities
-        if (isEntityExcluded(entityConfig)) continue;
-        
-        const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
-        if (!entityId) continue;
-        
-        const domain = entityId.split('.')[0];
-        if (domain !== 'binary_sensor') continue;
-        
-        const deviceClass = getDeviceClass(hass, entityId);
-        if (deviceClass !== 'motion' && deviceClass !== 'occupancy') continue;
-        
-        // Check actual state
-        const state = getEntityState(hass, entityId);
-        if (state === 'on') return true;
-        
-        // Check delay state for motion sensors
-        if (deviceClass === 'motion' && motionDelayActive.get(entityId)) {
+    // Check occupancy sensors (no delay, just current state)
+    for (const entityId of cachedIds.occupancySensors) {
+        const state = hass.states[entityId]?.state;
+        if (state === 'on') {
             return true;
         }
     }
@@ -134,47 +125,34 @@ export function hasActiveMotionOrOccupancy(
 }
 
 /**
- * Check if any lights are on
- * Checks both explicit room entities and area entities
+ * Check if any lights are on using cached entity IDs
+ * This is the optimized version that avoids calling getRoomEntities
  */
-export function hasActiveLights(hass: HomeAssistant, room: Room): boolean {
-    // Get all entities for room (including area entities)
-    const allEntities = getRoomEntities(hass, room, null, true);
-    if (!allEntities.length) return false;
-    
-    for (const entityConfig of allEntities) {
-        // Skip excluded entities
-        if (isEntityExcluded(entityConfig)) continue;
-        
-        const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
-        if (!entityId) continue;
-        
-        const domain = entityId.split('.')[0];
-        if (domain !== 'light') continue;
-        
-        const state = getEntityState(hass, entityId);
-        if (state === 'on') return true;
+export function hasActiveLights(
+    hass: HomeAssistant,
+    cachedIds: CachedEntityIds
+): boolean {
+    for (const entityId of cachedIds.lights) {
+        const state = hass.states[entityId]?.state;
+        if (state === 'on') {
+            return true;
+        }
     }
-    
     return false;
 }
 
 /**
- * Calculate dynamic room color based on entity states
+ * Calculate dynamic room color based on entity states (optimized with cached entity IDs)
+ * Uses cached entity IDs to avoid expensive getRoomEntities calls on every render
  * 
  * Precedence: Motion/Occupancy > Lights > Default
- * 
- * @param hass - Home Assistant instance
- * @param room - Room configuration
- * @param config - Global configuration
- * @param motionDelayActive - Map of motion sensors with active delays
- * @returns Dynamic color result with type
  */
 export function calculateDynamicRoomColor(
     hass: HomeAssistant,
     room: Room,
-    config: ScalableHousePlanConfig,
-    motionDelayActive: Map<string, boolean>
+    config: ScalableHousePlanConfig | undefined,
+    motionDelayActive: Map<string, boolean>,
+    cachedIds: CachedEntityIds
 ): DynamicColorResult {
     // Check if room has dynamic colors disabled
     if (room.disable_dynamic_color === true) {
@@ -182,54 +160,25 @@ export function calculateDynamicRoomColor(
     }
     
     // Check if global show_room_backgrounds is enabled (debugging mode)
-    if (config.show_room_backgrounds === true) {
+    if (config?.show_room_backgrounds === true) {
         return { color: room.color || 'transparent', type: 'transparent' };
     }
     
     // Get configured colors with defaults
-    const motionColor = config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)';
-    const lightsColor = config.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.17)';
-    const defaultColor = config.dynamic_colors?.default || 'rgba(100, 100, 100, 0.05)';
+    const motionColor = config?.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)';
+    const lightsColor = config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.17)';
+    const defaultColor = config?.dynamic_colors?.default || 'rgba(100, 100, 100, 0.05)';
     
-    // Check motion/occupancy (highest priority)
-    if (hasActiveMotionOrOccupancy(hass, room, motionDelayActive)) {
+    // Check motion/occupancy (highest priority) - using cached IDs
+    if (hasActiveMotionOrOccupancy(hass, cachedIds, motionDelayActive)) {
         return { color: motionColor, type: 'motion' };
     }
     
-    // Check lights (second priority)
-    if (hasActiveLights(hass, room)) {
+    // Check lights (second priority) - using cached IDs
+    if (hasActiveLights(hass, cachedIds)) {
         return { color: lightsColor, type: 'lights' };
     }
     
     // Default color
     return { color: defaultColor, type: 'default' };
-}
-
-/**
- * Get motion sensors that need delay tracking
- * Includes both explicit room entities and area entities
- */
-export function getMotionSensors(hass: HomeAssistant, room: Room): string[] {
-    // Get all entities for room (including area entities)
-    const allEntities = getRoomEntities(hass, room, null, true);
-    if (!allEntities.length) return [];
-    
-    const motionSensors: string[] = [];
-    
-    for (const entityConfig of allEntities) {
-        if (isEntityExcluded(entityConfig)) continue;
-        
-        const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
-        if (!entityId) continue;
-        
-        const domain = entityId.split('.')[0];
-        if (domain !== 'binary_sensor') continue;
-        
-        const deviceClass = getDeviceClass(hass, entityId);
-        if (deviceClass === 'motion') {
-            motionSensors.push(entityId);
-        }
-    }
-    
-    return motionSensors;
 }
