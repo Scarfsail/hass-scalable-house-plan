@@ -12,6 +12,8 @@ interface StateIconTriggerElementConfig extends ElementEntityBaseConfig {
 
 @customElement("state-icon-trigger-shp")
 export class StateIconTriggerElement extends ElementEntityBase<StateIconTriggerElementConfig> {
+    protected handleActionsInBase = false; // Actions handled by inner hui-state-icon-element
+
     static styles = css`
         :host {
             position: relative;
@@ -58,7 +60,10 @@ export class StateIconTriggerElement extends ElementEntityBase<StateIconTriggerE
         if (!this.icon) {
             this.icon = document.createElement("hui-state-icon-element");
             this.icon.setConfig({
-                entity: entity.entity_id
+                entity: entity.entity_id,
+                tap_action: this._config?.tap_action,
+                hold_action: this._config?.hold_action,
+                double_tap_action: this._config?.double_tap_action,
             });
         }
         this.icon.hass = this.hass;

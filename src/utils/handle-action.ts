@@ -12,18 +12,9 @@ export const handleAction = (
     config: ActionableConfig,
     action: string
 ): void => {
-    let actionConfig: ActionConfig | undefined;
-
-    if (action === "tap" && config.tap_action) {
-        actionConfig = config.tap_action;
-    }
-
-    if (!actionConfig) {
-        // Default to more-info if no action is configured
-        actionConfig = {
-            action: "more-info",
-        };
-    }
+    // Custom elements only use tap action
+    // Wrapped HA elements handle their own tap/hold/double_tap actions
+    const actionConfig = config.tap_action || { action: "more-info" };
 
     switch (actionConfig.action) {
         case "more-info": {

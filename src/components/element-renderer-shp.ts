@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-element";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig } from "../cards/scalable-house-plan";
-import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities } from "../utils";
+import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction } from "../utils";
 
 /**
  * Shared element rendering functionality for overview and detail views
@@ -90,6 +90,16 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             
             // Merge default properties with user overrides
             const elementConfig = mergeElementProperties(defaultElement, plan.element || {});
+
+            // Add default tap_action and hold_action for entities (if not already set by user)
+            if (entity) {
+                if (!elementConfig.tap_action) {
+                    elementConfig.tap_action = getDefaultTapAction(entity, hass);
+                }
+                if (!elementConfig.hold_action) {
+                    elementConfig.hold_action = getDefaultHoldAction();
+                }
+            }
 
             // Generate unique key: use entity if present, otherwise generate from type+position
             const uniqueKey = entity || generateElementKey(elementConfig.type, plan);

@@ -2,8 +2,8 @@ import { LitElement, TemplateResult, css, html, nothing } from "lit"
 import { property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { HassEntity } from "home-assistant-js-websocket";
-import { handleAction } from "../../utils/handle-action";
 import { ElementBase, ElementBaseConfig } from "./element-base";
+import { handleAction } from "../../utils/handle-action";
 
 export interface ElementEntityBaseConfig extends ElementBaseConfig {
     entity: string;
@@ -17,6 +17,9 @@ export abstract class ElementEntityBase<TConfig extends ElementEntityBaseConfig 
         }
     `
 
+    // Child classes can set this to false if they handle actions internally (e.g., by passing to wrapped HA elements)
+    protected handleActionsInBase = true;
+
     async setConfig(config: TConfig) {
         await super.setConfig(config);
 
@@ -25,27 +28,20 @@ export abstract class ElementEntityBase<TConfig extends ElementEntityBaseConfig 
         }
     }
 
-    private _handleTap(): void {
-        // If tap_action is defined, use it
-        if (this._config?.tap_action) {
-            handleAction(this, this.hass!, this._config!, "tap");
-        } else if (this.showMoreInfoOnClick) {
-            // Otherwise, fall back to the default showMoreInfo behavior if enabled
-            this._showMoreInfo();
+    private _handleClick(ev: MouseEvent) {
+        if (!this.handleActionsInBase) {
+            return; // Let child element or wrapped HA element handle it
+        }
+
+        // Prevent event from bubbling to wrapped elements
+        ev.stopPropagation();
+        ev.preventDefault();
+
+        // Trigger tap action
+        if (this._config && this.hass) {
+            handleAction(this, this.hass, this._config, "tap");
         }
     }
-
-    private _showMoreInfo() {
-        const entityId = this._config?.entity;
-        const event = new CustomEvent("hass-more-info", {
-            detail: { entityId: entityId },
-            bubbles: true,
-            composed: true,
-        });
-        this.dispatchEvent(event);
-    }
-
-    protected showMoreInfoOnClick = true;
 
     protected override renderContent() {
         if (!this._config || !this.hass) {
@@ -63,7 +59,7 @@ export abstract class ElementEntityBase<TConfig extends ElementEntityBaseConfig 
         }
 
         return html`
-        <div @click=${this._handleTap}>
+        <div @click=${this._handleClick}>
             ${this.renderEntityContent(entity)}
         </div>`
     }
