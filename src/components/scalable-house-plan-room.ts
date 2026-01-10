@@ -159,7 +159,7 @@ export class ScalableHousePlanRoom extends LitElement {
             }
         `;
     }
-
+ 
     /**
      * Compute and cache entity IDs when room configuration changes
      * This expensive operation (getAreaEntities, filtering) runs once per room config
