@@ -1,5 +1,6 @@
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, ScalableHousePlanConfig, EntityConfig } from "../cards/scalable-house-plan";
+import { getRoomEntities } from "./room-entity-helpers";
 
 /**
  * Result of dynamic color calculation
@@ -95,15 +96,18 @@ function getDeviceClass(hass: HomeAssistant, entityId: string): string | undefin
 
 /**
  * Check if any motion/occupancy sensors are active (considering delay state)
+ * Checks both explicit room entities and area entities
  */
 export function hasActiveMotionOrOccupancy(
     hass: HomeAssistant,
     room: Room,
     motionDelayActive: Map<string, boolean>
 ): boolean {
-    if (!room.entities) return false;
+    // Get all entities for room (including area entities)
+    const allEntities = getRoomEntities(hass, room, null, true);
+    if (!allEntities.length) return false;
     
-    for (const entityConfig of room.entities) {
+    for (const entityConfig of allEntities) {
         // Skip excluded entities
         if (isEntityExcluded(entityConfig)) continue;
         
@@ -131,11 +135,14 @@ export function hasActiveMotionOrOccupancy(
 
 /**
  * Check if any lights are on
+ * Checks both explicit room entities and area entities
  */
 export function hasActiveLights(hass: HomeAssistant, room: Room): boolean {
-    if (!room.entities) return false;
+    // Get all entities for room (including area entities)
+    const allEntities = getRoomEntities(hass, room, null, true);
+    if (!allEntities.length) return false;
     
-    for (const entityConfig of room.entities) {
+    for (const entityConfig of allEntities) {
         // Skip excluded entities
         if (isEntityExcluded(entityConfig)) continue;
         
@@ -200,13 +207,16 @@ export function calculateDynamicRoomColor(
 
 /**
  * Get motion sensors that need delay tracking
+ * Includes both explicit room entities and area entities
  */
 export function getMotionSensors(hass: HomeAssistant, room: Room): string[] {
-    if (!room.entities) return [];
+    // Get all entities for room (including area entities)
+    const allEntities = getRoomEntities(hass, room, null, true);
+    if (!allEntities.length) return [];
     
     const motionSensors: string[] = [];
     
-    for (const entityConfig of room.entities) {
+    for (const entityConfig of allEntities) {
         if (isEntityExcluded(entityConfig)) continue;
         
         const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;

@@ -109,6 +109,7 @@ export class ScalableHousePlanRoom extends LitElement {
 
             .room-container {
                 position: relative;
+                pointer-events: none;  /* Container is transparent, only children with pointer-events will respond */
             }
 
             .elements-container {
@@ -124,7 +125,21 @@ export class ScalableHousePlanRoom extends LitElement {
             }
 
             .room-polygon {
-                transition: fill 0.5s ease-in-out;
+                transition: opacity 0.3s ease-in-out;
+                pointer-events: fill;  /* Only the filled polygon responds to pointer events */
+            }
+
+            .room-polygon.no-pointer-events {
+                pointer-events: none;  /* Disable pointer events when elements are clickable */
+            }
+
+            .room-polygon:hover {
+                opacity: 1.3;
+                filter: brightness(1.2);
+            }
+
+            .room-svg {
+                pointer-events: none;  /* SVG container is transparent to pointer events */
             }
         `;
     }
@@ -204,12 +219,21 @@ export class ScalableHousePlanRoom extends LitElement {
 
     /**
      * Calculate room fill and stroke colors based on mode and settings
-     * @param forHover If true, returns hover colors (more opaque)
+     * 
+     * Priority logic:
+     * 1. Dynamic colors (motion/lights): gradient from _currentColor (if not transparent type)
+     * 2. Fallback: room.color or default based on mode
+     * 
+     * Note: Hover effect is handled by CSS opacity/brightness
+     * 
      * @returns Object with fillColor, strokeColor, and useGradient flag
      */
-    private _getRoomColors(forHover: boolean = false): { fillColor: string; strokeColor: string; useGradient: boolean; gradientId?: string } {
-        // Use dynamic colors if available and not hovering
-        if (!forHover && this._currentColor && this._currentColor.type !== 'transparent' && this._currentGradient) {
+    private _getRoomColors(): { fillColor: string; strokeColor: string; useGradient: boolean; gradientId?: string } {
+        const roomColor = this.room.color || ScalableHousePlanRoom.DEFAULT_ROOM_COLOR;
+        
+        // Dynamic colors: use gradient if motion/lights/default (not transparent type)
+        // This handles cases where motion sensors are active or lights are on
+        if (this._currentColor && this._currentColor.type !== 'transparent' && this._currentGradient) {
             return {
                 fillColor: `url(#${this._currentGradient.id})`,
                 strokeColor: 'rgba(0, 0, 0, 0.1)',
@@ -218,35 +242,22 @@ export class ScalableHousePlanRoom extends LitElement {
             };
         }
         
-        // Fallback to original logic
-        const roomColor = this.room.color || ScalableHousePlanRoom.DEFAULT_ROOM_COLOR;
-        
+        // Fallback: static room color or transparent based on mode and settings
         if (this.mode === 'detail') {
-            // Detail mode: always show room background
-            const fillColor = forHover 
-                ? roomColor.replace(/[\d.]+\)$/, '0.4)')
-                : roomColor;
-            const strokeColor = roomColor.replace(/[\d.]+\)$/, '0.4)');
-            return { fillColor, strokeColor, useGradient: false };
+            // Detail mode: always show static room background
+            return {
+                fillColor: roomColor,
+                strokeColor: roomColor.replace(/[\d.]+\)$/, '0.4)'),
+                useGradient: false
+            };
         } else {
             // Overview mode: respect showRoomBackgrounds setting
             const showBackgrounds = this.showRoomBackgrounds ?? false;
-            
-            if (forHover) {
-                // Hover: always show semi-transparent overlay
-                return {
-                    fillColor: roomColor.replace(/[\d.]+\)$/, '0.4)'),
-                    strokeColor: 'rgba(0, 0, 0, 0.3)',
-                    useGradient: false
-                };
-            } else {
-                // Normal: transparent or room color based on setting
-                return {
-                    fillColor: showBackgrounds ? roomColor : 'transparent',
-                    strokeColor: showBackgrounds ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
-                    useGradient: false
-                };
-            }
+            return {
+                fillColor: showBackgrounds ? roomColor : 'transparent',
+                strokeColor: showBackgrounds ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
+                useGradient: false
+            };
         }
     }
 
@@ -300,7 +311,7 @@ export class ScalableHousePlanRoom extends LitElement {
         
         // Build SVG polygon with conditional interactivity and gradient
         const polygonSvg = svg`
-            <svg style="position: absolute; top: 0; left: 0; width: ${roomBounds.width}px; height: ${roomBounds.height}px; pointer-events: none;" 
+            <svg class="room-svg" style="position: absolute; top: 0; left: 0; width: ${roomBounds.width}px; height: ${roomBounds.height}px;" 
                  viewBox="0 0 ${roomBounds.width} ${roomBounds.height}" 
                  preserveAspectRatio="none">
                 ${useGradient && this._currentGradient ? svg`
@@ -316,11 +327,9 @@ export class ScalableHousePlanRoom extends LitElement {
                     fill="${fillColor}" 
                     stroke="${strokeColor}"
                     stroke-width="2"
-                    class="room-polygon"
-                    style="cursor: ${elementsClickable ? 'default' : 'pointer'}; pointer-events: ${elementsClickable ? 'none' : 'auto'};"
+                    class="room-polygon ${elementsClickable ? 'no-pointer-events' : ''}"
+                    style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
                     @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
-                    @mouseenter=${elementsClickable ? null : (e: Event) => this._handleRoomHover(e, true)}
-                    @mouseleave=${elementsClickable ? null : (e: Event) => this._handleRoomHover(e, false)}
                 />
             </svg>
         `;
@@ -419,25 +428,6 @@ export class ScalableHousePlanRoom extends LitElement {
         event.stopPropagation();
         if (this.onClick) {
             this.onClick(this.room);
-        }
-    }
-
-    private _handleRoomHover(event: Event, isEntering: boolean) {
-        const target = event.target as SVGPolygonElement;
-        
-        // If using gradient, adjust opacity instead of replacing fill
-        if (this._currentGradient && this._currentColor?.type !== 'transparent') {
-            if (isEntering) {
-                target.style.opacity = '1.5';  // Brighten by increasing opacity
-                target.style.filter = 'brightness(1.3)';  // Additional brightness boost
-            } else {
-                target.style.opacity = '';  // Reset to default
-                target.style.filter = '';
-            }
-        } else {
-            // Fallback to solid color for non-gradient backgrounds
-            const { fillColor } = this._getRoomColors(isEntering);
-            target.setAttribute('fill', fillColor);
         }
     }
 
