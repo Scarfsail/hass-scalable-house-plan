@@ -35,7 +35,7 @@ export class ScalableHousePlanDetail extends LitElement {
                 display: block;
                 position: relative;
                 height: 100%;
-                background: var(--lovelace-background, var(--primary-background-color));
+                background: transparent;
             }
 
             .header {
@@ -101,6 +101,18 @@ export class ScalableHousePlanDetail extends LitElement {
                 height: calc(100% - 60px);
                 position: relative;
                 overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .clickable-background {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                cursor: pointer;
             }
         `;
     }
@@ -156,6 +168,7 @@ export class ScalableHousePlanDetail extends LitElement {
             </div>
 
             <div class="content">
+                <div class="clickable-background" @click=${this._handleBack}></div>
                 ${this._renderRoomDetail()}
             </div>
         `;

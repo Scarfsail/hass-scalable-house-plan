@@ -312,10 +312,11 @@ export class ScalableHousePlanRoom extends LitElement {
         
         // Fallback: static room color or transparent based on mode and settings
         if (this.mode === 'detail') {
-            // Detail mode: always show static room background
+            // Detail mode: always show static room background with more opacity
+            const detailColor = this.room.color || 'rgba(128, 128, 128, 0.8)';  // More opaque default for detail
             return {
-                fillColor: roomColor,
-                strokeColor: roomColor.replace(/[\d.]+\)$/, '0.4)'),
+                fillColor: detailColor,
+                strokeColor: detailColor.replace(/[\d.]+\)$/, '0.4)'),
                 useGradient: false
             };
         } else {
@@ -476,12 +477,20 @@ export class ScalableHousePlanRoom extends LitElement {
                                 </radialGradient>
                             </defs>
                         ` : ''}
+                        <!-- Solid background polygon to prevent transparency -->
+                        <polygon 
+                            points="${points}" 
+                            fill="#1a1a1a" 
+                            stroke="none"
+                        />
+                        <!-- Room colored polygon on top -->
                         <polygon 
                             points="${points}" 
                             fill="${fillColor}" 
                             stroke="${strokeColor}"
                             stroke-width="2"
                             class="room-polygon"
+                            @click=${(e: Event) => e.stopPropagation()}
                         />
                     </svg>
                 `}

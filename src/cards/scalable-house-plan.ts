@@ -134,11 +134,44 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             :host {
                 display: block;
                 height: 100%;
+                position: relative;
             }
             scalable-house-plan-overview,
             scalable-house-plan-detail,
             scalable-house-plan-entities {
                 display: block;
+                height: 100%;
+            }
+            
+            .detail-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 10;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .detail-backdrop {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                backdrop-filter: blur(8px) brightness(0.7);
+                -webkit-backdrop-filter: blur(8px) brightness(0.7);
+                background: rgba(0, 0, 0, 0.3);
+                cursor: pointer;
+                z-index: 1;
+            }
+            
+            .detail-content {
+                position: relative;
+                z-index: 2;
+                width: 100%;
                 height: 100%;
             }
         `;
@@ -196,28 +229,37 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             `;
         }
 
-        // Show room detail SVG view
-        if (this._currentView === 'detail' && this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex]) {
-            const room = this.config.rooms[this._selectedRoomIndex];
-            return html`
-                <scalable-house-plan-detail
-                    .hass=${this.hass}
-                    .room=${room}
-                    .config=${this.config}
-                    .onBack=${() => this._closeRoomDetail()}
-                    .onShowEntities=${() => this._openEntitiesView()}
-                ></scalable-house-plan-detail>
-            `;
-        }
-
-        // Show overview
-        return html`
+        // Always show overview as base layer
+        const overviewHtml = html`
             <scalable-house-plan-overview
                 .hass=${this.hass}
                 .config=${this.config}
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
             ></scalable-house-plan-overview>
         `;
+
+        // Show room detail as overlay on top of overview
+        if (this._currentView === 'detail' && this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex]) {
+            const room = this.config.rooms[this._selectedRoomIndex];
+            return html`
+                ${overviewHtml}
+                <div class="detail-overlay">
+                    <div class="detail-backdrop" @click=${() => this._closeRoomDetail()}></div>
+                    <div class="detail-content">
+                        <scalable-house-plan-detail
+                            .hass=${this.hass}
+                            .room=${room}
+                            .config=${this.config}
+                            .onBack=${() => this._closeRoomDetail()}
+                            .onShowEntities=${() => this._openEntitiesView()}
+                        ></scalable-house-plan-detail>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Show overview only
+        return overviewHtml;
     }
 
     private _openRoomDetail(roomIndex: number) {
