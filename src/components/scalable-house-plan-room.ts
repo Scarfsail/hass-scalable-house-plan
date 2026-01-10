@@ -145,7 +145,7 @@ export class ScalableHousePlanRoom extends LitElement {
                 pointer-events: none;  /* Disable pointer events when elements are clickable */
             }
 
-            .room-polygon:hover {
+            .room-polygon.overview:hover {
                 opacity: 1.3;
                 filter: brightness(1.2);
             }
@@ -396,7 +396,7 @@ export class ScalableHousePlanRoom extends LitElement {
                     fill="${fillColor}" 
                     stroke="${strokeColor}"
                     stroke-width="2"
-                    class="room-polygon ${elementsClickable ? 'no-pointer-events' : ''}"
+                    class="room-polygon overview ${elementsClickable ? 'no-pointer-events' : ''}"
                     style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
                     @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
                 />
