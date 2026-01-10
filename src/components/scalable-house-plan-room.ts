@@ -463,25 +463,40 @@ export class ScalableHousePlanRoom extends LitElement {
             .map(p => `${(p[0] - roomBounds.minX) * scale},${(p[1] - roomBounds.minY) * scale}`)
             .join(' ');
 
+        // Calculate background image positioning
+        const imageOffsetX = -roomBounds.minX * scale;
+        const imageOffsetY = -roomBounds.minY * scale;
+        const imageWidth = this.config.image_width * scale;
+        const imageHeight = this.config.image_height * scale;
+        const clipId = `room-clip-${this.room.name.replace(/\s+/g, '-')}-detail`;
+
         return html`
             <div class="room-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
                 ${svg`
-                    <svg style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px;" 
+                    <svg class="room-svg" style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px;" 
                          viewBox="0 0 ${scaledWidth} ${scaledHeight}" 
                          preserveAspectRatio="none">
-                        ${useGradient && this._currentGradient ? svg`
-                            <defs>
+                        <defs>
+                            <!-- Clip path for room boundary -->
+                            <clipPath id="${clipId}">
+                                <polygon points="${points}" />
+                            </clipPath>
+                            ${useGradient && this._currentGradient ? svg`
                                 <radialGradient id="${this._currentGradient.id}" cx="${this._currentGradient.cx}" cy="${this._currentGradient.cy}" r="70%">
                                     <stop offset="0%" stop-color="${this._currentGradient.innerColor}" />
                                     <stop offset="100%" stop-color="${this._currentGradient.outerColor}" />
                                 </radialGradient>
-                            </defs>
-                        ` : ''}
-                        <!-- Solid background polygon to prevent transparency -->
-                        <polygon 
-                            points="${points}" 
-                            fill="#1a1a1a" 
-                            stroke="none"
+                            ` : ''}
+                        </defs>
+                        <!-- Background image clipped to room shape -->
+                        <image 
+                            href="${this.config.image}" 
+                            x="${imageOffsetX}"
+                            y="${imageOffsetY}"
+                            width="${imageWidth}"
+                            height="${imageHeight}"
+                            clip-path="url(#${clipId})"
+                            preserveAspectRatio="none"
                         />
                         <!-- Room colored polygon on top -->
                         <polygon 
