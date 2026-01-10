@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-element";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig } from "../cards/scalable-house-plan";
-import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction } from "../utils";
+import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable } from "../utils";
 
 /**
  * Shared element rendering functionality for overview and detail views
@@ -92,7 +92,7 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             const elementConfig = mergeElementProperties(defaultElement, plan.element || {});
 
             // Add default tap_action and hold_action for entities (if not already set by user)
-            if (entity) {
+            if (entity && isEntityActionable(entity, hass)) {
                 if (!elementConfig.tap_action) {
                     elementConfig.tap_action = getDefaultTapAction(entity, hass);
                 }
