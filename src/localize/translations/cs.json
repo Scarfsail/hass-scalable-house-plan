@@ -88,6 +88,8 @@
     "plan_configuration_optional": "Plán (volitelné - pro umístění na plán)",
     "plan_configuration_required": "Plán (povinné - element.type a pozice)",
     "no_entity": "Bez entity",
-    "area": "Oblast"
+    "area": "Oblast",
+    "edit_yaml": "Upravit YAML",
+    "edit_ui": "Upravit vizuálně"
   }
 }

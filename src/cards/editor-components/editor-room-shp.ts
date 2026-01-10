@@ -14,6 +14,7 @@ export class EditorRoomShp extends LitElement {
     @property({ type: Number }) roomIndex!: number;
     @state() private _expanded = false;
     @state() private _expandedSections: Set<string> = new Set(['entities']); // Only entities expanded by default
+    @state() private _yamlMode = false;
     private _localize?: LocalizeFunction;
 
     private get localize(): LocalizeFunction {
@@ -93,6 +94,16 @@ export class EditorRoomShp extends LitElement {
             .info-text ha-icon {
                 --mdc-icon-size: 18px;
             }
+
+            .icon-button.toggled {
+                background: var(--primary-color);
+                color: var(--text-primary-color);
+            }
+
+            .icon-button.toggled:hover {
+                background: var(--primary-color);
+                opacity: 0.9;
+            }
         `
     ];
 
@@ -104,6 +115,13 @@ export class EditorRoomShp extends LitElement {
                     <ha-icon icon=${getRoomIcon(this.hass, this.room)}></ha-icon>
                     <div class="room-name">${getRoomName(this.hass, this.room) || this.localize('editor.unnamed_room')}</div>
                     <div class="room-actions" @click=${(e: Event) => e.stopPropagation()}>
+                        <button 
+                            class="icon-button ${this._yamlMode ? 'toggled' : ''}" 
+                            @click=${this._toggleYamlMode} 
+                            title="${this.localize(`editor.edit_${this._yamlMode ? 'ui' : 'yaml'}`)}"
+                        >
+                            <ha-icon icon="mdi:playlist-edit"></ha-icon>
+                        </button>
                         <button class="icon-button" @click=${this._duplicateRoom} title="${this.localize('editor.duplicate_room')}">
                             <ha-icon icon="mdi:content-duplicate"></ha-icon>
                         </button>
@@ -116,6 +134,13 @@ export class EditorRoomShp extends LitElement {
 
                 ${this._expanded ? html`
                     <div class="room-content">
+                        ${this._yamlMode ? html`
+                            <ha-yaml-editor
+                                .hass=${this.hass}
+                                .defaultValue=${this.room}
+                                @value-changed=${this._roomYamlChanged}
+                            ></ha-yaml-editor>
+                        ` : html`
                         <!-- Basic Configuration Section -->
                         <div class="config-section collapsible-section">
                             <div class="section-header ${this._expandedSections.has('basic') ? 'expanded' : ''}" 
@@ -280,6 +305,7 @@ export class EditorRoomShp extends LitElement {
                                 ></editor-elements-shp>
                             </div>
                         </div>
+                        `}
                     </div>
                 ` : ''}
             </div>
@@ -288,6 +314,16 @@ export class EditorRoomShp extends LitElement {
 
     private _toggleExpanded() {
         this._expanded = !this._expanded;
+    }
+
+    private _toggleYamlMode(e: Event) {
+        e.stopPropagation();
+        this._yamlMode = !this._yamlMode;
+    }
+
+    private _roomYamlChanged(e: CustomEvent) {
+        const updatedRoom = e.detail.value as Room;
+        this._dispatchUpdate(updatedRoom);
     }
 
     private _toggleSection(section: string): void {
