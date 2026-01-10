@@ -61,6 +61,7 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedRoomBounds?: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number };
     private _cachedRelativePoints?: string;
     private _cachedOverviewRoom?: Room;
+    private _infoBoxCache: Map<string, any> = new Map();  // Cache for info box entity config
 
     // Dynamic color state
     @state() private _motionDelayActive: Map<string, boolean> = new Map();
@@ -288,7 +289,8 @@ export class ScalableHousePlanRoom extends LitElement {
             scale: scale.scaleX,
             scaleRatio: 0,  // Overview: no element scaling
             config: this.config,
-            originalRoom: this.room  // Pass original room for info box entity detection
+            originalRoom: this.room,  // Pass original room for info box entity detection
+            infoBoxCache: this._infoBoxCache
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
@@ -372,7 +374,8 @@ export class ScalableHousePlanRoom extends LitElement {
             elementCards: this.elementCards,
             scale,
             scaleRatio,
-            config: this.config
+            config: this.config,
+            infoBoxCache: this._infoBoxCache
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();

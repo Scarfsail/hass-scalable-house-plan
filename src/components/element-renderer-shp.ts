@@ -22,6 +22,7 @@ export interface ElementRendererOptions {
     scaleRatio?: number;  // Element scaling ratio (0=no scale, 1=full scale with plan)
     config?: ScalableHousePlanConfig;  // Optional: needed for info box defaults
     originalRoom?: Room;  // Optional: original room with all entities (for info box in overview mode)
+    infoBoxCache?: Map<string, EntityConfig | null>;  // Cache for info box entity configs
 }
 /**
  * Generate unique key for no-entity elements based on type and position
@@ -46,7 +47,7 @@ function generateElementKey(elementType: string, plan: any): string {
  * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
  */
 export function renderElements(options: ElementRendererOptions): TemplateResult[] {
-    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom } = options;
+    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache } = options;
     
     // Calculate element scale: 1 + (planScale - 1) * scaleRatio
     // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
@@ -60,7 +61,7 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
     const isOverview = !!originalRoom;
     const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
     const roomForInfoBox = originalRoom || room;
-    const infoBoxEntity = createInfoBoxEntity(roomForInfoBox, config, hass, mode);
+    const infoBoxEntity = getOrCreateInfoBoxEntity(roomForInfoBox, config, hass, mode, infoBoxCache);
     const allEntities = infoBoxEntity ? [...(room.entities || []), infoBoxEntity] : (room.entities || []);
 
     // Get all entities with plan config
@@ -288,6 +289,41 @@ export function getRoomBounds(room: Room): { minX: number; minY: number; maxX: n
         width: maxX - minX,
         height: maxY - minY
     };
+}
+
+/**
+ * Get or create cached info box entity config
+ * @param room - The room to create info box for
+ * @param config - House plan config (for defaults)
+ * @param hass - Home Assistant instance
+ * @param mode - Current view mode
+ * @param cache - Optional cache map for info box configs
+ * @returns EntityConfig for info box or null if disabled
+ */
+function getOrCreateInfoBoxEntity(
+    room: Room, 
+    config: ScalableHousePlanConfig | undefined, 
+    hass: HomeAssistant, 
+    mode: 'overview' | 'detail',
+    cache?: Map<string, EntityConfig | null>
+): EntityConfig | null {
+    // Generate cache key: room name + mode
+    const cacheKey = `${room.name}-${mode}`;
+    
+    // Check cache first
+    if (cache?.has(cacheKey)) {
+        return cache.get(cacheKey) || null;
+    }
+    
+    // Create info box entity (expensive operation)
+    const infoBoxEntity = createInfoBoxEntity(room, config, hass, mode);
+    
+    // Store in cache if available
+    if (cache) {
+        cache.set(cacheKey, infoBoxEntity);
+    }
+    
+    return infoBoxEntity;
 }
 
 /**
