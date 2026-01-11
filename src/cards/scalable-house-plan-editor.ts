@@ -13,6 +13,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     @property({ attribute: false }) public hass!: HomeAssistant;
     @state() private _config!: ScalableHousePlanConfig;
     @state() private _expandedSections: Set<string> = new Set(['rooms']);
+    @state() private _previewRoomIndex: number | null = null;
     private _localize?: LocalizeFunction;
 
     // Lazy-load localize function and cache it
@@ -216,6 +217,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             @room-update=${this._updateRoom}
                             @room-remove=${this._removeRoom}
                             @rooms-reorder=${this._reorderRooms}
+                            @room-preview-detail=${this._handlePreviewDetail}
                         ></editor-rooms-shp>
                     </div>
                 </div>
@@ -234,6 +236,13 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     }
 
     // Room handlers
+    private _handlePreviewDetail(ev: CustomEvent): void {
+        const { roomIndex, showPreview } = ev.detail;
+        this._previewRoomIndex = showPreview ? roomIndex : null;
+        // Trigger config update to update the preview
+        this._configChanged();
+    }
+
     private _addRoom(): void {
         const newRoom: Room = {
             name: this.localize('editor.new_room'),
@@ -388,7 +397,12 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     private _configChanged(): void {
         const event = new CustomEvent("config-changed", {
-            detail: { config: this._config },
+            detail: { 
+                config: {
+                    ...this._config,
+                    _previewRoomIndex: this._previewRoomIndex
+                }
+            },
             bubbles: true,
             composed: true,
         });

@@ -115,6 +115,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     show_room_backgrounds?: boolean;  // Show room background colors (helpful for editing boundaries)
     dynamic_colors?: DynamicColorsConfig;  // Dynamic room color configuration
     info_box_defaults?: InfoBoxConfig;  // Default info box configuration for all rooms
+    _previewRoomIndex?: number;  // Internal: room index to preview in detail view (not persisted, used during editing)
 }
 
 
@@ -198,6 +199,16 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             ...config,
             rooms: config.rooms || [],
         };
+        
+        // Automatically show detail view for preview room (used during editing)
+        if (this._isEditMode() && config._previewRoomIndex !== undefined && config._previewRoomIndex !== null) {
+            this._selectedRoomIndex = config._previewRoomIndex;
+            this._currentView = 'detail';
+        } else if (this._isEditMode() && config._previewRoomIndex === null) {
+            // Reset to overview when preview is cleared
+            this._selectedRoomIndex = null;
+            this._currentView = 'overview';
+        }
     }
 
     public getLayoutOptions() {

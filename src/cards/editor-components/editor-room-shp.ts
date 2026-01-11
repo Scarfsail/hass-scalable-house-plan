@@ -15,6 +15,7 @@ export class EditorRoomShp extends LitElement {
     @state() private _expanded = false;
     @state() private _expandedSections: Set<string> = new Set(['entities']); // Only entities expanded by default
     @state() private _yamlMode = false;
+    @state() private _previewDetailView = false;
     private _localize?: LocalizeFunction;
 
     private get localize(): LocalizeFunction {
@@ -122,7 +123,16 @@ export class EditorRoomShp extends LitElement {
                         >
                             <ha-icon icon="mdi:playlist-edit"></ha-icon>
                         </button>
+                        <button 
+                            class="icon-button ${this._previewDetailView ? 'toggled' : ''}" 
+                            @click=${this._togglePreviewDetail} 
+                            title="${this.localize(this._previewDetailView ? 'editor.hide_detail_preview' : 'editor.show_detail_preview')}"
+                        >
+                            <ha-icon icon="mdi:eye${this._previewDetailView ? '-off' : ''}"></ha-icon>
+                        </button>
                         <button class="icon-button" @click=${this._duplicateRoom} title="${this.localize('editor.duplicate_room')}">
+                            <ha-icon icon="mdi:content-duplicate"></ha-icon>
+                        </button>
                             <ha-icon icon="mdi:content-duplicate"></ha-icon>
                         </button>
                         <button class="icon-button danger" @click=${this._removeRoom}>
@@ -321,6 +331,14 @@ export class EditorRoomShp extends LitElement {
         this._yamlMode = !this._yamlMode;
     }
 
+    private _togglePreviewDetail(e: Event) {
+        e.stopPropagation();
+        this._previewDetailView = !this._previewDetailView;
+        
+        // Dispatch event to notify parent about preview state
+        this._dispatchPreviewEvent(this._previewDetailView);
+    }
+
     private _roomYamlChanged(e: CustomEvent) {
         const updatedRoom = e.detail.value as Room;
         this._dispatchUpdate(updatedRoom);
@@ -433,6 +451,15 @@ export class EditorRoomShp extends LitElement {
     private _dispatchUpdate(updatedRoom: Room) {
         const event = new CustomEvent('room-update', {
             detail: { roomIndex: this.roomIndex, room: updatedRoom },
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(event);
+    }
+
+    private _dispatchPreviewEvent(showPreview: boolean) {
+        const event = new CustomEvent('room-preview-detail', {
+            detail: { roomIndex: this.roomIndex, showPreview },
             bubbles: true,
             composed: true
         });

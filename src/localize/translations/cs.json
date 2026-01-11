@@ -90,6 +90,8 @@
     "no_entity": "Bez entity",
     "area": "Oblast",
     "edit_yaml": "Upravit YAML",
-    "edit_ui": "Upravit vizuálně"
+    "edit_ui": "Upravit vizuálně",
+    "show_detail_preview": "Zobrazit náhled detailu",
+    "hide_detail_preview": "Skrýt náhled detailu"
   }
 }
