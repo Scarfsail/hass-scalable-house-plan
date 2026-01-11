@@ -74,6 +74,7 @@ export class ScalableHousePlanRoom extends LitElement {
     // Dynamic color state
     @state() private _currentColor?: DynamicColorResult;
     @state() private _currentGradient?: GradientDefinition;
+    @state() private _hasMotion: boolean = false;
 
     willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
         super.willUpdate(changedProperties);
@@ -146,6 +147,22 @@ export class ScalableHousePlanRoom extends LitElement {
                 filter: brightness(1.2);
             }
 
+            .room-polygon.motion-detected {
+                animation: pulse-glow 3s ease-in-out infinite;
+            }
+
+            @keyframes pulse-glow {
+                0% {
+                    opacity: 0.5;
+                }
+                50% {
+                    opacity: 1;
+                }
+                100% {
+                    opacity: 0.5;
+                }
+            }
+
             .room-svg {
                 pointer-events: none;  /* SVG container is transparent to pointer events */
                 backface-visibility: hidden;  /* Stabilize GPU rendering */
@@ -207,7 +224,7 @@ export class ScalableHousePlanRoom extends LitElement {
         };
     }
 
-    
+
     /**
      * Update dynamic room color based on current entity states
      */
@@ -221,6 +238,9 @@ export class ScalableHousePlanRoom extends LitElement {
             this.config,
             this._cachedEntityIds
         );
+        
+        // Track motion detection state for animation
+        this._hasMotion = this._currentColor.type === 'motion';
         
         // Create gradient if not transparent
         if (this._currentColor.type !== 'transparent') {
@@ -350,7 +370,7 @@ export class ScalableHousePlanRoom extends LitElement {
                     fill="${fillColor}" 
                     stroke="${strokeColor}"
                     stroke-width="2"
-                    class="room-polygon overview ${elementsClickable ? 'no-pointer-events' : ''}"
+                    class="room-polygon overview ${elementsClickable ? 'no-pointer-events' : ''} ${this._hasMotion ? 'motion-detected' : ''}"
                     style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
                     @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
                 />
@@ -458,7 +478,7 @@ export class ScalableHousePlanRoom extends LitElement {
                             fill="${fillColor}" 
                             stroke="${strokeColor}"
                             stroke-width="2"
-                            class="room-polygon"
+                            class="room-polygon ${this._hasMotion ? 'motion-detected' : ''}"
                             @click=${(e: Event) => e.stopPropagation()}
                         />
                     </svg>
