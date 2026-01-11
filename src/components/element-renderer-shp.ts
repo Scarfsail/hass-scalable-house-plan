@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-element";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig } from "../cards/scalable-house-plan";
-import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getInfoBoxEntityIds } from "../utils";
+import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds } from "../utils";
 
 /**
  * Shared element rendering functionality for overview and detail views
@@ -377,8 +377,8 @@ function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undef
     // Determine if background should be shown for current mode
     const showBackground = mode === 'overview' ? merged.show_background_overview : merged.show_background_detail;
     
-    // Get entity IDs for info box using the shared helper function
-    const roomEntityIds = Array.from(getInfoBoxEntityIds(hass, room, null));
+    // Get ALL entity IDs for info box to scan through (info box filters to specific types internally)
+    const roomEntityIds = getAllRoomEntityIds(hass, room, null);
     
     // Create element config for info box
     // Add room name to make unique key for each room's info box

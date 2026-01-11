@@ -4,6 +4,7 @@ import { getAreaEntities } from "./area-helpers";
 
 /**
  * Get entity IDs that should be shown in the info box for a room
+ * Info box only shows specific sensor types: motion, occupancy, temperature, humidity
  * 
  * @param hass - HomeAssistant instance
  * @param room - Room configuration
@@ -35,18 +36,28 @@ export function getInfoBoxEntityIds(
         )
     );
     
-    // Add explicit room entities (unless they have exclude_from_info_box flag)
+    // Helper function to check if entity should be shown in info box
+    const isInfoBoxEntity = (entityId: string): boolean => {
+        const entity = hass.states[entityId];
+        if (!entity) return false;
+        
+        const deviceClass = entity.attributes?.device_class;
+        const supportedTypes = ['motion', 'occupancy', 'temperature', 'humidity'];
+        return deviceClass ? supportedTypes.includes(deviceClass) : false;
+    };
+    
+    // Add explicit room entities that match info box types (unless they have exclude_from_info_box flag)
     room.entities.forEach(cfg => {
         const entityId = typeof cfg === 'string' ? cfg : cfg.entity;
         const excludeFromInfoBox = typeof cfg !== 'string' && cfg.plan?.exclude_from_info_box;
-        if (!excludeFromInfoBox) {
+        if (!excludeFromInfoBox && isInfoBoxEntity(entityId)) {
             infoBoxEntityIds.add(entityId);
         }
     });
     
-    // Add area entities (deduplicated)
+    // Add area entities that match info box types (deduplicated)
     areaIds.forEach(entityId => {
-        if (!explicitEntityIds.has(entityId)) {
+        if (!explicitEntityIds.has(entityId) && isInfoBoxEntity(entityId)) {
             infoBoxEntityIds.add(entityId);
         }
     });
@@ -55,12 +66,59 @@ export function getInfoBoxEntityIds(
 }
 
 /**
- * Get all entities for a room, optionally filtered to exclude those shown on detail page or in info box
+ * Get all entity IDs for a room (for info box element to scan through)
+ * This includes ALL entities regardless of type
+ * 
+ * @param hass - HomeAssistant instance
+ * @param room - Room configuration
+ * @param areaEntityIds - Cached area entity IDs (optional, will fetch if not provided)
+ * @returns Array of all entity IDs in the room
+ */
+export function getAllRoomEntityIds(
+    hass: HomeAssistant,
+    room: Room,
+    areaEntityIds: string[] | null = null
+): string[] {
+    // Get area entities if not provided
+    const areaIds = areaEntityIds !== null 
+        ? areaEntityIds 
+        : (room.area ? getAreaEntities(hass, room.area) : []);
+    
+    // Get explicitly configured entity IDs for deduplication
+    const explicitEntityIds = new Set(
+        room.entities.map(cfg => 
+            typeof cfg === 'string' ? cfg : cfg.entity
+        )
+    );
+    
+    const allEntityIds = new Set<string>();
+    
+    // Add explicit room entities (unless they have exclude_from_info_box flag)
+    room.entities.forEach(cfg => {
+        const entityId = typeof cfg === 'string' ? cfg : cfg.entity;
+        const excludeFromInfoBox = typeof cfg !== 'string' && cfg.plan?.exclude_from_info_box;
+        if (!excludeFromInfoBox) {
+            allEntityIds.add(entityId);
+        }
+    });
+    
+    // Add area entities (deduplicated)
+    areaIds.forEach(entityId => {
+        if (!explicitEntityIds.has(entityId)) {
+            allEntityIds.add(entityId);
+        }
+    });
+    
+    return Array.from(allEntityIds);
+}
+
+/**
+ * Get all entities for a room, optionally filtered to exclude those shown on detail page or info box
  * 
  * @param hass - HomeAssistant instance
  * @param room - Room configuration
  * @param areaEntityIds - Cached area entity IDs (optional, will fetch if not provided, empty if no area)
- * @param showAll - If true, returns all entities; if false, only entities not on detail page or in info box
+ * @param showAll - If true, returns all entities; if false, excludes entities on detail page or in info box
  * @returns Array of EntityConfig objects
  */
 export function getRoomEntities(
@@ -88,9 +146,6 @@ export function getRoomEntities(
             .map(cfg => (cfg as any).entity)
     );
 
-    // Get entities shown in info box (reuse helper function)
-    const infoBoxEntityIds = getInfoBoxEntityIds(hass, room, areaIds);
-
     // Combine explicit entities and area entities (deduplicated)
     const areaEntityConfigs: EntityConfig[] = areaIds
         .filter(entityId => !explicitEntityIds.has(entityId));
@@ -99,9 +154,12 @@ export function getRoomEntities(
     
     // Apply filter if not showing all entities
     if (!showAll) {
+        // Get entities shown in info box (if enabled)
+        const infoBoxEntityIds = getInfoBoxEntityIds(hass, room, areaIds);
+        
         allEntityConfigs = allEntityConfigs.filter(cfg => {
             const entityId = typeof cfg === 'string' ? cfg : cfg.entity;
-            // Exclude entities shown on detail page OR in info box
+            // Exclude entities on detail page OR in info box
             return !detailEntityIds.has(entityId) && !infoBoxEntityIds.has(entityId);
         });
     }
@@ -115,7 +173,7 @@ export function getRoomEntities(
  * @param hass - HomeAssistant instance
  * @param room - Room configuration
  * @param areaEntityIds - Cached area entity IDs (optional, will fetch if not provided)
- * @returns Count of entities not on detail page or in info box
+ * @returns Count of entities not shown on detail page or in info box
  */
 export function getEntitiesNotOnDetailCount(
     hass: HomeAssistant,
