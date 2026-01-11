@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-element";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig } from "../cards/scalable-house-plan";
-import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable } from "../utils";
+import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getInfoBoxEntityIds } from "../utils";
 
 /**
  * Shared element rendering functionality for overview and detail views
@@ -377,25 +377,8 @@ function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undef
     // Determine if background should be shown for current mode
     const showBackground = mode === 'overview' ? merged.show_background_overview : merged.show_background_detail;
     
-    // Get all entity IDs in room (including both explicit and area entities)
-    const allRoomEntities = getRoomEntities(hass, room, null, true);
-    
-    // Extract entity IDs and filter out those with exclude_from_info_box flag
-    const roomEntityIds = allRoomEntities
-        .map(entityConfig => {
-            if (typeof entityConfig === 'string') return entityConfig;
-            return entityConfig.entity;
-        })
-        .filter(entityId => {
-            // Filter out entities with exclude_from_info_box flag
-            const entityConfig = allRoomEntities.find(e => 
-                typeof e !== 'string' && e.entity === entityId
-            );
-            if (typeof entityConfig !== 'string' && entityConfig?.plan?.exclude_from_info_box) {
-                return false;
-            }
-            return true;
-        });
+    // Get entity IDs for info box using the shared helper function
+    const roomEntityIds = Array.from(getInfoBoxEntityIds(hass, room, null));
     
     // Create element config for info box
     // Add room name to make unique key for each room's info box

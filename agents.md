@@ -63,3 +63,15 @@ instead of string shortcuts. Update your configuration accordingly.
 - **Dependency update?** → `chore(deps):`
 - **Documentation only?** → `docs:` (no release)
 - **Refactoring?** → `refactor:` (no release)
+
+## Build Commands
+
+This project uses **Vite** for building. Available npm scripts in `package.json`:
+
+| Command | Description |
+|---------|-------------|
+| `npm run build-dev` | Build for development with source maps (`vite build --mode development`) |
+| `npm run build-prod` | Build for production, minified (`vite build`) |
+| `npm run watch` | Build in watch mode for development (`vite build --watch --mode development`) |
+
+**Note:** This project does NOT have a `npm run build` command. Use `build-dev` or `build-prod` instead.
