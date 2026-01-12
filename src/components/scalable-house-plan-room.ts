@@ -7,6 +7,7 @@ import { renderElements, getRoomBounds } from "./element-renderer-shp";
 import { 
     createGradientDefinition, 
     calculatePolygonCenter,
+    adjustOpacity,
     type DynamicColorResult,
     type GradientDefinition,
     type CachedEntityIds,
@@ -74,6 +75,7 @@ export class ScalableHousePlanRoom extends LitElement {
     // Dynamic color state
     @state() private _currentColor?: DynamicColorResult;
     @state() private _currentGradient?: GradientDefinition;
+    @state() private _currentGradientInverted?: GradientDefinition;
     @state() private _hasMotion: boolean = false;
 
     willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
@@ -134,7 +136,6 @@ export class ScalableHousePlanRoom extends LitElement {
             }
 
             .room-polygon {
-                transition: opacity 0.3s ease-in-out;
                 pointer-events: fill;  /* Only the filled polygon responds to pointer events */
             }
 
@@ -142,24 +143,34 @@ export class ScalableHousePlanRoom extends LitElement {
                 pointer-events: none;  /* Disable pointer events when elements are clickable */
             }
 
-            .room-polygon.overview:hover {
+            .room-polygon.overview:hover:not(.motion-normal):not(.motion-inverted) {
                 opacity: 1.3;
                 filter: brightness(1.2);
             }
 
-            .room-polygon.motion-detected {
-                animation: pulse-glow 3s ease-in-out infinite;
+            .room-polygon.motion-normal {
+                animation: pulse-normal 3s ease-in-out infinite;
             }
 
-            @keyframes pulse-glow {
-                0% {
-                    opacity: 0.5;
+            .room-polygon.motion-inverted {
+                animation: pulse-inverted 3s ease-in-out infinite;
+            }
+
+            @keyframes pulse-normal {
+                0%, 100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0;
+                }
+            }
+
+            @keyframes pulse-inverted {
+                0%, 100% {
+                    opacity: 0;
                 }
                 50% {
                     opacity: 1;
-                }
-                100% {
-                    opacity: 0.5;
                 }
             }
 
@@ -246,6 +257,7 @@ export class ScalableHousePlanRoom extends LitElement {
         if (this._currentColor.type !== 'transparent') {
             const center = calculatePolygonCenter(this.room.boundary);
             const gradientId = `gradient-${this.room.name.replace(/\s+/g, '-')}-${this.mode}`;
+            const gradientIdInverted = `gradient-inv-${this.room.name.replace(/\s+/g, '-')}-${this.mode}`;
             
             this._currentGradient = createGradientDefinition(
                 this._currentColor.color,
@@ -254,8 +266,29 @@ export class ScalableHousePlanRoom extends LitElement {
                 center.y,
                 this._cachedRoomBounds
             );
+            
+            // Create inverted gradient (dark center, bright edges) for motion animation
+            if (this._hasMotion) {
+                const cx = ((center.x - this._cachedRoomBounds.minX) / this._cachedRoomBounds.width * 100).toFixed(1);
+                const cy = ((center.y - this._cachedRoomBounds.minY) / this._cachedRoomBounds.height * 100).toFixed(1);
+                
+                // Inverted: Center is dark (0.05), outer is bright (0.2)
+                const innerColor = adjustOpacity(this._currentColor.color, 0.05);
+                const outerColor = adjustOpacity(this._currentColor.color, 0.2);
+                
+                this._currentGradientInverted = {
+                    id: gradientIdInverted,
+                    cx: `${cx}%`,
+                    cy: `${cy}%`,
+                    innerColor,
+                    outerColor
+                };
+            } else {
+                this._currentGradientInverted = undefined;
+            }
         } else {
             this._currentGradient = undefined;
+            this._currentGradientInverted = undefined;
         }
     }
 
@@ -363,17 +396,47 @@ export class ScalableHousePlanRoom extends LitElement {
                             <stop offset="0%" stop-color="${this._currentGradient.innerColor}" />
                             <stop offset="100%" stop-color="${this._currentGradient.outerColor}" />
                         </radialGradient>
+                        ${this._hasMotion && this._currentGradientInverted ? svg`
+                            <radialGradient id="${this._currentGradientInverted.id}" cx="${this._currentGradientInverted.cx}" cy="${this._currentGradientInverted.cy}" r="70%">
+                                <stop offset="0%" stop-color="${this._currentGradientInverted.innerColor}" />
+                                <stop offset="100%" stop-color="${this._currentGradientInverted.outerColor}" />
+                            </radialGradient>
+                        ` : ''}
                     </defs>
                 ` : ''}
-                <polygon 
-                    points="${this._cachedRelativePoints}" 
-                    fill="${fillColor}" 
-                    stroke="${strokeColor}"
-                    stroke-width="2"
-                    class="room-polygon overview ${elementsClickable ? 'no-pointer-events' : ''} ${this._hasMotion ? 'motion-detected' : ''}"
-                    style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
-                    @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
-                />
+                ${this._hasMotion && this._currentGradientInverted ? svg`
+                    <!-- Normal gradient polygon - fades out when inverted fades in -->
+                    <polygon 
+                        points="${this._cachedRelativePoints}" 
+                        fill="url(#${this._currentGradient!.id})" 
+                        stroke="${strokeColor}"
+                        stroke-width="2"
+                        class="room-polygon overview motion-normal ${elementsClickable ? 'no-pointer-events' : ''}"
+                        style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
+                        @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
+                    />
+                    <!-- Inverted gradient polygon - fades in when normal fades out -->
+                    <polygon 
+                        points="${this._cachedRelativePoints}" 
+                        fill="url(#${this._currentGradientInverted.id})" 
+                        stroke="${strokeColor}"
+                        stroke-width="2"
+                        class="room-polygon overview motion-inverted ${elementsClickable ? 'no-pointer-events' : ''}"
+                        style="cursor: ${elementsClickable ? 'default' : 'pointer'}; opacity: 0;"
+                        @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
+                    />
+                ` : svg`
+                    <!-- Single polygon for non-motion states -->
+                    <polygon 
+                        points="${this._cachedRelativePoints}" 
+                        fill="${fillColor}" 
+                        stroke="${strokeColor}"
+                        stroke-width="2"
+                        class="room-polygon overview ${elementsClickable ? 'no-pointer-events' : ''}"
+                        style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
+                        @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
+                    />
+                `}
             </svg>
         `;
 
@@ -460,6 +523,12 @@ export class ScalableHousePlanRoom extends LitElement {
                                     <stop offset="0%" stop-color="${this._currentGradient.innerColor}" />
                                     <stop offset="100%" stop-color="${this._currentGradient.outerColor}" />
                                 </radialGradient>
+                                ${this._hasMotion && this._currentGradientInverted ? svg`
+                                    <radialGradient id="${this._currentGradientInverted.id}" cx="${this._currentGradientInverted.cx}" cy="${this._currentGradientInverted.cy}" r="70%">
+                                        <stop offset="0%" stop-color="${this._currentGradientInverted.innerColor}" />
+                                        <stop offset="100%" stop-color="${this._currentGradientInverted.outerColor}" />
+                                    </radialGradient>
+                                ` : ''}
                             ` : ''}
                         </defs>
                         <!-- Background image clipped to room shape -->
@@ -473,14 +542,37 @@ export class ScalableHousePlanRoom extends LitElement {
                             preserveAspectRatio="none"
                         />
                         <!-- Room colored polygon on top -->
-                        <polygon 
-                            points="${points}" 
-                            fill="${fillColor}" 
-                            stroke="${strokeColor}"
-                            stroke-width="2"
-                            class="room-polygon ${this._hasMotion ? 'motion-detected' : ''}"
-                            @click=${(e: Event) => e.stopPropagation()}
-                        />
+                        ${this._hasMotion && this._currentGradientInverted ? svg`
+                            <!-- Normal gradient polygon - fades out when inverted fades in -->
+                            <polygon 
+                                points="${points}" 
+                                fill="url(#${this._currentGradient!.id})" 
+                                stroke="${strokeColor}"
+                                stroke-width="2"
+                                class="room-polygon motion-normal"
+                                @click=${(e: Event) => e.stopPropagation()}
+                            />
+                            <!-- Inverted gradient polygon - fades in when normal fades out -->
+                            <polygon 
+                                points="${points}" 
+                                fill="url(#${this._currentGradientInverted.id})" 
+                                stroke="${strokeColor}"
+                                stroke-width="2"
+                                class="room-polygon motion-inverted"
+                                style="opacity: 0;"
+                                @click=${(e: Event) => e.stopPropagation()}
+                            />
+                        ` : svg`
+                            <!-- Single polygon for non-motion states -->
+                            <polygon 
+                                points="${points}" 
+                                fill="${fillColor}" 
+                                stroke="${strokeColor}"
+                                stroke-width="2"
+                                class="room-polygon"
+                                @click=${(e: Event) => e.stopPropagation()}
+                            />
+                        `}
                     </svg>
                 `}
                 <div class="elements-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
