@@ -73,7 +73,7 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
 
     // Domain-level defaults
     'light': {
-        plan_element: { type: 'custom:state-icon-trigger-shp' },
+        plan_element: { type: 'custom:state-icon-shp', show_trigger_info: true },
         detail_element: { type: 'tile' }
     },
     'camera': {
@@ -81,27 +81,27 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
         detail_element: { type: 'custom:camera-shp', width: 300, height: 225 }
     },
     'cover': {
-        plan_element: { type: 'custom:hui-state-icon-element' },
+        plan_element: { type: 'custom:state-icon-shp' },
         detail_element: { type: 'tile' }
     },
     'climate': {
-        plan_element: { type: 'custom:hui-state-icon-element' },
+        plan_element: { type: 'custom:state-icon-shp' },
         detail_element: { type: 'tile' }
     },
     'switch': {
-        plan_element: { type: 'custom:hui-state-icon-element' },
+        plan_element: { type: 'custom:state-icon-shp' },
         detail_element: { type: 'tile' }
     },
     'fan': {
-        plan_element: { type: 'custom:hui-state-icon-element' },
+        plan_element: { type: 'custom:state-icon-shp' },
         detail_element: { type: 'tile' }
     },
     'lock': {
-        plan_element: { type: 'custom:hui-state-icon-element' },
+        plan_element: { type: 'custom:state-icon-shp' },
         detail_element: { type: 'tile' }
     },
     'binary_sensor': {
-        plan_element: { type: 'custom:hui-state-icon-element' },
+        plan_element: { type: 'custom:state-icon-shp' },
         detail_element: { type: 'tile' }
     },
     'sensor': {
@@ -115,7 +115,7 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
 
     // Wildcard fallback for any unrecognized entity
     '*': {
-        plan_element: { type: 'custom:hui-state-icon-element' },
+        plan_element: { type: 'custom:state-icon-shp' },
         detail_element: { type: 'tile' }
     }
 };
@@ -152,7 +152,7 @@ export function getElementTypeForEntity(
     }
 
     const elementDef = context === 'plan' ? mapping?.plan_element : mapping?.detail_element;
-    return elementDef || { type: 'custom:state-icon-trigger-shp', size: 20 };
+    return elementDef || { type: 'custom:state-icon-shp', size: 20 };
 }
 
 /**

@@ -2,31 +2,35 @@ import { html, css } from "lit"
 import { customElement } from "lit/decorators.js";
 import { ElementEntityBase, ElementEntityBaseConfig } from "./base";
 import { HassEntity } from "home-assistant-js-websocket";
-import { ShortenNumberPrefixType } from "../utils";
 
-interface StateIconTriggerElementConfig extends ElementEntityBaseConfig {
-    decimals?: number;
-    shorten_and_use_prefix?: ShortenNumberPrefixType
-
+interface StateIconElementConfig extends ElementEntityBaseConfig {
+    show_trigger_info?: boolean;
+    show_title?: boolean;
+    title?: string;
 }
 
-@customElement("state-icon-trigger-shp")
-export class StateIconTriggerElement extends ElementEntityBase<StateIconTriggerElementConfig> {
+@customElement("state-icon-shp")
+export class StateIconElement extends ElementEntityBase<StateIconElementConfig> {
     protected handleActionsInBase = false; // Actions handled by inner hui-state-icon-element
 
     static styles = css`
         :host {
             position: relative;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .icon-container {
+            position: relative;
             display: inline-block;
         }
         
-        .trigger-indicator {
+        .info-label {
             position: absolute;
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
             font-size: 8px;
             font-weight: bold;
             padding: 1px 3px;
@@ -35,7 +39,12 @@ export class StateIconTriggerElement extends ElementEntityBase<StateIconTriggerE
             z-index: 1;
             min-width: 12px;
             text-align: center;
-            opacity:0.7
+            opacity: 0.7;
+        }
+        
+        .trigger-indicator {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
         }
         
         .trigger-automation {
@@ -51,6 +60,15 @@ export class StateIconTriggerElement extends ElementEntityBase<StateIconTriggerE
         .trigger-manual {
             background: rgba(128, 128, 128, 0.9); /* Gray for manual */
             color: white;
+        }
+        
+        .title {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
     `;
 
@@ -68,12 +86,25 @@ export class StateIconTriggerElement extends ElementEntityBase<StateIconTriggerE
         }
         this.icon.hass = this.hass;
         
-        // Determine trigger source
-        const triggerIndicator = this.getTriggerIndicator(entity);
+        // Show trigger info OR title (mutually exclusive, trigger takes priority)
+        const showTriggerInfo = this._config?.show_trigger_info ?? false;
+        const showTitle = this._config?.show_title ?? false;
+        
+        let infoLabel = null;
+        if (showTriggerInfo) {
+            // Trigger info takes priority
+            infoLabel = this.getTriggerIndicator(entity);
+        } else if (showTitle) {
+            // Show title if trigger is not enabled
+            const titleText = this._config?.title || entity.attributes.friendly_name || entity.entity_id;
+            infoLabel = html`<div class="info-label title">${titleText}</div>`;
+        }
         
         return html`
-            ${this.icon}
-            ${triggerIndicator}
+            <div class="icon-container">
+                ${this.icon}
+                ${infoLabel}
+            </div>
         `
     }
     
@@ -81,20 +112,20 @@ export class StateIconTriggerElement extends ElementEntityBase<StateIconTriggerE
         // Check if entity has context information
         const context = entity.context;
         if (!context) {
-            return html`<div class="trigger-indicator trigger-manual">M</div>`;
+            return html`<div class="info-label trigger-indicator trigger-manual">M</div>`;
         }
         
         // If context.parent_id exists, it was triggered by automation
         if (context.parent_id) {
-            return html`<div class="trigger-indicator trigger-automation">A</div>`;
+            return html`<div class="info-label trigger-indicator trigger-automation">A</div>`;
         }
         
         // If context.user_id exists and no parent_id, it was triggered by user
         if (context.user_id) {
-            return html`<div class="trigger-indicator trigger-user">U</div>`;
+            return html`<div class="info-label trigger-indicator trigger-user">U</div>`;
         }
         
         // Manual trigger (no user_id and no parent_id)
-        return html`<div class="trigger-indicator trigger-manual">M</div>`;
+        return html`<div class="info-label trigger-indicator trigger-manual">M</div>`;
     }
 }

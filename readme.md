@@ -67,7 +67,7 @@ This library also contains some custom elements like door/window element to bett
     - [Configuration](#configuration-11)
     - [Example](#example-10)
     - [Notes](#notes-2)
-  - [12. `state-icon-trigger-element`](#12-state-icon-trigger-element)
+  - [12. `state-icon-element`](#12-state-icon-element)
     - [Features](#features-11)
     - [Configuration](#configuration-12)
     - [Example](#example-11)
@@ -102,7 +102,7 @@ Just search for Scalable House Plan in the plugins tab.
 | `motion-sensor-element` | Motion sensor | Icon with alarm state colors |
 | `scalable-house-plan-layers` | Layer controls | Toggle buttons for layers |
 | `scripts-buttons-group-element` | Script controls | Multiple script buttons with running status |
-| `state-icon-trigger-element` | State icon + trigger | Shows how state was triggered (A/U/M) |
+| `state-icon-element` | State icon | Flexible state icon with trigger info and title options |
 
 ---
 
@@ -168,8 +168,9 @@ rooms:
           left: 250
           top: 200
           element:
-            type: custom:state-icon-trigger-shp  # Explicit type
-            size: 30                    # Custom properties
+            type: custom:state-icon-shp  # Explicit type
+            show_trigger_info: true       # Show trigger indicator
+            size: 30                      # Custom properties
       
       # Camera with plan and detail
       - entity: camera.living_room
@@ -677,33 +678,59 @@ running_height: 100
 
 ---
 
-## 12. `state-icon-trigger-element`
+## 12. `state-icon-element`
 
-Displays an entity's state icon with a small indicator showing how the last state change was triggered.
+Displays an entity's state icon with optional trigger indicator and title display.
 
 ### Features
 - Shows entity state icon (native HA state icon element)
-- Small overlay indicator showing trigger source:
+- Optional trigger indicator showing how the last state change was triggered:
   - **A** (Automation) - Orange: Triggered by automation
   - **U** (User) - Blue: Manually triggered by user
   - **M** (Manual) - Gray: Other/manual trigger
+- Optional title display below icon (entity friendly name or custom)
+- Configurable display options for trigger info and title
 - Uses entity context to determine trigger source
-- Semi-transparent overlay badge
 
 ### Configuration
 
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `entity` | string | Required | Entity ID |
+| `show_trigger_info` | boolean | `false` | Show trigger source indicator |
+| `show_title` | boolean | `false` | Show entity name below icon |
+| `title` | string | Optional | Custom title override (if show_title is true) |
+
 ```yaml
-type: custom:state-icon-trigger-element
+type: custom:state-icon-element
 entity: light.living_room
+show_trigger_info: true  # Show A/U/M indicator
+show_title: true         # Show entity name
 ```
 
 ### Example
 
 ```yaml
-- type: custom:state-icon-trigger-element
+# Basic state icon
+- type: custom:state-icon-element
   entity: switch.hallway_light
   left: 150
   top: 200
+
+# With trigger info (like lights have by default)
+- type: custom:state-icon-element
+  entity: light.bedroom
+  show_trigger_info: true
+  left: 250
+  top: 300
+
+# With custom title
+- type: custom:state-icon-element
+  entity: switch.pump
+  show_title: true
+  title: "Water Pump"
+  left: 350
+  top: 400
 ```
 
 ### Notes
@@ -785,7 +812,8 @@ rooms:
           left: 50
           top: 100
           element:
-            type: custom:state-icon-trigger-shp
+            type: custom:state-icon-shp
+            show_title: true
             size: 25
       
       # Battery sensor (analog on plan, bar in detail)
