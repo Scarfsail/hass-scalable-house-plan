@@ -2,7 +2,7 @@ import type { ActionConfig } from "../elements/base/element-base";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 
 /**
- * Domains that are considered "actionable" - entities that can be toggled or controlled
+ * Domains that are considered "actionable" by default - entities that can be toggled or controlled
  * Tap action will be "toggle" for these domains
  */
 const ACTIONABLE_DOMAINS = new Set([
@@ -10,7 +10,6 @@ const ACTIONABLE_DOMAINS = new Set([
     'switch',
     'fan',
     'lock',
-    'cover',
     'input_boolean',
     'automation',
     'script',
@@ -18,14 +17,40 @@ const ACTIONABLE_DOMAINS = new Set([
 ]);
 
 /**
- * Check if an entity is actionable (can be toggled/controlled)
+ * Icons that should NOT be considered actionable, even if their domain is actionable
+ * These icons indicate entities that should only show more-info on tap
+ */
+const NON_ACTIONABLE_ICONS = new Set([
+    'mdi:fuse',
+]);
+
+/**
+ * Check if an entity should be actionable (can be toggled/controlled via tap)
+ * This checks multiple factors:
+ * - Domain (light, switch, etc.)
+ * - Icon (certain icons like mdi:fuse are excluded)
+ * 
  * @param entityId - Entity ID
- * @param hass - Home Assistant instance (for future expansion)
- * @returns true if entity is actionable
+ * @param hass - Home Assistant instance
+ * @returns true if entity should be actionable
  */
 export function isEntityActionable(entityId: string, hass?: HomeAssistant): boolean {
     const domain = entityId.split('.')[0];
-    return ACTIONABLE_DOMAINS.has(domain);
+    
+    // Check if domain is actionable
+    if (!ACTIONABLE_DOMAINS.has(domain)) {
+        return false;
+    }
+    
+    // Check if icon should override actionability
+    if (hass?.states[entityId]) {
+        const icon = hass.states[entityId].attributes?.icon;
+        if (icon && NON_ACTIONABLE_ICONS.has(icon)) {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 /**
