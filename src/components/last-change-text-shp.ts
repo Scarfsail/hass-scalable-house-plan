@@ -6,6 +6,11 @@ import type { HassEntity } from 'home-assistant-js-websocket';
 
 @customElement('last-change-text-shp')
 class LastChangeText extends LitElement {
+  // Static color constants - avoid recreating objects on every render
+  private static readonly NORMAL_BACKGROUND = { red: 0, green: 0, blue: 0, alpha: 1 };
+  private static readonly NORMAL_TEXT = { red: 192, green: 192, blue: 192 };
+  private static readonly HIGHLIGHTED_TEXT = { red: 0, green: 0, blue: 0 };
+  private static readonly MINUTES_FOR_HIGHLIGHT = 2;
 
   @property({ attribute: false }) public entity?: HassEntity;
   @property({ attribute: false }) public secondsForSuperHighlight?: number;
@@ -57,28 +62,24 @@ class LastChangeText extends LitElement {
     if (!this.entity)
       return html`<div>No entity defined</div>`
 
-    const normalBackground = { red: 0, green: 0, blue: 0, alpha: 1 }
-    const normalText = { red: 192, green: 192, blue: 192 }
-    const highlightedText = { red: 0, green: 0, blue: 0 }
-    const minutesForHighlight = 2;
     const secondsForSuperHighlight = this.secondsForSuperHighlight;
 
     const lastChanged = this.entity.attributes["state_last_changed"] ?? this.entity.last_changed;
 
     const lastChangeBefore = lastChanged && dayjs.duration(dayjs().diff(lastChanged));
-    const doHighlight = lastChangeBefore && lastChangeBefore.asMinutes() <= minutesForHighlight;
+    const doHighlight = lastChangeBefore && lastChangeBefore.asMinutes() <= LastChangeText.MINUTES_FOR_HIGHLIGHT;
 
-    let textRgb = { ...normalText, alpha: 1 };
-    let backgroundRgb = normalBackground;
+    let textRgb = { ...LastChangeText.NORMAL_TEXT, alpha: 1 };
+    let backgroundRgb = LastChangeText.NORMAL_BACKGROUND;
 
     if (doHighlight) {
-      const percent = 100 / (minutesForHighlight * 60) * (lastChangeBefore.asSeconds() == 0 ? 0.1 : lastChangeBefore.asSeconds());
-      let highlightedBackground = { red: 255, green: 255, blue: 0, alpha: 0.7 }
-      if (secondsForSuperHighlight && lastChangeBefore.asSeconds() <= secondsForSuperHighlight)
-        highlightedBackground = { red: 255, green: 0, blue: 0, alpha: 1 };
+      const percent = 100 / (LastChangeText.MINUTES_FOR_HIGHLIGHT * 60) * (lastChangeBefore.asSeconds() == 0 ? 0.1 : lastChangeBefore.asSeconds());
+      const highlightedBackground = secondsForSuperHighlight && lastChangeBefore.asSeconds() <= secondsForSuperHighlight
+        ? { red: 255, green: 0, blue: 0, alpha: 1 }
+        : { red: 255, green: 255, blue: 0, alpha: 0.7 };
 
-      textRgb = percent < 42 ? { ...highlightedText, alpha: 1 } : { ...normalText, alpha: 1 };
-      backgroundRgb = calculateRgbaColors(highlightedBackground, normalBackground, percent);
+      textRgb = percent < 42 ? { ...LastChangeText.HIGHLIGHTED_TEXT, alpha: 1 } : { ...LastChangeText.NORMAL_TEXT, alpha: 1 };
+      backgroundRgb = calculateRgbaColors(highlightedBackground, LastChangeText.NORMAL_BACKGROUND, percent);
     }
 
     const textColor = `rgba(${textRgb.red},${textRgb.green},${textRgb.blue},${textRgb.alpha})`;

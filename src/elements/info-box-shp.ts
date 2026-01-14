@@ -1,9 +1,8 @@
 import { html, css, nothing } from "lit"
-import { customElement, property } from "lit/decorators.js";
+import { customElement } from "lit/decorators.js";
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { ElementBase, ElementBaseConfig } from "./base";
 import type { HassEntity } from "home-assistant-js-websocket";
-import { Utils } from "../utils/utils";
 import type { InfoBoxTypeConfig } from "../cards/scalable-house-plan";
 import "../components/last-change-text-shp";
 
@@ -28,8 +27,22 @@ interface InfoBoxItem {
     icon_position: 'inline' | 'separate';  // Icon layout
 }
 
+// Pre-computed type config for caching
+interface TypeConfigCache {
+    show: boolean;
+    size: string;
+    scale: number;  // Pre-parsed scale value
+    icon_position: 'inline' | 'separate';
+}
+
+// Type order for sorting - defined once as static constant
+const TYPE_ORDER = ['motion', 'occupancy', 'temperature', 'humidity'] as const;
+
 @customElement("info-box-shp")
 export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
+    // Cached type configurations (computed once in setConfig)
+    private _typeConfigs!: Record<string, TypeConfigCache>;
+    private _containerClass!: string;
 
     static override styles = css`
         :host {
@@ -90,6 +103,42 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
         }
     `;
 
+    async setConfig(config: InfoBoxElementConfig) {
+        await super.setConfig(config);
+        
+        // Pre-compute container class
+        const mode = config.mode || 'detail';
+        const showBackground = config.show_background ?? true;
+        const classes = ['info-box-container'];
+        if (mode === 'overview') classes.push('overview');
+        if (!showBackground) classes.push('no-background');
+        this._containerClass = classes.join(' ');
+        
+        // Pre-compute type configurations
+        const typesConfig = config.types || {};
+        this._typeConfigs = {};
+        
+        for (const type of TYPE_ORDER) {
+            const typeConfig = typesConfig[type as keyof typeof typesConfig];
+            
+            // Check mode-specific visibility (new) or fallback to legacy show (deprecated)
+            let show: boolean;
+            if (mode === 'overview') {
+                show = typeConfig?.visible_overview ?? typeConfig?.show ?? true;
+            } else {
+                show = typeConfig?.visible_detail ?? typeConfig?.show ?? true;
+            }
+            
+            const size = typeConfig?.size ?? "100%";
+            this._typeConfigs[type] = {
+                show,
+                size,
+                scale: parseFloat(size) / 100,
+                icon_position: typeConfig?.icon_position ?? 'inline'
+            };
+        }
+    }
+
     protected renderContent() {
         if (!this._config || !this.hass) {
             return nothing;
@@ -101,26 +150,20 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             return nothing;  // Don't render if no data
         }
 
-        const mode = this._config.mode || 'detail';
-        const showBackground = this._config.show_background ?? true;
-        
-        const classes = ['info-box-container'];
-        if (mode === 'overview') classes.push('overview');
-        if (!showBackground) classes.push('no-background');
-        const containerClass = classes.join(' ');
-
         return html`
-            <div class="${containerClass}">
+            <div class="${this._containerClass}">
                 ${items.map(item => {
-                    const scale = parseFloat(item.size) / 100;
+                    const typeConfig = this._typeConfigs[item.type];
                     const isMotionOrOccupancy = item.type === 'motion' || item.type === 'occupancy';
-                    const isSeparate = item.icon_position === 'separate';
+                    const isSeparate = typeConfig.icon_position === 'separate';
                     const itemClass = isSeparate ? 'info-item separate' : 'info-item';
-                    const transformOrigin = isSeparate ? 'center center' : 'left center';
+                    const transformStyle = typeConfig.scale !== 1 
+                        ? `transform: scale(${typeConfig.scale}); transform-origin: ${isSeparate ? 'center center' : 'left center'};`
+                        : '';
                     return html`
                         <div 
                             class="${itemClass}" 
-                            style="transform: scale(${scale}); transform-origin: ${transformOrigin};"
+                            style="${transformStyle}"
                             @click=${() => this._showMoreInfo(item.entity.entity_id)}
                         >
                             <ha-icon icon="${item.icon}"></ha-icon>
@@ -145,33 +188,11 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
     }
 
     private _collectInfoBoxItems(): InfoBoxItem[] {
-        if (!this._config || !this.hass) {
+        if (!this._config || !this.hass || !this._typeConfigs) {
             return [];
         }
 
         const items: InfoBoxItem[] = [];
-        const typesConfig = this._config.types || {};
-        const supportedTypes = ['motion', 'occupancy', 'temperature', 'humidity'];
-
-        // Get config for each type
-        const getTypeConfig = (type: string): { show: boolean; size: string; icon_position: 'inline' | 'separate' } => {
-            const config = typesConfig[type as keyof typeof typesConfig];
-            const mode = this._config?.mode || 'detail';
-            
-            // Check mode-specific visibility (new) or fallback to legacy show (deprecated)
-            let show: boolean;
-            if (mode === 'overview') {
-                show = config?.visible_overview ?? config?.show ?? true;
-            } else {
-                show = config?.visible_detail ?? config?.show ?? true;
-            }
-            
-            return {
-                show,
-                size: config?.size ?? "100%",
-                icon_position: config?.icon_position ?? 'inline'
-            };
-        };
 
         // Process each entity in the room
         for (const entityId of this._config.room_entities) {
@@ -182,7 +203,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
 
             // Motion sensors
             if (deviceClass === 'motion') {
-                const config = getTypeConfig('motion');
+                const config = this._typeConfigs.motion;
                 if (config.show) {
                     items.push({
                         icon: 'mdi:motion-sensor',
@@ -195,8 +216,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             }
 
             // Occupancy sensors
-            if (deviceClass === 'occupancy') {
-                const config = getTypeConfig('occupancy');
+            else if (deviceClass === 'occupancy') {
+                const config = this._typeConfigs.occupancy;
                 if (config.show) {
                     items.push({
                         icon: 'mdi:motion-sensor',
@@ -209,8 +230,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             }
 
             // Temperature sensors
-            if (deviceClass === 'temperature') {
-                const config = getTypeConfig('temperature');
+            else if (deviceClass === 'temperature') {
+                const config = this._typeConfigs.temperature;
                 if (config.show) {
                     const temp = parseFloat(entity.state);
                     if (!isNaN(temp)) {
@@ -228,8 +249,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             }
 
             // Humidity sensors
-            if (deviceClass === 'humidity') {
-                const config = getTypeConfig('humidity');
+            else if (deviceClass === 'humidity') {
+                const config = this._typeConfigs.humidity;
                 if (config.show) {
                     const humidity = parseFloat(entity.state);
                     if (!isNaN(humidity)) {
@@ -247,9 +268,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             }
         }
 
-        // Sort by type order: motion/occupancy, temperature, humidity
-        const typeOrder = ['motion', 'occupancy', 'temperature', 'humidity'];
-        items.sort((a, b) => typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type));
+        // Sort by type order using static constant
+        items.sort((a, b) => TYPE_ORDER.indexOf(a.type as typeof TYPE_ORDER[number]) - TYPE_ORDER.indexOf(b.type as typeof TYPE_ORDER[number]));
 
         return items;
     }

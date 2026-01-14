@@ -16,6 +16,12 @@ interface DoorWindowElementConfig extends ElementEntityBaseConfig {
 
 @customElement("door-window-shp")
 export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElementConfig> {
+    // Cached computed values (set in setConfig)
+    private _computedWidth!: number;
+    private _computedHeight!: number;
+    private _svgPath!: string;
+    private _isVertical!: boolean;
+
     static styles = css`
         :host {
             display: block;
@@ -48,6 +54,13 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             orientation: config.orientation ?? "horizontal",
             text_position: config.text_position ?? "end"
         });
+        
+        // Pre-compute orientation-based values
+        const isHorizontal = this._config!.orientation === 'horizontal';
+        this._isVertical = !isHorizontal;
+        this._computedHeight = isHorizontal ? this._config!.height : this._config!.width;
+        this._computedWidth = isHorizontal ? this._config!.width : this._config!.height;
+        this._svgPath = `M0 0 L0 ${this._computedHeight} L${this._computedWidth} ${this._computedHeight} L${this._computedWidth} 0 Z`;
     }
 
     protected renderEntityContent(entity: HassEntity) {
@@ -55,19 +68,9 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             return nothing;
 
         const opened = entity.state == "on";
-        const height = this._config.orientation == 'horizontal' ? this._config.height : this._config.width;
-        const width = this._config.orientation == 'horizontal' ? this._config.width : this._config.height;
-
-        const svgPathArea = "M" + 0 + " " + 0 + " L" + 0 + " " + height + " L" + width + " " + height + " L" + width + " " + 0 + " Z";
-
-
         const alarmState = this.getAlarmoSensorState();
         const color = opened ? 
-            (this._config?.unobtrusive ?
-                'white'
-                :
-                '#6464FF'
-            ) 
+            (this._config?.unobtrusive ? 'white' : '#6464FF') 
             : 
             alarmState ? 
                 (alarmState.armed ? 'red' : 'green') 
@@ -76,15 +79,14 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
 
         const svgElement = html`
             <div>
-                <svg width="${width}px" height="${height}px">
-                    <path d=${svgPathArea} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
+                <svg width="${this._computedWidth}px" height="${this._computedHeight}px">
+                    <path d=${this._svgPath} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
                 </svg>
             </div>
         `;
         
-        const isVertical = this._config.orientation === 'vertical';
         const textElement = html`
-            <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5} .vertical=${isVertical}></last-change-text-shp>
+            <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5} .vertical=${this._isVertical}></last-change-text-shp>
         `;
 
         return html`

@@ -10,6 +10,15 @@ interface ImageLastChangeElementConfig extends ElementEntityBaseConfig {
 @customElement("image-last-change-shp")
 export class ImageLastChangeElement extends ElementEntityBase<ImageLastChangeElementConfig> {
     private element: any;
+    private _sizeStyle: string = '';
+    
+    async setConfig(config: ImageLastChangeElementConfig) {
+        await super.setConfig(config);
+        // Pre-compute size style
+        const size = (config.size || 50) + "px";
+        this._sizeStyle = `width:${size};height:${size};border-radius:50%;overflow:hidden`;
+    }
+    
     protected override renderEntityContent(entity: HassEntity) {
 
         if (!this.element) {
@@ -19,11 +28,8 @@ export class ImageLastChangeElement extends ElementEntityBase<ImageLastChangeEle
 
         this.element.hass = this.hass;
 
-        const size = (this._config?.size || 50) + "px";
-        const style = `width:${size};height:${size};border-radius:50%;overflow:hidden`
-
         return html`
-            <div style=${style}>   
+            <div style=${this._sizeStyle}>   
                 ${this.element}
             </div>
             <last-change-text-shp .entity=${entity}></last-change-text-shp>            

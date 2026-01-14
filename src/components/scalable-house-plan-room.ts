@@ -62,6 +62,7 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedRoomBounds?: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number };
     private _cachedRelativePoints?: string;
     private _cachedOverviewRoom?: Room;
+    private _cachedClipId?: string;  // Clip path ID for detail mode
     private _infoBoxCache: Map<string, any> = new Map();  // Cache for info box entity config
     
     // Cached entity IDs (computed once when room changes, used with fresh hass.states lookups)
@@ -89,6 +90,9 @@ export class ScalableHousePlanRoom extends LitElement {
             this._cachedRelativePoints = this.room.boundary
                 .map(p => `${p[0] - this._cachedRoomBounds!.minX},${p[1] - this._cachedRoomBounds!.minY}`)
                 .join(' ');
+            
+            // Pre-compute clip path ID for detail mode
+            this._cachedClipId = `room-clip-${this.room.name.replace(/\s+/g, '-')}-detail`;
             
             // Filter entities for overview mode
             this._cachedOverviewRoom = {
@@ -505,7 +509,6 @@ export class ScalableHousePlanRoom extends LitElement {
         const imageOffsetY = -roomBounds.minY * scale;
         const imageWidth = this.config.image_width * scale;
         const imageHeight = this.config.image_height * scale;
-        const clipId = `room-clip-${this.room.name.replace(/\s+/g, '-')}-detail`;
 
         return html`
             <div class="room-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
@@ -515,7 +518,7 @@ export class ScalableHousePlanRoom extends LitElement {
                          preserveAspectRatio="none">
                         <defs>
                             <!-- Clip path for room boundary -->
-                            <clipPath id="${clipId}">
+                            <clipPath id="${this._cachedClipId}">
                                 <polygon points="${points}" />
                             </clipPath>
                             ${useGradient && this._currentGradient ? svg`
@@ -538,7 +541,7 @@ export class ScalableHousePlanRoom extends LitElement {
                             y="${imageOffsetY}"
                             width="${imageWidth}"
                             height="${imageHeight}"
-                            clip-path="url(#${clipId})"
+                            clip-path="url(#${this._cachedClipId})"
                             preserveAspectRatio="none"
                         />
                         <!-- Room colored polygon on top -->
