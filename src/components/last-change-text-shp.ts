@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import dayjs from 'dayjs';
 import { Utils } from '../utils/utils';
 import type { HassEntity } from 'home-assistant-js-websocket';
+import { timerService } from '../utils/timer-service';
 
 @customElement('last-change-text-shp')
 class LastChangeText extends LitElement {
@@ -16,8 +17,8 @@ class LastChangeText extends LitElement {
   @property({ attribute: false }) public secondsForSuperHighlight?: number;
   @property({ attribute: false, type: Boolean }) public vertical?: boolean;
 
-  @state() private _currentTime = new Date(); // State to force re-renders
-  private _timer?: number;
+  @state() private _lastRenderedText: string = '';
+  private _timerCallback?: () => void;
 
   static styles = css`
     /* Add component styles here */
@@ -43,19 +44,31 @@ class LastChangeText extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    // Set up interval to update _currentTime every second
-    this._timer = window.setInterval(() => {
-      this._currentTime = new Date();
-    }, 1000);
+    // Bind and subscribe to shared timer service
+    this._timerCallback = this._onTimerTick.bind(this);
+    timerService.subscribe(this._timerCallback);
   }
 
   disconnectedCallback() {
-    // Clean up timer when component is removed
-    if (this._timer) {
-      clearInterval(this._timer);
-      this._timer = undefined;
+    // Unsubscribe from shared timer service
+    if (this._timerCallback) {
+      timerService.unsubscribe(this._timerCallback);
     }
     super.disconnectedCallback();
+  }
+
+  /**
+   * Called by shared timer service every second
+   * Only triggers re-render if the displayed text would change
+   */
+  private _onTimerTick(): void {
+    if (!this.entity) return;
+
+    const lastChanged = this.entity.attributes["state_last_changed"] ?? this.entity.last_changed;
+    const newText = Utils.formatDurationFromTo(lastChanged, undefined, 2);
+
+    // Setting @state property automatically triggers re-render only if value changed
+    this._lastRenderedText = newText;
   }
 
   render() {
@@ -90,7 +103,7 @@ class LastChangeText extends LitElement {
            style="color: ${textColor}; 
                   background-color: ${backgroundColor}; 
                   box-shadow: 0px 0px 7px 3px ${backgroundColor};">
-        ${Utils.formatDurationFromTo(lastChanged, undefined, 2)}
+        ${this._lastRenderedText}
       </div>
     `;
   }
