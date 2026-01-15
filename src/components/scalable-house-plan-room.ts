@@ -70,6 +70,7 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedEntityIds?: {
         all: string[];              // All entity IDs (explicit + area entities)
         motionSensors: string[];    // Motion sensor entity IDs
+        ambientLights: string[];    // Ambient light entity IDs
         lights: string[];           // Light entity IDs
         occupancySensors: string[]; // Occupancy sensor entity IDs
     };
@@ -118,6 +119,7 @@ export class ScalableHousePlanRoom extends LitElement {
             this._cachedEntityIds = {
                 all: this.cachedEntityIds.allEntityIds,
                 motionSensors: this.cachedEntityIds.motionSensorIds,
+                ambientLights: this.cachedEntityIds.ambientLightIds || [],
                 lights: this.cachedEntityIds.lightIds,
                 occupancySensors: this.cachedEntityIds.occupancySensorIds
             };
@@ -215,6 +217,7 @@ export class ScalableHousePlanRoom extends LitElement {
         // Extract entity IDs and categorize them
         const allIds: string[] = [];
         const motionSensorIds: string[] = [];
+        const ambientLightIds: string[] = [];
         const lightIds: string[] = [];
         const occupancySensorIds: string[] = [];
         
@@ -233,7 +236,15 @@ export class ScalableHousePlanRoom extends LitElement {
             
             // Categorize by domain and device class
             if (domain === 'light') {
-                lightIds.push(entityId);
+                // Check if entity is configured as ambient light via plan.light
+                const lightType = typeof entityConfig !== 'string' ? entityConfig.plan?.light : undefined;
+                
+                if (lightType === 'ambient') {
+                    ambientLightIds.push(entityId);
+                } else {
+                    // Default to normal light if not specified or explicitly 'normal'
+                    lightIds.push(entityId);
+                }
             } else if (domain === 'binary_sensor') {
                 const deviceClass = this.hass.states[entityId]?.attributes?.device_class;
                 if (deviceClass === 'motion') {
@@ -247,6 +258,7 @@ export class ScalableHousePlanRoom extends LitElement {
         this._cachedEntityIds = {
             all: allIds,
             motionSensors: motionSensorIds,
+            ambientLights: ambientLightIds,
             lights: lightIds,
             occupancySensors: occupancySensorIds
         };

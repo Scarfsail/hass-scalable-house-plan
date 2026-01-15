@@ -63,6 +63,7 @@ interface PlanConfig {
     position_scaling_vertical?: PositionScalingMode;    // How vertical position scales in detail view (default: "plan")
     disable_dynamic_color?: boolean;  // Opt-out entity from dynamic color evaluation
     exclude_from_info_box?: boolean;  // Opt-out entity from info box display
+    light?: 'ambient' | 'normal';     // Light type: ambient (subtle) or normal (default)
 }
 
 interface ElementConfig {
@@ -98,6 +99,7 @@ interface PictureElement {
 
 export interface DynamicColorsConfig {
     motion_occupancy?: string;      // Default: (light blue)
+    ambient_lights?: string;        // Default: (subtle purple/pink)
     lights?: string;                // Default: (warm white light)
     default?: string;               // Default: (very light gray)
     motion_delay_seconds?: number;  // Default: 60
@@ -108,6 +110,7 @@ export interface DynamicColorsConfig {
  */
 export interface RoomEntityCache {
     allEntityIds: string[];           // All entities (explicit + area)
+    ambientLightIds: string[];        // Ambient light entity IDs
     areaEntityIds: string[];          // Cached area entities
     infoBoxEntityIds: string[];       // For info box scanning (allEntityIds)
     // Used for dynamic color calculation
@@ -259,6 +262,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
             // Categorize entities for dynamic color calculation (extracted from room component logic)
             const motionSensorIds: string[] = [];
+            const ambientLightIds: string[] = [];
             const lightIds: string[] = [];
             const occupancySensorIds: string[] = [];
 
@@ -298,9 +302,17 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                     }
                 }
 
-                // Lights
+                // Lights (categorize ambient vs normal)
                 if (domain === 'light') {
-                    lightIds.push(entityId);
+                    // Check if entity is configured as ambient light via plan.light
+                    const lightType = typeof entityConfig !== 'string' ? entityConfig.plan?.light : undefined;
+                    
+                    if (lightType === 'ambient') {
+                        ambientLightIds.push(entityId);
+                    } else {
+                        // Default to normal light if not specified or explicitly 'normal'
+                        lightIds.push(entityId);
+                    }
                 }
             }
 
@@ -310,6 +322,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 areaEntityIds,
                 infoBoxEntityIds: allEntityIds,  // Info box uses all entities
                 motionSensorIds,
+                ambientLightIds,
                 lightIds,
                 occupancySensorIds
             });

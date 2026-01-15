@@ -140,16 +140,22 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                     <div class="section-content ${this._expandedSections.has('dynamicColors') ? 'expanded' : ''}">
                         <div class="basic-config">
                             <ha-textfield
-                                label="${this.localize('editor.motion_occupancy_color')}"
-                                .value=${this._config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)'}
-                                @input=${this._motionOccupancyColorChanged}
-                                placeholder="rgba(135, 206, 250, 0.15)"
+                                label="${this.localize('editor.ambient_lights_color')}"
+                                .value=${this._config.dynamic_colors?.ambient_lights || 'rgba(220, 180, 255, 0.12)'}
+                                @input=${this._ambientLightsColorChanged}
+                                placeholder="rgba(220, 180, 255, 0.12)"
                             ></ha-textfield>
                             <ha-textfield
                                 label="${this.localize('editor.lights_color')}"
                                 .value=${this._config.dynamic_colors?.lights || 'rgba(255, 250, 250, 0.18)'}
                                 @input=${this._lightsColorChanged}
                                 placeholder="rgba(255, 250, 220, 0.18)"
+                            ></ha-textfield>
+                            <ha-textfield
+                                label="${this.localize('editor.motion_occupancy_color')}"
+                                .value=${this._config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)'}
+                                @input=${this._motionOccupancyColorChanged}
+                                placeholder="rgba(135, 206, 250, 0.15)"
                             ></ha-textfield>
                             <ha-textfield
                                 label="${this.localize('editor.default_color')}"
@@ -340,6 +346,17 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     }
 
     // Dynamic colors change handlers
+    private _ambientLightsColorChanged(ev: any): void {
+        this._config = { 
+            ...this._config, 
+            dynamic_colors: {
+                ...this._config.dynamic_colors,
+                ambient_lights: ev.target.value
+            }
+        };
+        this._configChanged();
+    }
+
     private _motionOccupancyColorChanged(ev: any): void {
         this._config = { 
             ...this._config, 

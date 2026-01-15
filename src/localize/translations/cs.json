@@ -31,6 +31,7 @@
     "layer_state_persistence_helper": "Unikátní ID pro stav viditelnosti vrstev. Stejné ID = sdílený stav mezi kartami.",
     "show_room_backgrounds": "Zobrazit pozadí místností",
     "dynamic_room_colors": "Dynamické barvy místností",
+    "ambient_lights_color": "Barva ambientních světel",
     "motion_occupancy_color": "Barva pohybu/přítomnosti",
     "lights_color": "Barva světel",
     "default_color": "Výchozí barva",

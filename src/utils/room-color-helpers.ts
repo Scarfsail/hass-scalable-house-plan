@@ -6,7 +6,7 @@ import type { Room, ScalableHousePlanConfig, EntityConfig } from "../cards/scala
  */
 export interface DynamicColorResult {
     color: string;
-    type: 'motion' | 'lights' | 'default' | 'transparent';
+    type: 'motion' | 'ambient_lights' | 'lights' | 'default' | 'transparent';
 }
 
 /**
@@ -26,6 +26,7 @@ export interface GradientDefinition {
 export interface CachedEntityIds {
     motionSensors: string[];
     occupancySensors: string[];
+    ambientLights: string[];
     lights: string[];
     all: string[];
 }
@@ -153,10 +154,27 @@ export function hasActiveLights(
 }
 
 /**
+ * Check if any ambient lights are on using cached entity IDs
+ * This is the optimized version that avoids calling getRoomEntities
+ */
+export function hasActiveAmbientLights(
+    hass: HomeAssistant,
+    cachedIds: CachedEntityIds
+): boolean {
+    for (const entityId of cachedIds.ambientLights) {
+        const state = hass.states[entityId]?.state;
+        if (state === 'on') {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Calculate dynamic room color based on entity states (optimized with cached entity IDs)
  * Uses cached entity IDs to avoid expensive getRoomEntities calls on every render
  * 
- * Precedence: Motion/Occupancy > Lights > Default
+ * Precedence: Lights > Ambient Lights > Motion/Occupancy > Default
  */
 export function calculateDynamicRoomColor(
     hass: HomeAssistant,
@@ -175,19 +193,25 @@ export function calculateDynamicRoomColor(
     }
     
     // Get configured colors with defaults
-    const motionColor = config?.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)';
     const lightsColor = config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.17)';
+    const ambientLightsColor = config?.dynamic_colors?.ambient_lights || 'rgba(220, 180, 255, 0.12)';  // Subtle purple/pink
+    const motionColor = config?.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)';
     const defaultColor = config?.dynamic_colors?.default || 'rgba(100, 100, 100, 0.05)';
     const delaySeconds = config?.dynamic_colors?.motion_delay_seconds ?? 60;
     
-    // Check motion/occupancy (highest priority) - using cached IDs and timestamp-based delay
-    if (hasActiveMotionOrOccupancy(hass, cachedIds, delaySeconds)) {
-        return { color: motionColor, type: 'motion' };
-    }
-    
-    // Check lights (second priority) - using cached IDs
+    // Check regular lights (highest priority) - using cached IDs
     if (hasActiveLights(hass, cachedIds)) {
         return { color: lightsColor, type: 'lights' };
+    }
+    
+    // Check ambient lights (second priority) - using cached IDs
+    if (hasActiveAmbientLights(hass, cachedIds)) {
+        return { color: ambientLightsColor, type: 'ambient_lights' };
+    }
+    
+    // Check motion/occupancy (third priority) - using cached IDs and timestamp-based delay
+    if (hasActiveMotionOrOccupancy(hass, cachedIds, delaySeconds)) {
+        return { color: motionColor, type: 'motion' };
     }
     
     // Default color
