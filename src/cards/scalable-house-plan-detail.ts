@@ -1,7 +1,7 @@
 import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, ScalableHousePlanConfig } from "./scalable-house-plan";
+import type { Room, ScalableHousePlanConfig, RoomEntityCache } from "./scalable-house-plan";
 import { CreateCardElement, getCreateCardElement, getRoomName, getRoomIcon, getAreaEntities, getEntitiesNotOnDetailCount, applyScaleLimits, hasViewportChanged } from "../utils";
 import { getRoomBounds } from "../components/element-renderer-shp";
 import "../components/scalable-house-plan-room";
@@ -22,6 +22,7 @@ export class ScalableHousePlanDetail extends LitElement {
     @property({ attribute: false }) public config?: ScalableHousePlanConfig;
     @property({ attribute: false }) public onBack?: () => void;
     @property({ attribute: false }) public onShowEntities?: () => void;
+    @property({ attribute: false }) public roomEntityCache?: Map<string, RoomEntityCache>;
 
     @state() private _createCardElement: CreateCardElement = null;
     @state() private _entitiesNotOnDetailCount: number = 0;
@@ -210,6 +211,7 @@ export class ScalableHousePlanDetail extends LitElement {
                 .scale=${scale}
                 .createCardElement=${this._createCardElement}
                 .elementCards=${this._elementCards}
+                .cachedEntityIds=${this.roomEntityCache?.get(this.room.name)}
             ></scalable-house-plan-room>
         `;
     }

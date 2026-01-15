@@ -47,6 +47,7 @@ class LastChangeText extends LitElement {
     // Bind and subscribe to shared timer service
     this._timerCallback = this._onTimerTick.bind(this);
     timerService.subscribe(this._timerCallback);
+    this._timerCallback();
   }
 
   disconnectedCallback() {

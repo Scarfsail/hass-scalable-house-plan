@@ -1,7 +1,7 @@
 import { LitElement, html, svg, css, TemplateResult } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, ScalableHousePlanConfig, EntityConfig } from "../cards/scalable-house-plan";
+import type { Room, ScalableHousePlanConfig, EntityConfig, RoomEntityCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getRoomEntities } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
 import { 
@@ -54,6 +54,7 @@ export class ScalableHousePlanRoom extends LitElement {
     @property({ attribute: false }) public elementCards!: Map<string, any>;
     @property({ attribute: false }) public showRoomBackgrounds?: boolean;
     @property({ attribute: false }) public onClick?: (room: Room) => void;
+    @property({ attribute: false }) public cachedEntityIds?: RoomEntityCache;  // Pre-computed entity IDs from parent
 
     // Constants
     private static readonly DEFAULT_ROOM_COLOR = 'rgba(128, 128, 128, 0.2)';
@@ -105,9 +106,21 @@ export class ScalableHousePlanRoom extends LitElement {
                 })
             };
             
-            // Compute entity IDs once when room changes (includes initial connection)
-            // These IDs are then used to look up fresh state from hass.states on each render
-            this._computeEntityIdCache();
+            // Only compute entity IDs if not provided by parent (backward compatibility)
+            // Parent cache is preferred as it's computed once for all rooms
+            if (!this.cachedEntityIds) {
+                this._computeEntityIdCache();
+            }
+        }
+        
+        // Update cached entity IDs when parent provides new cache
+        if (changedProperties.has('cachedEntityIds') && this.cachedEntityIds) {
+            this._cachedEntityIds = {
+                all: this.cachedEntityIds.allEntityIds,
+                motionSensors: this.cachedEntityIds.motionSensorIds,
+                lights: this.cachedEntityIds.lightIds,
+                occupancySensors: this.cachedEntityIds.occupancySensorIds
+            };
         }
         
         // Update dynamic colors when hass changes
@@ -381,7 +394,8 @@ export class ScalableHousePlanRoom extends LitElement {
             scaleRatio: 0,  // Overview: no element scaling
             config: this.config,
             originalRoom: this.room,  // Pass original room for info box entity detection
-            infoBoxCache: this._infoBoxCache
+            infoBoxCache: this._infoBoxCache,
+            cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds  // Use cached IDs from parent
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
@@ -494,7 +508,8 @@ export class ScalableHousePlanRoom extends LitElement {
             scale,
             scaleRatio,
             config: this.config,
-            infoBoxCache: this._infoBoxCache
+            infoBoxCache: this._infoBoxCache,
+            cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds  // Use cached IDs from parent
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();

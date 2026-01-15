@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { LovelaceCardConfig } from "../../hass-frontend/src/data/lovelace/config/card";
+import { getAreaEntities, getAllRoomEntityIds } from "../utils";
 import "./scalable-house-plan-overview";
 import "./scalable-house-plan-detail";
 import "./scalable-house-plan-entities";
@@ -102,6 +103,19 @@ export interface DynamicColorsConfig {
     motion_delay_seconds?: number;  // Default: 60
 }
 
+/**
+ * Cached entity IDs for a room to avoid expensive lookups on every render
+ */
+export interface RoomEntityCache {
+    allEntityIds: string[];           // All entities (explicit + area)
+    areaEntityIds: string[];          // Cached area entities
+    infoBoxEntityIds: string[];       // For info box scanning (allEntityIds)
+    // Used for dynamic color calculation
+    motionSensorIds: string[];
+    lightIds: string[];
+    occupancySensorIds: string[];
+}
+
 export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     rooms: Room[];
     image: string;
@@ -127,6 +141,9 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     @state() private _selectedRoomIndex: number | null = null;
     @state() private _currentView: 'overview' | 'detail' | 'entities' = 'overview';
+
+    // Performance optimization: Cache entity IDs per room to avoid expensive lookups
+    private _roomEntityCache: Map<string, RoomEntityCache> = new Map();
 
     @property({ attribute: false }) hass?: HomeAssistant;
 
@@ -199,7 +216,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             ...config,
             rooms: config.rooms || [],
         };
-        
+
         // Automatically show detail view for preview room (used during editing)
         if (this._isEditMode() && config._previewRoomIndex !== undefined && config._previewRoomIndex !== null) {
             this._selectedRoomIndex = config._previewRoomIndex;
@@ -208,6 +225,94 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             // Reset to overview when preview is cleared
             this._selectedRoomIndex = null;
             this._currentView = 'overview';
+        }
+    }
+
+    /**
+     * Lifecycle hook - compute entity caches when config or hass changes
+     */
+    willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
+        super.willUpdate(changedProperties);
+
+        // Recompute entity cache when config changes (rooms, areas, entities)
+        // Don't need to invalidate on hass changes - cache contains IDs only, not state
+        if (changedProperties.has('config') && this.config && this.hass) {
+            this._computeRoomEntityCaches();
+        }
+    }
+
+    /**
+     * Compute and cache entity IDs for all rooms
+     * This expensive operation runs once when config changes, not on every render
+     */
+    private _computeRoomEntityCaches(): void {
+        if (!this.config || !this.hass) return;
+
+        this._roomEntityCache.clear();
+
+        for (const room of this.config.rooms) {
+            // Get area entities once for this room (expensive call)
+            const areaEntityIds = room.area ? getAreaEntities(this.hass, room.area) : [];
+
+            // Get all entity IDs (uses getAllRoomEntityIds logic)
+            const allEntityIds = getAllRoomEntityIds(this.hass, room, areaEntityIds);
+
+            // Categorize entities for dynamic color calculation (extracted from room component logic)
+            const motionSensorIds: string[] = [];
+            const lightIds: string[] = [];
+            const occupancySensorIds: string[] = [];
+
+            // Get all entity configs (explicit + area)
+            const explicitEntityIds = new Set(
+                room.entities.map(cfg => typeof cfg === 'string' ? cfg : cfg.entity)
+            );
+
+            const allEntityConfigs: EntityConfig[] = [
+                ...room.entities,
+                ...areaEntityIds
+                    .filter(entityId => !explicitEntityIds.has(entityId))
+                    .map(entityId => entityId as EntityConfig)
+            ];
+
+            // Categorize entities by type
+            for (const entityConfig of allEntityConfigs) {
+                const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
+                if (!entityId) continue;
+
+                // Skip entities opted out of dynamic colors
+                const optedOut = typeof entityConfig !== 'string' && entityConfig.plan?.disable_dynamic_color;
+                if (optedOut) continue;
+
+                const stateObj = this.hass.states[entityId];
+                if (!stateObj) continue;
+
+                const [domain] = entityId.split('.');
+                const deviceClass = stateObj.attributes?.device_class;
+
+                // Motion sensors
+                if (domain === 'binary_sensor' && (deviceClass === 'motion' || deviceClass === 'occupancy')) {
+                    if (deviceClass === 'motion') {
+                        motionSensorIds.push(entityId);
+                    } else {
+                        occupancySensorIds.push(entityId);
+                    }
+                }
+
+                // Lights
+                if (domain === 'light') {
+                    lightIds.push(entityId);
+                }
+            }
+
+            // Store in cache
+            this._roomEntityCache.set(room.name, {
+                allEntityIds,
+                areaEntityIds,
+                infoBoxEntityIds: allEntityIds,  // Info box uses all entities
+                motionSensorIds,
+                lightIds,
+                occupancySensorIds
+            });
         }
     }
 
@@ -243,31 +348,33 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 .hass=${this.hass}
                 .config=${this.config}
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
+                .roomEntityCache=${this._roomEntityCache}
             ></scalable-house-plan-overview>
         `;
+        
+        let detailHtml =
+        this._currentView === 'detail' && this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex] ?
+        html`
+            <div class="detail-overlay">
+                <div class="detail-backdrop" @click=${() => this._closeRoomDetail()}></div>
+                <div class="detail-content">
+                    <scalable-house-plan-detail
+                        .hass=${this.hass}
+                        .room=${this.config.rooms[this._selectedRoomIndex]}
+                        .config=${this.config}
+                        .onBack=${() => this._closeRoomDetail()}
+                        .onShowEntities=${() => this._openEntitiesView()}
+                        .roomEntityCache=${this._roomEntityCache}
+                    ></scalable-house-plan-detail>
+                </div>
+            </div>
+        `: html``;;
 
         // Show room detail as overlay on top of overview
-        if (this._currentView === 'detail' && this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex]) {
-            const room = this.config.rooms[this._selectedRoomIndex];
-            return html`
-                ${overviewHtml}
-                <div class="detail-overlay">
-                    <div class="detail-backdrop" @click=${() => this._closeRoomDetail()}></div>
-                    <div class="detail-content">
-                        <scalable-house-plan-detail
-                            .hass=${this.hass}
-                            .room=${room}
-                            .config=${this.config}
-                            .onBack=${() => this._closeRoomDetail()}
-                            .onShowEntities=${() => this._openEntitiesView()}
-                        ></scalable-house-plan-detail>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Show overview only
-        return overviewHtml;
+        return html`
+            ${overviewHtml}
+            ${detailHtml}
+        `;
     }
 
     private _openRoomDetail(roomIndex: number) {
@@ -313,9 +420,9 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         if (this._isEditMode()) {
             return;
         }
-        
+
         const currentState = window.history.state;
-        
+
         // Handle navigation based on current view
         if (this._currentView === 'entities') {
             // Going back from entities view -> detail view

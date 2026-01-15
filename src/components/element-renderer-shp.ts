@@ -1,4 +1,5 @@
 import { html, TemplateResult } from "lit-element";
+import { keyed } from "lit/directives/keyed.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig } from "../cards/scalable-house-plan";
 import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds } from "../utils";
@@ -23,7 +24,62 @@ export interface ElementRendererOptions {
     config?: ScalableHousePlanConfig;  // Optional: needed for info box defaults
     originalRoom?: Room;  // Optional: original room with all entities (for info box in overview mode)
     infoBoxCache?: Map<string, EntityConfig | null>;  // Cache for info box entity configs
+    cachedInfoBoxEntityIds?: string[];  // Pre-computed entity IDs for info box (avoids expensive getAllRoomEntityIds call)
 }
+
+/**
+ * Cached element metadata to avoid expensive lookups on every render
+ */
+interface ElementMetadata {
+    defaultElement: any;        // Result from getElementTypeForEntity
+    elementConfig: any;         // Merged config (defaults + user overrides)
+    deviceClass?: string;       // Cached device class
+}
+
+/**
+ * Global element metadata cache
+ * Key: entityId (for entities) or generated key (for no-entity elements)
+ * Cache persists across renders and rooms - invalidated only on page refresh
+ */
+const elementMetadataCache = new Map<string, ElementMetadata>();
+
+/**
+ * Cached position/style calculations to avoid recomputing on every render
+ */
+interface PositionCache {
+    style: Record<string, string>;  // Position styles (left, top, right, bottom)
+    transformOrigin: string;        // Transform origin based on positioning
+    transform: string;              // Transform scale string
+    styleString: string;            // Pre-built CSS string (including custom styles)
+}
+
+/**
+ * Global position calculation cache
+ * Key: `${uniqueKey}-${scale}-${scaleRatio}-${boundsKey}`
+ * Cache persists across renders - invalidated only when scale/bounds change
+ */
+const positionCache = new Map<string, PositionCache>();
+
+/**
+ * Cached element structure to avoid filtering/mapping room.entities on every render
+ */
+interface CachedElementStructure {
+    elements: Array<{
+        entity: string;
+        plan: any;
+        elementConfig: any;
+        uniqueKey: string;
+    }>;
+    entitiesHash: string;  // Hash to detect when room.entities changes
+}
+
+/**
+ * Global element structure cache
+ * Key: room name
+ * Invalidated when room.entities array changes (detected via hash)
+ */
+const elementStructureCache = new Map<string, CachedElementStructure>();
+
 /**
  * Generate unique key for no-entity elements based on type and position
  * Key format: elementType-left-top-right-bottom-room_id (if present)
@@ -39,32 +95,34 @@ function generateElementKey(elementType: string, plan: any): string {
     
     return `${elementType}-${left}-${top}-${right}-${bottom}${roomId}`;
 }
+
 /**
- * Renders elements for a room
- * Element scaling is based on scaleRatio: elementScale = 1 + (planScale - 1) * scaleRatio
- * - scaleRatio = 0: elements keep original size (no scaling)
- * - scaleRatio = 1: elements scale fully with plan
- * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
+ * Generate simple hash of entities array for cache invalidation
  */
-export function renderElements(options: ElementRendererOptions): TemplateResult[] {
-    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache } = options;
+function hashEntities(entities: EntityConfig[]): string {
+    return entities.length + '-' + entities.map(e => 
+        typeof e === 'string' ? e : `${e.entity}-${!!e.plan}`
+    ).join('|');
+}
+
+/**
+ * Get or create cached element structure for a room
+ * This avoids filtering/mapping room.entities on every render
+ */
+function getOrCreateElementStructure(
+    roomName: string,
+    allEntities: EntityConfig[],
+    hass: HomeAssistant
+): Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }> {
+    const entitiesHash = hashEntities(allEntities);
+    const cached = elementStructureCache.get(roomName);
     
-    // Calculate element scale: 1 + (planScale - 1) * scaleRatio
-    // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
-    // When scale=5, ratio=0: elementScale = 1 (no scaling)
-    // When scale=5, ratio=1: elementScale = 5 (full scaling)
-    const elementScale = 1 + (scale - 1) * scaleRatio;
-
-    // Add info box element if enabled
-    // Use originalRoom if provided (for overview mode), otherwise use room
-    // Determine mode: if originalRoom is provided, we're in overview
-    const isOverview = !!originalRoom;
-    const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
-    const roomForInfoBox = originalRoom || room;
-    const infoBoxEntity = getOrCreateInfoBoxEntity(roomForInfoBox, config, hass, mode, infoBoxCache);
-    const allEntities = infoBoxEntity ? [...(room.entities || []), infoBoxEntity] : (room.entities || []);
-
-    // Get all entities with plan config
+    // Check if cache is valid
+    if (cached && cached.entitiesHash === entitiesHash) {
+        return cached.elements;
+    }
+    
+    // Cache miss or invalidated - compute element structure
     const elements = allEntities
         .filter((entityConfig: EntityConfig) => {
             if (typeof entityConfig === 'string') return false;
@@ -76,119 +134,249 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             
             if (!plan) return null;
 
-            // Validate no-entity elements: must have element.type
+            // Validate no-entity elements
             if (!entity && (!plan.element || !plan.element.type)) {
                 console.warn('No-entity element missing element.type:', plan);
                 return null;
             }
 
-            // Get default element definition for this entity (or use plan.element.type for no-entity)
-            const deviceClass = entity && hass?.states[entity]?.attributes?.device_class;
-            const defaultElement = entity 
-                ? getElementTypeForEntity(entity, deviceClass, 'plan')
-                : { type: plan.element!.type as string }; // For no-entity, use specified type (! is safe due to validation above)
-            
-            // Merge default properties with user overrides
-            const elementConfig = mergeElementProperties(defaultElement, plan.element || {});
+            // Generate unique key
+            const uniqueKey = entity || generateElementKey(plan.element?.type || 'unknown', plan);
 
-            // Add default tap_action and hold_action for entities (if not already set by user)
-            if (entity && isEntityActionable(entity, hass)) {
-                if (!elementConfig.tap_action) {
-                    elementConfig.tap_action = getDefaultTapAction(entity, hass);
-                }
-                if (!elementConfig.hold_action) {
-                    elementConfig.hold_action = getDefaultHoldAction();
-                }
-            }
+            // Get cached element metadata
+            const metadata = getOrCreateElementMetadata(uniqueKey, entity, plan, hass);
 
-            // Generate unique key: use entity if present, otherwise generate from type+position
-            const uniqueKey = entity || generateElementKey(elementConfig.type, plan);
-
-            return { entity, plan, elementConfig, uniqueKey };
+            return { entity, plan, elementConfig: metadata.elementConfig, uniqueKey };
         })
         .filter((el): el is { entity: string; plan: any; elementConfig: any; uniqueKey: string } => el !== null);
+    
+    // Store in cache
+    elementStructureCache.set(roomName, {
+        elements,
+        entitiesHash
+    });
+    
+    return elements;
+}
 
-    return elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
-        // Get position scaling modes (default to "plan" if not specified)
-        const horizontalScaling: PositionScalingMode = plan.position_scaling_horizontal || "plan";
-        const verticalScaling: PositionScalingMode = plan.position_scaling_vertical || "plan";
+/**
+ * Get or create cached element metadata
+ * @param cacheKey - Unique key for this element (entity ID or generated key)
+ * @param entity - Entity ID (can be empty for no-entity elements)
+ * @param plan - Plan configuration
+ * @param hass - Home Assistant instance
+ * @returns Cached or newly computed element metadata
+ */
+function getOrCreateElementMetadata(
+    cacheKey: string,
+    entity: string,
+    plan: any,
+    hass: HomeAssistant
+): ElementMetadata {
+    // Check cache first
+    let metadata = elementMetadataCache.get(cacheKey);
+    
+    if (!metadata) {
+        // Compute metadata (expensive operations)
+        const deviceClass = entity && hass?.states[entity]?.attributes?.device_class;
+        const defaultElement = entity 
+            ? getElementTypeForEntity(entity, deviceClass, 'plan')
+            : { type: plan.element!.type as string };
         
-        // Calculate position scale factors
-        // When scaleRatio is 0 (overview), always use plan scale (ignore position scaling modes)
-        // When scaleRatio is non-zero (detail), apply custom scaling modes:
-        // "plan": positions scale with the room (current behavior)
-        // "element": positions scale with element size (using scaleRatio)
-        // "fixed": positions don't scale (use absolute values)
-        const getPositionScale = (mode: PositionScalingMode): number => {
-            if (scaleRatio === 0) return scale; // Overview always uses plan scale
-            
-            switch (mode) {
-                case "element":
-                    // Position scales same as element size: 1 + (scale - 1) * scaleRatio
-                    return 1 + (scale - 1) * scaleRatio;
-                case "fixed":
-                    return 1; // No scaling
-                case "plan":
-                default:
-                    return scale; // Full plan scaling
+        // Merge default properties with user overrides
+        const elementConfig = mergeElementProperties(defaultElement, plan.element || {});
+
+        // Add default tap_action and hold_action for entities (if not already set by user)
+        if (entity && isEntityActionable(entity, hass)) {
+            if (!elementConfig.tap_action) {
+                elementConfig.tap_action = getDefaultTapAction(entity, hass);
             }
+            if (!elementConfig.hold_action) {
+                elementConfig.hold_action = getDefaultHoldAction();
+            }
+        }
+        
+        metadata = {
+            defaultElement,
+            elementConfig,
+            deviceClass
         };
         
-        const horizontalPositionScale = getPositionScale(horizontalScaling);
-        const verticalPositionScale = getPositionScale(verticalScaling);
-        
-        // Calculate percentage-based position (maintain relative position in room)
-        const style: Record<string, string> = {
-            position: 'absolute'
-        };
+        // Store in cache
+        elementMetadataCache.set(cacheKey, metadata);
+    }
+    
+    return metadata;
+}
 
-        // Handle positions - support both pixels (convert to %) and percentages (use as-is)
-        if (plan.left !== undefined) {
-            if (typeof plan.left === 'string' && plan.left.includes('%')) {
-                // Already a percentage - use directly
-                style.left = plan.left;
-            } else if (typeof plan.left === 'number') {
-                // Pixels - apply position scaling then convert to percentage
-                const scaledLeft = plan.left * horizontalPositionScale;
-                const percentage = (scaledLeft / (roomBounds.width * scale)) * 100;
-                style.left = `${percentage}%`;
-            }
-        }
-        
-        if (plan.top !== undefined) {
-            if (typeof plan.top === 'string' && plan.top.includes('%')) {
-                style.top = plan.top;
-            } else if (typeof plan.top === 'number') {
-                const scaledTop = plan.top * verticalPositionScale;
-                const percentage = (scaledTop / (roomBounds.height * scale)) * 100;
-                style.top = `${percentage}%`;
-            }
-        }
-        
-        if (plan.right !== undefined) {
-            if (typeof plan.right === 'string' && plan.right.includes('%')) {
-                style.right = plan.right;
-            } else if (typeof plan.right === 'number') {
-                const scaledRight = plan.right * horizontalPositionScale;
-                const percentage = (scaledRight / (roomBounds.width * scale)) * 100;
-                style.right = `${percentage}%`;
-            }
-        }
-        
-        if (plan.bottom !== undefined) {
-            if (typeof plan.bottom === 'string' && plan.bottom.includes('%')) {
-                style.bottom = plan.bottom;
-            } else if (typeof plan.bottom === 'number') {
-                const scaledBottom = plan.bottom * verticalPositionScale;
-                const percentage = (scaledBottom / (roomBounds.height * scale)) * 100;
-                style.bottom = `${percentage}%`;
-            }
-        }
+/**
+ * Generate compact bounds key for cache
+ */
+function getBoundsKey(bounds: { width: number; height: number }): string {
+    return `${bounds.width}x${bounds.height}`;
+}
 
-        // Note: Width/height are NOT set on the wrapper div.
-        // Elements are responsible for sizing themselves via their internal styles.
-        // This allows elements like door-window to correctly handle orientation swapping
-        // without causing positioning issues with right/bottom alignment.
+/**
+ * Generate position cache key
+ */
+function getPositionCacheKey(uniqueKey: string, scale: number, scaleRatio: number, boundsKey: string): string {
+    return `${uniqueKey}-${scale.toFixed(2)}-${scaleRatio}-${boundsKey}`;
+}
+
+/**
+ * Calculate position styles (expensive operation - cached)
+ */
+function calculatePositionStyles(
+    plan: any,
+    scale: number,
+    scaleRatio: number,
+    roomBounds: { width: number; height: number },
+    elementScale: number
+): PositionCache {
+    // Get position scaling modes
+    const horizontalScaling: PositionScalingMode = plan.position_scaling_horizontal || "plan";
+    const verticalScaling: PositionScalingMode = plan.position_scaling_vertical || "plan";
+    
+    // Calculate position scale factors
+    const getPositionScale = (mode: PositionScalingMode): number => {
+        if (scaleRatio === 0) return scale;
+        
+        switch (mode) {
+            case "element":
+                return 1 + (scale - 1) * scaleRatio;
+            case "fixed":
+                return 1;
+            case "plan":
+            default:
+                return scale;
+        }
+    };
+    
+    const horizontalPositionScale = getPositionScale(horizontalScaling);
+    const verticalPositionScale = getPositionScale(verticalScaling);
+    
+    // Calculate percentage-based positions
+    const style: Record<string, string> = {
+        position: 'absolute'
+    };
+
+    if (plan.left !== undefined) {
+        if (typeof plan.left === 'string' && plan.left.includes('%')) {
+            style.left = plan.left;
+        } else if (typeof plan.left === 'number') {
+            const scaledLeft = plan.left * horizontalPositionScale;
+            const percentage = (scaledLeft / (roomBounds.width * scale)) * 100;
+            style.left = `${percentage}%`;
+        }
+    }
+    
+    if (plan.top !== undefined) {
+        if (typeof plan.top === 'string' && plan.top.includes('%')) {
+            style.top = plan.top;
+        } else if (typeof plan.top === 'number') {
+            const scaledTop = plan.top * verticalPositionScale;
+            const percentage = (scaledTop / (roomBounds.height * scale)) * 100;
+            style.top = `${percentage}%`;
+        }
+    }
+    
+    if (plan.right !== undefined) {
+        if (typeof plan.right === 'string' && plan.right.includes('%')) {
+            style.right = plan.right;
+        } else if (typeof plan.right === 'number') {
+            const scaledRight = plan.right * horizontalPositionScale;
+            const percentage = (scaledRight / (roomBounds.width * scale)) * 100;
+            style.right = `${percentage}%`;
+        }
+    }
+    
+    if (plan.bottom !== undefined) {
+        if (typeof plan.bottom === 'string' && plan.bottom.includes('%')) {
+            style.bottom = plan.bottom;
+        } else if (typeof plan.bottom === 'number') {
+            const scaledBottom = plan.bottom * verticalPositionScale;
+            const percentage = (scaledBottom / (roomBounds.height * scale)) * 100;
+            style.bottom = `${percentage}%`;
+        }
+    }
+
+    // Calculate transform-origin
+    const horizontalOrigin = plan.left !== undefined ? 'left' : 
+                            plan.right !== undefined ? 'right' : 'center';
+    const verticalOrigin = plan.top !== undefined ? 'top' : 
+                          plan.bottom !== undefined ? 'bottom' : 'center';
+    const transformOrigin = `${horizontalOrigin} ${verticalOrigin}`;
+
+    // Calculate transform
+    const transform = elementScale !== 1 ? `scale(${elementScale})` : '';
+    
+    // Build base style string
+    let styleString = Object.entries(style)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('; ');
+    
+    // Apply custom styles
+    if (plan.style) {
+        const customStyles = typeof plan.style === 'string' 
+            ? plan.style 
+            : Object.entries(plan.style)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join('; ');
+        
+        if (customStyles) {
+            styleString += `; ${customStyles}`;
+        }
+    }
+
+    return {
+        style,
+        transformOrigin,
+        transform,
+        styleString
+    };
+}
+
+/**
+ * Renders elements for a room
+ * Element scaling is based on scaleRatio: elementScale = 1 + (planScale - 1) * scaleRatio
+ * - scaleRatio = 0: elements keep original size (no scaling)
+ * - scaleRatio = 1: elements scale fully with plan
+ * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
+ */
+export function renderElements(options: ElementRendererOptions): unknown[] {
+    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds } = options;
+    
+    // Calculate element scale: 1 + (planScale - 1) * scaleRatio
+    // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
+    // When scale=5, ratio=0: elementScale = 1 (no scaling)
+    // When scale=5, ratio=1: elementScale = 5 (full scaling)
+    const elementScale = 1 + (scale - 1) * scaleRatio;
+
+    // Generate bounds key for position cache
+    const boundsKey = getBoundsKey(roomBounds);
+
+    // Add info box element if enabled
+    const isOverview = !!originalRoom;
+    const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
+    const roomForInfoBox = originalRoom || room;
+    const infoBoxEntity = getOrCreateInfoBoxEntity(roomForInfoBox, config, hass, mode, infoBoxCache, cachedInfoBoxEntityIds);
+    
+    const allEntities = infoBoxEntity ? [...(room.entities || []), infoBoxEntity] : (room.entities || []);
+
+    // Get or create cached element structure
+    // This avoids expensive filter/map operations on every render
+    const elements = getOrCreateElementStructure(room.name, allEntities, hass);
+
+    const renderedElements = elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
+        // Get or create cached position styles
+        const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, boundsKey);
+        let positionData = positionCache.get(positionCacheKey);
+        
+        if (!positionData) {
+            // Cache miss - calculate and store
+            positionData = calculatePositionStyles(plan, scale, scaleRatio, roomBounds, elementScale);
+            positionCache.set(positionCacheKey, positionData);
+        }
 
         // Get or create the element card using unique key
         const card = getOrCreateElementCard(uniqueKey, entity, elementConfig, createCardElement, elementCards);
@@ -196,47 +384,14 @@ export function renderElements(options: ElementRendererOptions): TemplateResult[
             card.hass = hass;
         }
 
-        // Calculate transform-origin based on positioning
-        // Horizontal: use 'left' if left is set, 'right' if right is set, otherwise 'center'
-        const horizontalOrigin = plan.left !== undefined ? 'left' : 
-                                plan.right !== undefined ? 'right' : 'center';
-        
-        // Vertical: use 'top' if top is set, 'bottom' if bottom is set, otherwise 'center'
-        const verticalOrigin = plan.top !== undefined ? 'top' : 
-                              plan.bottom !== undefined ? 'bottom' : 'center';
-        
-        const transformOrigin = `${horizontalOrigin} ${verticalOrigin}`;
-
-        // Apply element scaling via transform
-        const transform = elementScale !== 1 ? `scale(${elementScale})` : '';
-        
-        // Build base style string from position styles
-        let styleString = Object.entries(style)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join('; ');
-        
-        // Apply user-defined custom styles from plan.style if present
-        // Supports both object notation: { 'z-index': '999', opacity: '0.8' }
-        // and string notation: "z-index: 999; opacity: 0.8"
-        // Custom styles are appended to position styles (position, left, top, right, bottom)
-        if (plan.style) {
-            const customStyles = typeof plan.style === 'string' 
-                ? plan.style 
-                : Object.entries(plan.style)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join('; ');
-            
-            if (customStyles) {
-                styleString += `; ${customStyles}`;
-            }
-        }
-
-        return html`
-            <div class="element-wrapper" style="${styleString}; transform: ${transform}; transform-origin: ${transformOrigin};">
+        return keyed(uniqueKey, html`
+            <div class="element-wrapper" style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin};">
                 ${card}
             </div>
-        `;
+        `);
     });
+    
+    return renderedElements;
 }
 
 /**
@@ -308,6 +463,7 @@ export function getRoomBounds(room: Room): { minX: number; minY: number; maxX: n
  * @param hass - Home Assistant instance
  * @param mode - Current view mode
  * @param cache - Optional cache map for info box configs
+ * @param cachedEntityIds - Pre-computed entity IDs (avoids expensive getAllRoomEntityIds call)
  * @returns EntityConfig for info box or null if disabled
  */
 function getOrCreateInfoBoxEntity(
@@ -315,7 +471,8 @@ function getOrCreateInfoBoxEntity(
     config: ScalableHousePlanConfig | undefined, 
     hass: HomeAssistant, 
     mode: 'overview' | 'detail',
-    cache?: Map<string, EntityConfig | null>
+    cache?: Map<string, EntityConfig | null>,
+    cachedEntityIds?: string[]
 ): EntityConfig | null {
     // Generate cache key: room name + mode
     const cacheKey = `${room.name}-${mode}`;
@@ -326,7 +483,7 @@ function getOrCreateInfoBoxEntity(
     }
     
     // Create info box entity (expensive operation)
-    const infoBoxEntity = createInfoBoxEntity(room, config, hass, mode);
+    const infoBoxEntity = createInfoBoxEntity(room, config, hass, mode, cachedEntityIds);
     
     // Store in cache if available
     if (cache) {
@@ -341,9 +498,11 @@ function getOrCreateInfoBoxEntity(
  * @param room - The room to create info box for
  * @param config - House plan config (for defaults)
  * @param hass - Home Assistant instance
+ * @param mode - Current view mode
+ * @param cachedEntityIds - Pre-computed entity IDs (avoids expensive getAllRoomEntityIds call)
  * @returns EntityConfig for info box or null if disabled
  */
-function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undefined, hass: HomeAssistant, mode: 'overview' | 'detail'): EntityConfig | null {
+function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undefined, hass: HomeAssistant, mode: 'overview' | 'detail', cachedEntityIds?: string[]): EntityConfig | null {
     // Merge defaults: code default -> house config -> room config
     const codeDefault: InfoBoxConfig = {
         show: true,
@@ -377,8 +536,8 @@ function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undef
     // Determine if background should be shown for current mode
     const showBackground = mode === 'overview' ? merged.show_background_overview : merged.show_background_detail;
     
-    // Get ALL entity IDs for info box to scan through (info box filters to specific types internally)
-    const roomEntityIds = getAllRoomEntityIds(hass, room, null);
+    // Use cached entity IDs if provided, otherwise fall back to expensive getAllRoomEntityIds call
+    const roomEntityIds = cachedEntityIds || getAllRoomEntityIds(hass, room, null);
     
     // Create element config for info box
     // Add room name to make unique key for each room's info box
