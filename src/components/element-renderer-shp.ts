@@ -82,7 +82,7 @@ const elementStructureCache = new Map<string, CachedElementStructure>();
 
 /**
  * Generate unique key for no-entity elements based on type and position
- * Key format: elementType-left-top-right-bottom-room_id (if present)
+ * Key format: elementType-left-top-right-bottom-room_id-mode (mode only for info boxes)
  */
 function generateElementKey(elementType: string, plan: any): string {
     const left = plan.left !== undefined ? String(plan.left) : 'undefined';
@@ -93,7 +93,11 @@ function generateElementKey(elementType: string, plan: any): string {
     // Include room_id if present (for info boxes to be unique per room)
     const roomId = plan.element?.room_id ? `-${plan.element.room_id}` : '';
     
-    return `${elementType}-${left}-${top}-${right}-${bottom}${roomId}`;
+    // Include mode only for info boxes (they have mode-specific visibility settings)
+    const isInfoBox = elementType === 'custom:info-box-shp';
+    const mode = isInfoBox && plan.element?.mode ? `-${plan.element.mode}` : '';
+    
+    return `${elementType}-${left}-${top}-${right}-${bottom}${roomId}${mode}`;
 }
 
 /**
