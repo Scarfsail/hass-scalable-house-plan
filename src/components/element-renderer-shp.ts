@@ -102,11 +102,27 @@ function generateElementKey(elementType: string, plan: any): string {
 
 /**
  * Generate simple hash of entities array for cache invalidation
+ * Includes position data to detect when element positions change
  */
 function hashEntities(entities: EntityConfig[]): string {
-    return entities.length + '-' + entities.map(e => 
-        typeof e === 'string' ? e : `${e.entity}-${!!e.plan}`
-    ).join('|');
+    return entities.length + '-' + entities.map(e => {
+        if (typeof e === 'string') return e;
+        
+        // Include position values in hash to detect position changes
+        const planHash = e.plan ? JSON.stringify({
+            left: e.plan.left,
+            top: e.plan.top,
+            right: e.plan.right,
+            bottom: e.plan.bottom,
+            width: e.plan.width,
+            height: e.plan.height,
+            overview: e.plan.overview,
+            position_scaling_horizontal: e.plan.position_scaling_horizontal,
+            position_scaling_vertical: e.plan.position_scaling_vertical
+        }) : 'no-plan';
+        
+        return `${e.entity}-${planHash}`;
+    }).join('|');
 }
 
 /**
@@ -222,9 +238,13 @@ function getBoundsKey(bounds: { width: number; height: number }): string {
 
 /**
  * Generate position cache key
+ * Includes position values to detect when positions change
  */
-function getPositionCacheKey(uniqueKey: string, scale: number, scaleRatio: number, boundsKey: string): string {
-    return `${uniqueKey}-${scale.toFixed(2)}-${scaleRatio}-${boundsKey}`;
+function getPositionCacheKey(uniqueKey: string, scale: number, scaleRatio: number, boundsKey: string, plan: any): string {
+    // Include position values in cache key to invalidate when they change
+    const positionKey = `${plan.left}-${plan.top}-${plan.right}-${plan.bottom}-${plan.width}-${plan.height}`;
+    const scalingKey = `${plan.position_scaling_horizontal || 'plan'}-${plan.position_scaling_vertical || 'plan'}`;
+    return `${uniqueKey}-${scale.toFixed(2)}-${scaleRatio}-${boundsKey}-${positionKey}-${scalingKey}`;
 }
 
 /**
@@ -373,7 +393,7 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
 
     const renderedElements = elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
         // Get or create cached position styles
-        const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, boundsKey);
+        const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, boundsKey, plan);
         let positionData = positionCache.get(positionCacheKey);
         
         if (!positionData) {
