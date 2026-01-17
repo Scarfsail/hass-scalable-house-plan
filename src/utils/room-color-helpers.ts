@@ -7,6 +7,7 @@ import type { Room, ScalableHousePlanConfig, EntityConfig } from "../cards/scala
 export interface DynamicColorResult {
     color: string;
     type: 'motion' | 'ambient_lights' | 'lights' | 'default' | 'transparent';
+    activeTypes: ('motion' | 'ambient_lights' | 'lights' | 'default')[];  // All active states, not just priority
 }
 
 /**
@@ -184,12 +185,12 @@ export function calculateDynamicRoomColor(
 ): DynamicColorResult {
     // Check if room has dynamic colors disabled
     if (room.disable_dynamic_color === true) {
-        return { color: 'transparent', type: 'transparent' };
+        return { color: 'transparent', type: 'transparent', activeTypes: [] };
     }
     
     // Check if global show_room_backgrounds is enabled (debugging mode)
     if (config?.show_room_backgrounds === true) {
-        return { color: room.color || 'transparent', type: 'transparent' };
+        return { color: room.color || 'transparent', type: 'transparent', activeTypes: [] };
     }
     
     // Get configured colors with defaults
@@ -199,21 +200,29 @@ export function calculateDynamicRoomColor(
     const defaultColor = config?.dynamic_colors?.default || 'rgba(100, 100, 100, 0.05)';
     const delaySeconds = config?.dynamic_colors?.motion_delay_seconds ?? 60;
     
-    // Check motion/occupancy (highest priority) - using cached IDs and timestamp-based delay
-    if (hasActiveMotionOrOccupancy(hass, cachedIds, delaySeconds)) {
-        return { color: motionColor, type: 'motion' };
-    }
+    // Check all states (do all checks once to build complete picture)
+    const hasMotion = hasActiveMotionOrOccupancy(hass, cachedIds, delaySeconds);
+    const hasLights = hasActiveLights(hass, cachedIds);
+    const hasAmbientLights = hasActiveAmbientLights(hass, cachedIds);
     
-    // Check regular lights (second priority) - using cached IDs
-    if (hasActiveLights(hass, cachedIds)) {
-        return { color: lightsColor, type: 'lights' };
-    }
+    // Build list of all active types
+    const activeTypes: ('motion' | 'ambient_lights' | 'lights' | 'default')[] = [];
+    if (hasMotion) activeTypes.push('motion');
+    if (hasLights) activeTypes.push('lights');
+    if (hasAmbientLights) activeTypes.push('ambient_lights');
     
-    // Check ambient lights (third priority) - using cached IDs
-    if (hasActiveAmbientLights(hass, cachedIds)) {
-        return { color: ambientLightsColor, type: 'ambient_lights' };
+    // Determine primary color based on priority: Motion > Lights > Ambient Lights > Default
+    if (hasMotion) {
+        return { color: motionColor, type: 'motion', activeTypes };
+    }
+    if (hasLights) {
+        return { color: lightsColor, type: 'lights', activeTypes };
+    }
+    if (hasAmbientLights) {
+        return { color: ambientLightsColor, type: 'ambient_lights', activeTypes };
     }
     
     // Default color
-    return { color: defaultColor, type: 'default' };
+    activeTypes.push('default');
+    return { color: defaultColor, type: 'default', activeTypes };
 }

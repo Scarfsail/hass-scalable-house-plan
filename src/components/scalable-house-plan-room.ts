@@ -80,6 +80,7 @@ export class ScalableHousePlanRoom extends LitElement {
     @state() private _currentGradient?: GradientDefinition;
     @state() private _currentGradientInverted?: GradientDefinition;
     @state() private _hasMotion: boolean = false;
+    @state() private _activeLightColor?: string;  // Color from actual light entity when both light and motion are active
 
     willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
         super.willUpdate(changedProperties);
@@ -282,6 +283,13 @@ export class ScalableHousePlanRoom extends LitElement {
         // Track motion detection state for animation
         this._hasMotion = this._currentColor.type === 'motion';
         
+        // Check if both motion and lights are active to use configured light color for motion layer
+        this._activeLightColor = undefined;
+        if (this._hasMotion && this._currentColor.activeTypes.includes('lights')) {
+            // Use the configured light color (the same color shown when only light is active)
+            this._activeLightColor = this.config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.17)';
+        }
+        
         // Create gradient if not transparent
         if (this._currentColor.type !== 'transparent') {
             const center = calculatePolygonCenter(this.room.boundary);
@@ -301,9 +309,12 @@ export class ScalableHousePlanRoom extends LitElement {
                 const cx = ((center.x - this._cachedRoomBounds.minX) / this._cachedRoomBounds.width * 100).toFixed(1);
                 const cy = ((center.y - this._cachedRoomBounds.minY) / this._cachedRoomBounds.height * 100).toFixed(1);
                 
+                // Use light color if both motion and light are active, otherwise use motion color
+                const colorForInverted = this._activeLightColor || this._currentColor.color;
+                
                 // Inverted: Center is dark (0.05), outer is bright (0.2)
-                const innerColor = adjustOpacity(this._currentColor.color, 0.05);
-                const outerColor = adjustOpacity(this._currentColor.color, 0.2);
+                const innerColor = adjustOpacity(colorForInverted, 0.05);
+                const outerColor = adjustOpacity(colorForInverted, 0.2);
                 
                 this._currentGradientInverted = {
                     id: gradientIdInverted,
