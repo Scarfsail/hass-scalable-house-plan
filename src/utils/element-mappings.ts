@@ -73,7 +73,7 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
 
     // Domain-level defaults
     'light': {
-        plan_element: { type: 'custom:state-icon-shp', show_trigger_info: true },
+        plan_element: { type: 'custom:state-icon-shp' },
         detail_element: { type: 'tile' }
     },
     'camera': {

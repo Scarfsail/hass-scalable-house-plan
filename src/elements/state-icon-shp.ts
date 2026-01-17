@@ -88,7 +88,7 @@ export class StateIconElement extends ElementEntityBase<StateIconElementConfig> 
         
         // Show trigger info OR title (mutually exclusive, trigger takes priority)
         const showTriggerInfo = this._config?.show_trigger_info ?? false;
-        const showTitle = this._config?.show_title ?? false;
+        const showTitle = this._config?.show_title ?? (this._config?.title !== undefined);
         
         let infoLabel = null;
         if (showTriggerInfo) {
