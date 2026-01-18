@@ -1,4 +1,4 @@
-import { css, html, nothing } from "lit"
+import { css, html, svg, nothing } from "lit"
 import { customElement } from "lit/decorators.js";
 import "../components/last-change-text-shp";
 
@@ -68,6 +68,9 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
     protected renderEntityContent(entity: HassEntity) {
         if (!this._config || !this.hass)
             return nothing;
+        
+        if (this._computedWidth === undefined || this._computedHeight === undefined)
+            return nothing;
 
         const opened = entity.state == "on";
         const alarmState = this.getAlarmoSensorState();
@@ -79,12 +82,10 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
                 : 
                 'gray';
 
-        const svgElement = html`
-            <div>
-                <svg width="${this._computedWidth}px" height="${this._computedHeight}px">
-                    <path d=${this._svgPath} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
-                </svg>
-            </div>
+        const svgElement = svg`
+            <svg width="${this._computedWidth}" height="${this._computedHeight}">
+                <path d=${this._svgPath} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
+            </svg>
         `;
         
         const textElement = html`
