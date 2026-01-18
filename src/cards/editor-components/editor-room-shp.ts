@@ -133,8 +133,7 @@ export class EditorRoomShp extends LitElement {
                         <button class="icon-button" @click=${this._duplicateRoom} title="${this.localize('editor.duplicate_room')}">
                             <ha-icon icon="mdi:content-duplicate"></ha-icon>
                         </button>
-                            <ha-icon icon="mdi:content-duplicate"></ha-icon>
-                        </button>
+
                         <button class="icon-button danger" @click=${this._removeRoom}>
                             <ha-icon icon="mdi:delete"></ha-icon>
                         </button>
