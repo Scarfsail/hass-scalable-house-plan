@@ -79,21 +79,21 @@ class LastChangeText extends LitElement {
     const secondsSinceChange = lastChangeBefore ? lastChangeBefore.asSeconds() : Infinity;
 
     let textColor = 'rgba(192, 192, 192, 0.6)';
-    let backgroundColor = 'rgba(0, 0, 0, 0.4)';
+    let backgroundColor = 'rgba(0, 0, 0, 0.3)';
 
     // Superhighlight overrides all other highlighting
     if (this.secondsForSuperHighlight && secondsSinceChange <= this.secondsForSuperHighlight) {
-      textColor = 'rgba(0, 0, 0, 1)';
-      backgroundColor = 'rgba(200, 80, 80, 0.3)';
+      textColor = 'rgba(255, 255, 255, 1)';
+      backgroundColor = 'rgba(200, 60, 60, 0.4)';
     }
     // White/gray for first 30 seconds
     else if (secondsSinceChange <= 30) {
-      textColor = 'rgba(0, 0, 0, 1)';
+      textColor = 'rgba(255, 255, 255, 1)';
       backgroundColor = 'rgba(220, 220, 220, 0.3)';
     }
     // Even less bright for next 90 seconds (31-120 seconds)
     else if (secondsSinceChange <= 120) {
-      textColor = 'rgba(0, 0, 0, 1)';
+      textColor = 'rgba(192, 192, 192, 1)';
       backgroundColor = 'rgba(180, 180, 180, 0.25)';
     }
 
