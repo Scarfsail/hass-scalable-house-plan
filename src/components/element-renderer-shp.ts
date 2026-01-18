@@ -86,12 +86,15 @@ function generateElementKey(elementType: string, plan: any): string {
  */
 function getOrCreateElementStructure(
     roomName: string,
+    mode: 'overview' | 'detail',
     allEntities: EntityConfig[],
     hass: HomeAssistant,
     elementStructureCache: Map<string, CachedElementStructure>,
     elementMetadataCache: Map<string, ElementMetadata>
 ): Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }> {
-    const cached = elementStructureCache.get(roomName);
+    // Include mode in cache key to separate overview and detail caches
+    const cacheKey = `${roomName}-${mode}`;
+    const cached = elementStructureCache.get(cacheKey);
     
     // Check if cache is valid
     if (cached) {
@@ -129,7 +132,7 @@ function getOrCreateElementStructure(
         .filter((el): el is { entity: string; plan: any; elementConfig: any; uniqueKey: string } => el !== null);
     
     // Store in cache
-    elementStructureCache.set(roomName, {
+    elementStructureCache.set(cacheKey, {
         elements
     });
     
@@ -353,7 +356,7 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
 
     // Get or create cached element structure
     // This avoids expensive filter/map operations on every render
-    const elements = getOrCreateElementStructure(room.name, allEntities, hass, structureCache, metadataCache);
+    const elements = getOrCreateElementStructure(room.name, mode, allEntities, hass, structureCache, metadataCache);
 
     const renderedElements = elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
         // Get or create cached position styles
