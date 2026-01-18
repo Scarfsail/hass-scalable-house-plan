@@ -11,6 +11,7 @@ interface DoorWindowElementConfig extends ElementEntityBaseConfig {
     orientation: "vertical" | "horizontal";
     unobtrusive?: boolean;
     text_position?: "start" | "end";
+    text_align?: "start" | "center" | "end";
 }
 
 
@@ -52,7 +53,8 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             ...config,
             height: config.height ?? 7,
             orientation: config.orientation ?? "horizontal",
-            text_position: config.text_position ?? "end"
+            text_position: config.text_position ?? "end",
+            text_align: config.text_align ?? "center"
         });
         
         // Pre-compute orientation-based values
@@ -89,8 +91,11 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5} .vertical=${this._isVertical}></last-change-text-shp>
         `;
 
+        const alignItems = this._config.text_align === "start" ? "flex-end" : 
+                           this._config.text_align === "end" ? "flex-start" : "center";
+
         return html`
-            <div class="container ${this._config.orientation}">
+            <div class="container ${this._config.orientation}" style="align-items: ${alignItems};">
                 ${this._config.text_position === "start" ? html`${textElement}${svgElement}` : html`${svgElement}${textElement}`}
             </div>            
             `
