@@ -148,11 +148,15 @@ export class ScalableHousePlanRoom extends LitElement {
                 top: 0;
                 left: 0;
                 pointer-events: none;
+                isolation: isolate;
+                transform: translateZ(0);
+                -webkit-transform: translateZ(0);
+                backface-visibility: hidden;
+                -webkit-backface-visibility: hidden;
             }
 
             .element-wrapper {
                 position: absolute;
-                pointer-events: auto;
             }
 
             .room-polygon {
@@ -407,6 +411,9 @@ export class ScalableHousePlanRoom extends LitElement {
         const roomBounds = this._cachedRoomBounds;
         const scale = this.scale;
 
+        // Check if elements should be clickable on overview
+        const elementsClickable = this.room.elements_clickable_on_overview ?? false;
+
         const elements = renderElements({
             hass: this.hass,
             room: this._cachedOverviewRoom,
@@ -418,13 +425,12 @@ export class ScalableHousePlanRoom extends LitElement {
             config: this.config,
             originalRoom: this.room,  // Pass original room for info box entity detection
             infoBoxCache: this._infoBoxCache,
-            cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds  // Use cached IDs from parent
+            cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds,  // Use cached IDs from parent
+            elementsClickable  // Control element clickability
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
 
-        // Check if elements should be clickable on overview
-        const elementsClickable = this.room.elements_clickable_on_overview ?? false;
         
         // Build SVG polygon with conditional interactivity and gradient
         const polygonSvg = svg`
@@ -481,14 +487,14 @@ export class ScalableHousePlanRoom extends LitElement {
             </svg>
         `;
 
-        // Render with conditional order: elements clickable = SVG below elements
+        // Render with conditional order: SVG always below elements for proper visual stacking
+        // Pointer events controlled via elementsClickable at the element-wrapper level
         return html`
             <div class="room-container" style="position: absolute; left: ${roomBounds.minX}px; top: ${roomBounds.minY}px; width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
-                ${elementsClickable ? polygonSvg : html``}
+                ${polygonSvg}
                 <div class="elements-container" style="width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
                     ${elements}
                 </div>
-                ${elementsClickable ? html`` : polygonSvg}
             </div>
         `;
     }
@@ -532,7 +538,8 @@ export class ScalableHousePlanRoom extends LitElement {
             scaleRatio,
             config: this.config,
             infoBoxCache: this._infoBoxCache,
-            cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds  // Use cached IDs from parent
+            cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds,  // Use cached IDs from parent
+            elementsClickable: true  // Elements always clickable in detail view
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();

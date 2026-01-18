@@ -25,6 +25,7 @@ export interface ElementRendererOptions {
     originalRoom?: Room;  // Optional: original room with all entities (for info box in overview mode)
     infoBoxCache?: Map<string, EntityConfig | null>;  // Cache for info box entity configs
     cachedInfoBoxEntityIds?: string[];  // Pre-computed entity IDs for info box (avoids expensive getAllRoomEntityIds call)
+    elementsClickable?: boolean;  // Whether elements should be clickable (controls pointer-events)
 }
 
 /**
@@ -368,7 +369,7 @@ function calculatePositionStyles(
  * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
  */
 export function renderElements(options: ElementRendererOptions): unknown[] {
-    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds } = options;
+    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, elementsClickable = false } = options;
     
     // Calculate element scale: 1 + (planScale - 1) * scaleRatio
     // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
@@ -409,7 +410,7 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
         }
 
         return keyed(uniqueKey, html`
-            <div class="element-wrapper" style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin};">
+            <div class="element-wrapper" style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin}; pointer-events: ${elementsClickable ? 'auto' : 'none'};">
                 ${card}
             </div>
         `);
