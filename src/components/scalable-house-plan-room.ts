@@ -1,7 +1,7 @@
 import { LitElement, html, svg, css, TemplateResult } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, ScalableHousePlanConfig, EntityConfig, RoomEntityCache } from "../cards/scalable-house-plan";
+import type { Room, ScalableHousePlanConfig, EntityConfig, RoomEntityCache, HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getRoomEntities } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
 import { 
@@ -55,6 +55,7 @@ export class ScalableHousePlanRoom extends LitElement {
     @property({ attribute: false }) public showRoomBackgrounds?: boolean;
     @property({ attribute: false }) public onClick?: (room: Room) => void;
     @property({ attribute: false }) public cachedEntityIds?: RoomEntityCache;  // Pre-computed entity IDs from parent
+    @property({ attribute: false }) public houseCache!: HouseCache;
 
     // Constants
     private static readonly DEFAULT_ROOM_COLOR = 'rgba(128, 128, 128, 0.2)';
@@ -426,7 +427,8 @@ export class ScalableHousePlanRoom extends LitElement {
             originalRoom: this.room,  // Pass original room for info box entity detection
             infoBoxCache: this._infoBoxCache,
             cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds,  // Use cached IDs from parent
-            elementsClickable  // Control element clickability
+            elementsClickable,  // Control element clickability
+            houseCache: this.houseCache
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
@@ -539,7 +541,8 @@ export class ScalableHousePlanRoom extends LitElement {
             config: this.config,
             infoBoxCache: this._infoBoxCache,
             cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds,  // Use cached IDs from parent
-            elementsClickable: true  // Elements always clickable in detail view
+            elementsClickable: true,  // Elements always clickable in detail view
+            houseCache: this.houseCache
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();

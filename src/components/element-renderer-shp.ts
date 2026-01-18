@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-element";
 import { keyed } from "lit/directives/keyed.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig } from "../cards/scalable-house-plan";
+import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds } from "../utils";
 
 /**
@@ -26,6 +26,7 @@ export interface ElementRendererOptions {
     infoBoxCache?: Map<string, EntityConfig | null>;  // Cache for info box entity configs
     cachedInfoBoxEntityIds?: string[];  // Pre-computed entity IDs for info box (avoids expensive getAllRoomEntityIds call)
     elementsClickable?: boolean;  // Whether elements should be clickable (controls pointer-events)
+    houseCache: HouseCache;  // Element renderer caches (required)
 }
 
 /**
@@ -38,13 +39,6 @@ interface ElementMetadata {
 }
 
 /**
- * Global element metadata cache
- * Key: entityId (for entities) or generated key (for no-entity elements)
- * Cache persists across renders and rooms - invalidated only on page refresh
- */
-const elementMetadataCache = new Map<string, ElementMetadata>();
-
-/**
  * Cached position/style calculations to avoid recomputing on every render
  */
 interface PositionCache {
@@ -53,13 +47,6 @@ interface PositionCache {
     transform: string;              // Transform scale string
     styleString: string;            // Pre-built CSS string (including custom styles)
 }
-
-/**
- * Global position calculation cache
- * Key: `${uniqueKey}-${scale}-${scaleRatio}-${boundsKey}`
- * Cache persists across renders - invalidated only when scale/bounds change
- */
-const positionCache = new Map<string, PositionCache>();
 
 /**
  * Cached element structure to avoid filtering/mapping room.entities on every render
@@ -71,15 +58,7 @@ interface CachedElementStructure {
         elementConfig: any;
         uniqueKey: string;
     }>;
-    entitiesHash: string;  // Hash to detect when room.entities changes
 }
-
-/**
- * Global element structure cache
- * Key: room name
- * Invalidated when room.entities array changes (detected via hash)
- */
-const elementStructureCache = new Map<string, CachedElementStructure>();
 
 /**
  * Generate unique key for no-entity elements based on type and position
@@ -102,48 +81,26 @@ function generateElementKey(elementType: string, plan: any): string {
 }
 
 /**
- * Generate simple hash of entities array for cache invalidation
- * Includes position data to detect when element positions change
- */
-function hashEntities(entities: EntityConfig[]): string {
-    return entities.length + '-' + entities.map(e => {
-        if (typeof e === 'string') return e;
-        
-        // Include position values in hash to detect position changes
-        const planHash = e.plan ? JSON.stringify({
-            left: e.plan.left,
-            top: e.plan.top,
-            right: e.plan.right,
-            bottom: e.plan.bottom,
-            width: e.plan.width,
-            height: e.plan.height,
-            overview: e.plan.overview,
-            position_scaling_horizontal: e.plan.position_scaling_horizontal,
-            position_scaling_vertical: e.plan.position_scaling_vertical
-        }) : 'no-plan';
-        
-        return `${e.entity}-${planHash}`;
-    }).join('|');
-}
-
-/**
  * Get or create cached element structure for a room
  * This avoids filtering/mapping room.entities on every render
  */
 function getOrCreateElementStructure(
     roomName: string,
     allEntities: EntityConfig[],
-    hass: HomeAssistant
+    hass: HomeAssistant,
+    elementStructureCache: Map<string, CachedElementStructure>,
+    elementMetadataCache: Map<string, ElementMetadata>
 ): Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }> {
-    const entitiesHash = hashEntities(allEntities);
     const cached = elementStructureCache.get(roomName);
     
     // Check if cache is valid
-    if (cached && cached.entitiesHash === entitiesHash) {
+    if (cached) {
         return cached.elements;
     }
     
-    // Cache miss or invalidated - compute element structure
+    
+
+    // Compute element structure
     const elements = allEntities
         .filter((entityConfig: EntityConfig) => {
             if (typeof entityConfig === 'string') return false;
@@ -164,8 +121,8 @@ function getOrCreateElementStructure(
             // Generate unique key
             const uniqueKey = entity || generateElementKey(plan.element?.type || 'unknown', plan);
 
-            // Get cached element metadata
-            const metadata = getOrCreateElementMetadata(uniqueKey, entity, plan, hass);
+            // Get cached element metadata (will be recomputed since we cleared the cache above)
+            const metadata = getOrCreateElementMetadata(uniqueKey, entity, plan, hass, elementMetadataCache);
 
             return { entity, plan, elementConfig: metadata.elementConfig, uniqueKey };
         })
@@ -173,8 +130,7 @@ function getOrCreateElementStructure(
     
     // Store in cache
     elementStructureCache.set(roomName, {
-        elements,
-        entitiesHash
+        elements
     });
     
     return elements;
@@ -186,13 +142,15 @@ function getOrCreateElementStructure(
  * @param entity - Entity ID (can be empty for no-entity elements)
  * @param plan - Plan configuration
  * @param hass - Home Assistant instance
+ * @param elementMetadataCache - Cache map for element metadata
  * @returns Cached or newly computed element metadata
  */
 function getOrCreateElementMetadata(
     cacheKey: string,
     entity: string,
     plan: any,
-    hass: HomeAssistant
+    hass: HomeAssistant,
+    elementMetadataCache: Map<string, ElementMetadata>
 ): ElementMetadata {
     // Check cache first
     let metadata = elementMetadataCache.get(cacheKey);
@@ -369,7 +327,12 @@ function calculatePositionStyles(
  * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
  */
 export function renderElements(options: ElementRendererOptions): unknown[] {
-    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, elementsClickable = false } = options;
+    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, elementsClickable = false, houseCache } = options;
+    
+    // Extract caches from HouseCache
+    const metadataCache = houseCache.elementMetadata;
+    const structureCache = houseCache.elementStructure;
+    const posCache = houseCache.position;
     
     // Calculate element scale: 1 + (planScale - 1) * scaleRatio
     // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
@@ -390,17 +353,17 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
 
     // Get or create cached element structure
     // This avoids expensive filter/map operations on every render
-    const elements = getOrCreateElementStructure(room.name, allEntities, hass);
+    const elements = getOrCreateElementStructure(room.name, allEntities, hass, structureCache, metadataCache);
 
     const renderedElements = elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
         // Get or create cached position styles
         const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, boundsKey, plan);
-        let positionData = positionCache.get(positionCacheKey);
+        let positionData = posCache.get(positionCacheKey);
         
         if (!positionData) {
             // Cache miss - calculate and store
             positionData = calculatePositionStyles(plan, scale, scaleRatio, roomBounds, elementScale);
-            positionCache.set(positionCacheKey, positionData);
+            posCache.set(positionCacheKey, positionData);
         }
 
         // Get or create the element card using unique key

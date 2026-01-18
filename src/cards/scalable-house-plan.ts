@@ -119,6 +119,16 @@ export interface RoomEntityCache {
     occupancySensorIds: string[];
 }
 
+/**
+ * House cache - contains all performance caches for element rendering
+ * Shared across all views and rooms within a card instance
+ */
+export class HouseCache {
+    elementMetadata: Map<string, any> = new Map();
+    elementStructure: Map<string, any> = new Map();
+    position: Map<string, any> = new Map();
+}
+
 export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     rooms: Room[];
     image: string;
@@ -147,6 +157,9 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     // Performance optimization: Cache entity IDs per room to avoid expensive lookups
     private _roomEntityCache: Map<string, RoomEntityCache> = new Map();
+    
+    // Element renderer caches (shared across all views and rooms)
+    private _houseCache: HouseCache = new HouseCache();
 
     @property({ attribute: false }) hass?: HomeAssistant;
 
@@ -362,6 +375,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 .config=${this.config}
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
                 .roomEntityCache=${this._roomEntityCache}
+                .houseCache=${this._houseCache}
             ></scalable-house-plan-overview>
         `;
         
@@ -378,6 +392,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                         .onBack=${() => this._closeRoomDetail()}
                         .onShowEntities=${() => this._openEntitiesView()}
                         .roomEntityCache=${this._roomEntityCache}
+                        .houseCache=${this._houseCache}
                     ></scalable-house-plan-detail>
                 </div>
             </div>

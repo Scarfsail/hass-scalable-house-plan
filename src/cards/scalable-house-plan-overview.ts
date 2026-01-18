@@ -1,7 +1,7 @@
 import { LitElement, html, svg, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, ScalableHousePlanConfig, RoomEntityCache } from "./scalable-house-plan";
+import type { Room, ScalableHousePlanConfig, RoomEntityCache, HouseCache } from "./scalable-house-plan";
 import { CreateCardElement, getCreateCardElement, applyScaleLimits, hasViewportChanged } from "../utils";
 import "../components/scalable-house-plan-room";
 
@@ -15,6 +15,7 @@ export class ScalableHousePlanOverview extends LitElement {
     @property({ attribute: false }) public config?: ScalableHousePlanConfig;
     @property({ attribute: false }) public onRoomClick?: (room: Room, index: number) => void;
     @property({ attribute: false }) public roomEntityCache?: Map<string, RoomEntityCache>;
+    @property({ attribute: false }) public houseCache!: HouseCache;
 
     @state() private _createCardElement: CreateCardElement = null;
     // Cache for element cards across all rooms (key: entity_id, value: card element)
@@ -107,6 +108,7 @@ export class ScalableHousePlanOverview extends LitElement {
                 .scale=${scale}
                 .createCardElement=${this._createCardElement}
                 .elementCards=${this._elementCards}
+                .houseCache=${this.houseCache}
                 .showRoomBackgrounds=${this.config!.show_room_backgrounds}
                 .onClick=${() => this._handleRoomClick(room, index)}
                 .cachedEntityIds=${this.roomEntityCache?.get(room.name)}
