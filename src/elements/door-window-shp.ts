@@ -18,33 +18,75 @@ interface DoorWindowElementConfig extends ElementEntityBaseConfig {
 @customElement("door-window-shp")
 export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElementConfig> {
     // Cached computed values (set in setConfig)
-    private _computedWidth!: number;
-    private _computedHeight!: number;
+    private _svgWidth!: number;
+    private _svgHeight!: number;
     private _svgPath!: string;
     private _isVertical!: boolean;
 
     static styles = css`
         :host {
             display: block;
-            width: fit-content;
-            height: fit-content;
+            position: relative;
         }
         
-        .container {
+        .content {
             display: flex;
+            flex-direction: column;
             align-items: center;
+            position: absolute;
             line-height: 0;
             cursor: pointer;
+            gap: 1px;
         }
         
-        .container.horizontal {
-            flex-direction: column;
-            gap: 7px;
+        /* Horizontal: text-start = text above, SVG bottom aligned */
+        :host(.horizontal.text-start) .content {
+            bottom: 0;
+            left: 0;
         }
         
-        .container.vertical {
-            flex-direction: row;
-            gap: 5px;
+        /* Horizontal: text-end = text below, SVG top aligned */
+        :host(.horizontal.text-end) .content {
+            top: 0;
+            left: 0;
+        }
+        
+        /* Vertical: text-start = after rotation, SVG right aligned */
+        :host(.vertical.text-start) .content {
+            bottom: 100%;
+            right: 0;
+            transform: rotate(-90deg);
+            transform-origin: bottom right;
+        }
+        
+        /* Vertical: text-end = after rotation, SVG left aligned */
+        :host(.vertical.text-end) .content {
+            top: 100%;
+            left: 0;
+            transform: rotate(-90deg);
+            transform-origin: top left;
+        }
+        
+        /* Text alignment - horizontal: start=left, center=center, end=right */
+        :host(.horizontal.align-start) .content {
+            align-items: flex-start;
+        }
+        :host(.horizontal.align-center) .content {
+            align-items: center;
+        }
+        :host(.horizontal.align-end) .content {
+            align-items: flex-end;
+        }
+        
+        /* Text alignment - vertical (flipped): start=top, end=bottom */
+        :host(.vertical.align-start) .content {
+            align-items: flex-start;
+        }
+        :host(.vertical.align-center) .content {
+            align-items: center;
+        }
+        :host(.vertical.align-end) .content {
+            align-items: flex-end;
         }
     `;
      
@@ -57,20 +99,38 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             text_align: config.text_align ?? "center"
         });
         
-        // Pre-compute orientation-based values
-        const isHorizontal = this._config!.orientation === 'horizontal';
-        this._isVertical = !isHorizontal;
-        this._computedHeight = isHorizontal ? this._config!.height : this._config!.width;
-        this._computedWidth = isHorizontal ? this._config!.width : this._config!.height;
-        this._svgPath = `M0 0 L0 ${this._computedHeight} L${this._computedWidth} ${this._computedHeight} L${this._computedWidth} 0 Z`;
+        this._svgWidth = this._config!.width;
+        this._svgHeight = this._config!.height;
+        this._svgPath = `M0 0 L0 ${this._svgHeight} L${this._svgWidth} ${this._svgHeight} L${this._svgWidth} 0 Z`;
+        this._isVertical = this._config!.orientation === 'vertical';
+
+        // Set host dimensions (swap for vertical)
+        if (this._isVertical) {
+            this.style.width = `${this._svgHeight}px`;
+            this.style.height = `${this._svgWidth}px`;
+        } else {
+            this.style.width = `${this._svgWidth}px`;
+            this.style.height = `${this._svgHeight}px`;
+        }
+        
+        // Set classes for CSS positioning
+        this.classList.toggle('horizontal', !this._isVertical);
+        this.classList.toggle('vertical', this._isVertical);
+        this.classList.toggle('text-start', this._config.text_position === 'start');
+        this.classList.toggle('text-end', this._config.text_position === 'end');
+        this.classList.toggle('align-start', this._config.text_align === 'start');
+        this.classList.toggle('align-center', this._config.text_align === 'center');
+        this.classList.toggle('align-end', this._config.text_align === 'end');
     }
 
     protected renderEntityContent(entity: HassEntity) {
         if (!this._config || !this.hass)
             return nothing;
         
-        if (this._computedWidth === undefined || this._computedHeight === undefined)
+        if (this._svgWidth === undefined || this._svgHeight === undefined)
             return nothing;
+
+
 
         const opened = entity.state == "on";
         const alarmState = this.getAlarmoSensorState();
@@ -83,22 +143,22 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
                 'gray';
 
         const svgElement = svg`
-            <svg width="${this._computedWidth}" height="${this._computedHeight}">
+            <svg width="${this._svgWidth}" height="${this._svgHeight}">
                 <path d=${this._svgPath} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
             </svg>
         `;
         
         const textElement = html`
-            <last-change-text-shp .entity=${entity} .secondsForSuperHighlight=${5} .vertical=${this._isVertical}></last-change-text-shp>
+            <last-change-text-shp 
+                .entity=${entity} 
+                .secondsForSuperHighlight=${5}
+            ></last-change-text-shp>
         `;
 
-        const alignItems = this._config.text_align === "start" ? "flex-end" : 
-                           this._config.text_align === "end" ? "flex-start" : "center";
-
         return html`
-            <div class="container ${this._config.orientation}" style="align-items: ${alignItems};">
+            <div class="content">
                 ${this._config.text_position === "start" ? html`${textElement}${svgElement}` : html`${svgElement}${textElement}`}
-            </div>            
+            </div>
             `
     }
 }

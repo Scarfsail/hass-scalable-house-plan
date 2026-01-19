@@ -9,7 +9,6 @@ import { timerService } from '../utils/timer-service';
 class LastChangeText extends LitElement {
   @property({ attribute: false }) public entity?: HassEntity;
   @property({ attribute: false }) public secondsForSuperHighlight?: number;
-  @property({ attribute: false, type: Boolean }) public vertical?: boolean;
 
   @state() private _lastRenderedText: string = '';
   private _timerCallback?: () => void;
@@ -32,11 +31,6 @@ class LastChangeText extends LitElement {
             line-height: normal;
             position: relative;
             isolation: isolate;
-        }
-        
-        div.vertical {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
         }
   `;
 
@@ -98,10 +92,9 @@ class LastChangeText extends LitElement {
     }
 
     return html`
-      <div class="${this.vertical ? 'vertical' : ''}" 
-           style="color: ${textColor}; 
+      <div style="color: ${textColor}; 
                   background-color: ${backgroundColor}; 
-                  box-shadow: 0px 0px 12px 7px ${backgroundColor};
+                  box-shadow: 0px 0px 12px 7px ${backgroundColor}
                   ">
         ${this._lastRenderedText}
       </div>
