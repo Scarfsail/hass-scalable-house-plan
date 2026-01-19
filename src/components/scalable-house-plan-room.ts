@@ -1,6 +1,7 @@
 import { LitElement, html, svg, css, TemplateResult } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
+import { actionHandler, type ActionHandlerEvent } from "../utils/action-handler";
 import type { Room, ScalableHousePlanConfig, EntityConfig, RoomEntityCache, HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getRoomEntities } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
@@ -462,7 +463,8 @@ export class ScalableHousePlanRoom extends LitElement {
                         stroke-width="2"
                         class="room-polygon overview motion-normal ${elementsClickable ? 'no-pointer-events' : ''}"
                         style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
-                        @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
+                        @action=${elementsClickable ? null : this._handleAction}
+                        .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
                     <!-- Inverted gradient polygon - fades in when normal fades out -->
                     <polygon 
@@ -472,7 +474,8 @@ export class ScalableHousePlanRoom extends LitElement {
                         stroke-width="2"
                         class="room-polygon overview motion-inverted ${elementsClickable ? 'no-pointer-events' : ''}"
                         style="cursor: ${elementsClickable ? 'default' : 'pointer'}; opacity: 0;"
-                        @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
+                        @action=${elementsClickable ? null : this._handleAction}
+                        .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
                 ` : svg`
                     <!-- Single polygon for non-motion states -->
@@ -483,7 +486,8 @@ export class ScalableHousePlanRoom extends LitElement {
                         stroke-width="2"
                         class="room-polygon overview ${elementsClickable ? 'no-pointer-events' : ''}"
                         style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
-                        @click=${elementsClickable ? null : (e: Event) => this._handleRoomClick(e)}
+                        @action=${elementsClickable ? null : this._handleAction}
+                        .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
                 `}
             </svg>
@@ -633,10 +637,52 @@ export class ScalableHousePlanRoom extends LitElement {
         `;
     }
 
-    private _handleRoomClick(event: Event) {
+    /**
+     * Handle action events (tap, hold) from actionHandler directive
+     */
+    private _handleAction(event: ActionHandlerEvent) {
         event.stopPropagation();
-        if (this.onClick) {
-            this.onClick(this.room);
+        
+        if (event.detail.action === 'tap') {
+            // Regular click - navigate to detail view
+            if (this.onClick) {
+                this.onClick(this.room);
+            }
+        } else if (event.detail.action === 'hold') {
+            // Long press - toggle lights
+            this._toggleRoomLights();
+        }
+    }
+
+    /**
+     * Toggle non-ambient lights in the room
+     */
+    private _toggleRoomLights() {
+        if (!this.hass || !this._cachedEntityIds) return;
+        
+        const lightEntityIds = this._cachedEntityIds.lights;
+        if (lightEntityIds.length === 0) return;
+        
+        // Check if any lights are on
+        const anyLightOn = lightEntityIds.some(entityId => {
+            const state = this.hass.states[entityId];
+            return state && state.state === 'on';
+        });
+        
+        // Determine action: if any light is on, turn all off; otherwise turn all on
+        const action = anyLightOn ? 'turn_off' : 'turn_on';
+        
+        // Call service for each light
+        lightEntityIds.forEach(entityId => {
+            const domain = entityId.split('.')[0];
+            this.hass.callService(domain, action, {
+                entity_id: entityId
+            });
+        });
+        
+        // Provide haptic feedback if available
+        if ('vibrate' in navigator) {
+            navigator.vibrate(50);
         }
     }
 
