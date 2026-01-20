@@ -83,8 +83,17 @@ class ActionHandlerController {
       
       if (options.hasHold) {
         this.held = false;
+        const target = ev.target as HTMLElement;
         this.timer = window.setTimeout(() => {
           this.held = true;
+          // Dispatch hold event immediately when timer expires
+          target.dispatchEvent(
+            new CustomEvent<ActionHandlerDetail>('action', {
+              bubbles: true,
+              composed: true,
+              detail: { action: 'hold' }
+            })
+          );
         }, HOLD_TIME);
       }
     };
@@ -107,17 +116,8 @@ class ActionHandlerController {
         this.timer = undefined;
       }
       
-      if (options.hasHold && this.held) {
-        // Dispatch hold event
-        target.dispatchEvent(
-          new CustomEvent<ActionHandlerDetail>('action', {
-            bubbles: true,
-            composed: true,
-            detail: { action: 'hold' }
-          })
-        );
-      } else {
-        // Dispatch tap event
+      // Only dispatch tap if hold wasn't triggered
+      if (!this.held) {
         target.dispatchEvent(
           new CustomEvent<ActionHandlerDetail>('action', {
             bubbles: true,
@@ -126,6 +126,9 @@ class ActionHandlerController {
           })
         );
       }
+      
+      // Reset held state for next interaction
+      this.held = false;
     };
 
     element.actionHandler.handleKeyDown = (ev: KeyboardEvent) => {
