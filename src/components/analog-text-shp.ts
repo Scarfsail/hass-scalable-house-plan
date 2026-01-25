@@ -1,7 +1,10 @@
-import { LitElement, html, css } from 'lit-element';
+import { LitElement, html, css, TemplateResult } from 'lit-element';
 import { customElement, property } from "lit/decorators.js";
+import { styleMap } from 'lit/directives/style-map.js';
 import type { HassEntity } from 'home-assistant-js-websocket';
 import { shortenNumberAndAddPrefixUnits, ShortenNumberPrefixType } from '../utils';
+import type { GaugeConfig, ResolvedGaugeConfig } from '../utils/gauge-presets';
+import { resolveGaugeConfig, getColorForValue, calculateBarWidth } from '../utils/gauge-presets';
 
 @customElement('analog-text-shp')
 class AnalogText extends LitElement {
@@ -11,6 +14,8 @@ class AnalogText extends LitElement {
   @property({ attribute: false }) public shorten_and_use_prefix?: ShortenNumberPrefixType;
 
   @property({ attribute: false }) public decimals?: number;
+
+  @property({ attribute: false }) public gauge?: boolean | GaugeConfig;
 
   static styles = css`
     /* Add component styles here */
@@ -22,6 +27,64 @@ class AnalogText extends LitElement {
         span {
             line-height: 1;
         }
+        
+        .gauge-container-bottom {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            width: 100%;
+        }
+        
+        .gauge-container-background {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .gauge-bar-background-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            border-radius: 2px;
+            z-index: 0;
+        }
+        
+        .text-content {
+            line-height: 1;
+        }
+        
+        .text-overlay {
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+            line-height: 1;
+        }
+        
+        .gauge-bar-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border-radius: 2px;
+        }
+        
+        .gauge-bar-background {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+        
+        .gauge-bar-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
   `;
 
   render() {
@@ -29,12 +92,83 @@ class AnalogText extends LitElement {
       return html`<div>No entity defined</div>`
 
     const value = parseFloat(this.entity.state);
-    const units = this.entity.attributes.unit_of_measurement as string;
+    const gaugeConfig = this.resolveGaugeSettings();
+
+    // No gauge configured - render text only (existing behavior)
+    if (!gaugeConfig) {
+      return this.renderText(value);
+    }
+
+    // Render with gauge
+    const textHtml = this.renderText(value);
+
+    if (gaugeConfig.position === 'background') {
+      return this.renderBackgroundGauge(textHtml, gaugeConfig);
+    }
+
+    const barHtml = this.renderGaugeBar(value, gaugeConfig);
+    return this.renderBottomGauge(textHtml, barHtml);
+  }
+
+  private renderText(value: number): TemplateResult {
+    const units = this.entity!.attributes.unit_of_measurement as string;
     const decimals = this.decimals ?? 1;
-    const valueAndUnits = this.shorten_and_use_prefix ? shortenNumberAndAddPrefixUnits(value, units, this.shorten_and_use_prefix) : { value: value, units: units };
+    const valueAndUnits = this.shorten_and_use_prefix 
+      ? shortenNumberAndAddPrefixUnits(value, units, this.shorten_and_use_prefix) 
+      : { value: value, units: units };
 
     return html`
-        <span>${valueAndUnits.value.toFixed(decimals)}<span style="font-size:50%">${valueAndUnits.units}</span></span>
-    `
+      <span>${valueAndUnits.value.toFixed(decimals)}<span style="font-size:50%">${valueAndUnits.units}</span></span>
+    `;
+  }
+
+  private resolveGaugeSettings(): ResolvedGaugeConfig | null {
+    if (!this.gauge || !this.entity) {
+      return null;
+    }
+    return resolveGaugeConfig(this.gauge, this.entity);
+  }
+
+  private renderGaugeBar(value: number, config: ResolvedGaugeConfig): TemplateResult {
+    const widthPercent = calculateBarWidth(value, config.min, config.max);
+    const color = getColorForValue(value, config.thresholds);
+
+    return html`
+      <div class="gauge-bar-container" style=${styleMap({ height: `${config.height}px` })}>
+        <div class="gauge-bar-background"></div>
+        <div class="gauge-bar-fill" style=${styleMap({
+          width: `${widthPercent}%`,
+          backgroundColor: color
+        })}></div>
+      </div>
+    `;
+  }
+
+  private renderBottomGauge(textHtml: TemplateResult, barHtml: TemplateResult): TemplateResult {
+    return html`
+      <div class="gauge-container-bottom">
+        <div class="text-content">${textHtml}</div>
+        ${barHtml}
+      </div>
+    `;
+  }
+
+  private renderBackgroundGauge(textHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+    const value = parseFloat(this.entity!.state);
+    const widthPercent = calculateBarWidth(value, gaugeConfig.min, gaugeConfig.max);
+    const color = getColorForValue(value, gaugeConfig.thresholds);
+
+    return html`
+      <div class="gauge-container-background">
+        <div class="gauge-bar-background-layer">
+          <div class="gauge-bar-background"></div>
+          <div class="gauge-bar-fill" style=${styleMap({
+            width: `${widthPercent}%`,
+            backgroundColor: color
+          })}></div>
+        </div>
+        <div class="text-overlay">${textHtml}</div>
+      </div>
+    `;
   }
 }

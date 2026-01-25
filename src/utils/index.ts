@@ -6,6 +6,7 @@ export * from './js-templates'
 export * from "./shortenNumberAndAddPrefixUnits"
 export * from "./handle-action"
 export * from "./element-mappings"
+export * from "./gauge-presets"
 export * from "./area-helpers"
 export * from "./entity-categories"
 export * from "./room-entity-helpers"
