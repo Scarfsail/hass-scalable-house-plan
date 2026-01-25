@@ -1,10 +1,10 @@
 import { html, css, nothing } from "lit"
 import { customElement } from "lit/decorators.js";
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { ElementBase, ElementBaseConfig } from "./base";
 import type { HassEntity } from "home-assistant-js-websocket";
 import type { InfoBoxTypeConfig } from "../cards/scalable-house-plan";
 import "../components/last-change-text-shp";
+import "../components/analog-text-shp";
 
 export interface InfoBoxElementConfig extends ElementBaseConfig {
     room_entities: string[];  // All entity IDs in the room
@@ -20,7 +20,6 @@ export interface InfoBoxElementConfig extends ElementBaseConfig {
 
 interface InfoBoxItem {
     icon: string;
-    value?: string;  // Optional: for temp/humidity, not used for motion/occupancy
     entity: HassEntity;
     type: string;
     size: string;  // Percentage scale (e.g., "100%", "200%")
@@ -169,7 +168,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                             <ha-icon icon="${item.icon}"></ha-icon>
                             ${isMotionOrOccupancy
                                 ? html`<last-change-text-shp .entity=${item.entity}></last-change-text-shp>`
-                                : html`<span class="value">${unsafeHTML(item.value || '')}</span>`
+                                : html`<analog-text-shp .entity=${item.entity} .gauge=${true}></analog-text-shp>`
                             }
                         </div>
                     `;
@@ -235,10 +234,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 if (config.show) {
                     const temp = parseFloat(entity.state);
                     if (!isNaN(temp)) {
-                        const unit = entity.attributes.unit_of_measurement || '°C';
                         items.push({
                             icon: 'mdi:thermometer',
-                            value: `${temp.toFixed(1)}<span style="font-size:50%">${unit}</span>`,
                             entity: entity,
                             type: 'temperature',
                             size: config.size,
@@ -254,10 +251,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 if (config.show) {
                     const humidity = parseFloat(entity.state);
                     if (!isNaN(humidity)) {
-                        const unit = entity.attributes.unit_of_measurement || '%';
                         items.push({
                             icon: 'mdi:water-percent',
-                            value: `${humidity.toFixed(0)}<span style="font-size:50%">${unit}</span>`,
                             entity: entity,
                             type: 'humidity',
                             size: config.size,

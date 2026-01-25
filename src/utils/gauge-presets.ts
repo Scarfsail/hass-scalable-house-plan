@@ -82,9 +82,9 @@ export const GAUGE_PRESETS: Record<string, GaugePreset> = {
     max: 27,
     thresholds: [
       { value: 18, color: '#2196F3' },  // Blue (cold)
-      { value: 19, color: '#4CAF50' },  // Green (comfortable)
-      { value: 23, color: '#FF9800' },  // Orange (warm)
-      { value: 25, color: '#F44336' },  // Red (hot)
+      { value: 22, color: '#4CAF50' },  // Green (comfortable)
+      { value: 24, color: '#FF9800' },  // Orange (warm)
+      { value: 26, color: '#F44336' },  // Red (hot)
     ],
   },
   temperature_outdoor: {
@@ -93,8 +93,8 @@ export const GAUGE_PRESETS: Record<string, GaugePreset> = {
     thresholds: [
       { value: -20, color: '#2196F3' }, // Blue (freezing)
       { value: 0, color: '#00BCD4' },   // Cyan (cold)
-      { value: 10, color: '#4CAF50' },  // Green (comfortable)
-      { value: 25, color: '#FF9800' },  // Orange (warm)
+      { value: 15, color: '#4CAF50' },  // Green (comfortable)
+      { value: 26, color: '#FF9800' },  // Orange (warm)
       { value: 35, color: '#F44336' },  // Red (hot)
     ],
   },
