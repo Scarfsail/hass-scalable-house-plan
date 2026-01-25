@@ -81,6 +81,16 @@ class ActionHandlerController {
     element.actionHandler.start = (ev: Event) => {
       this.cancelled = false;
       
+      // Cancel hold action if multi-touch gesture detected (e.g., pinch-to-zoom)
+      if (ev instanceof TouchEvent && ev.touches.length > 1) {
+        this.cancelled = true;
+        if (this.timer) {
+          clearTimeout(this.timer);
+          this.timer = undefined;
+        }
+        return;
+      }
+      
       if (options.hasHold) {
         this.held = false;
         const target = ev.target as HTMLElement;
