@@ -1,12 +1,15 @@
-import { html } from "lit"
+import { html, nothing } from "lit"
 import { customElement } from "lit/decorators.js";
 import "../components/last-change-text-shp";
-import { ElementEntityArmableBase } from "./base";
+import { ElementEntityArmableBase, ElementEntityBaseConfig } from "./base";
 import { HassEntity } from "home-assistant-js-websocket";
 
+interface MotionSensorElementConfig extends ElementEntityBaseConfig {
+    hide_icon?: boolean;  // Default: false - whether to hide the icon
+}
 
 @customElement("motion-sensor-shp")
-export class MotionSensorElement extends ElementEntityArmableBase {
+export class MotionSensorElement extends ElementEntityArmableBase<MotionSensorElementConfig> {
     protected override renderEntityContent(entity: HassEntity) {
 
         //const opened = entity.state == "on";
@@ -17,7 +20,7 @@ export class MotionSensorElement extends ElementEntityArmableBase {
 
 
         return html`
-            <ha-icon style="color:${color}" icon="mdi:motion-sensor"></ha-icon>
+            ${this._config?.hide_icon ? nothing : html`<ha-icon style="color:${color}" icon="mdi:motion-sensor"></ha-icon>`}
             <last-change-text-shp .entity=${entity}></last-change-text-shp>
         `
     }

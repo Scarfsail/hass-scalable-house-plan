@@ -3,6 +3,7 @@ import { keyed } from "lit/directives/keyed.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds } from "../utils";
+import { getOrCreateElementCard } from "../utils/card-element-cache";
 
 /**
  * Shared element rendering functionality for overview and detail views
@@ -383,42 +384,6 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
     });
     
     return renderedElements;
-}
-
-/**
- * Get or create a card element for an entity or no-entity element
- * @param uniqueKey - Unique identifier (entity ID for entities, generated key for no-entity elements)
- * @param entityId - Entity ID (can be empty string for no-entity elements)
- * @param elementConfig - Element configuration
- * @param createCardElement - Function to create card elements
- * @param elementCards - Cache map for card elements
- */
-function getOrCreateElementCard(
-    uniqueKey: string,
-    entityId: string, 
-    elementConfig: any, 
-    createCardElement: CreateCardElement | null,
-    elementCards: Map<string, any>
-) {
-    let card = elementCards.get(uniqueKey);
-    
-    if (!card && createCardElement) {
-        const cardConfig = {
-            ...elementConfig,
-            entity: entityId || undefined,  // Don't pass empty string to card config
-        };
-        
-        try {
-            card = createCardElement(cardConfig);
-            if (card) {
-                elementCards.set(uniqueKey, card);
-            }
-        } catch (e) {
-            console.error('Error creating element card:', e);
-        }
-    }
-    
-    return card;
 }
 
 /**

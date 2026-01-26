@@ -3,8 +3,8 @@ import { customElement } from "lit/decorators.js";
 import { ElementBase, ElementBaseConfig } from "./base";
 import type { HassEntity } from "home-assistant-js-websocket";
 import type { InfoBoxTypeConfig } from "../cards/scalable-house-plan";
-import "../components/last-change-text-shp";
-import "../components/analog-text-shp";
+import { getCreateCardElement, CreateCardElement } from "../utils/getCreateCardElement";
+import { getOrCreateElementCard } from "../utils/card-element-cache";
 
 export interface InfoBoxElementConfig extends ElementBaseConfig {
     room_entities: string[];  // All entity IDs in the room
@@ -32,6 +32,7 @@ interface TypeConfigCache {
     size: string;
     scale: number;  // Pre-parsed scale value
     icon_position: 'inline' | 'separate';
+    element?: Record<string, any>;  // Parameters to spread to child component
 }
 
 // Type order for sorting - defined once as static constant
@@ -42,6 +43,10 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
     // Cached type configurations (computed once in setConfig)
     private _typeConfigs!: Record<string, TypeConfigCache>;
     private _containerClass!: string;
+    // Cache for created card elements (key: entityId, value: card instance)
+    private _elementCache = new Map<string, any>();
+    // Home Assistant card creator function
+    private _createCardElement: CreateCardElement | null = null;
 
     static override styles = css`
         :host {
@@ -105,6 +110,14 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
     async setConfig(config: InfoBoxElementConfig) {
         await super.setConfig(config);
         
+        // Clear element cache on config change
+        this._elementCache.clear();
+        
+        // Initialize card creator
+        if (!this._createCardElement) {
+            this._createCardElement = await getCreateCardElement();
+        }
+        
         // Pre-compute container class
         const mode = config.mode || 'detail';
         const showBackground = config.show_background ?? true;
@@ -133,7 +146,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 show,
                 size,
                 scale: parseFloat(size) / 100,
-                icon_position: typeConfig?.icon_position ?? 'inline'
+                icon_position: typeConfig?.icon_position ?? 'inline',
+                element: typeConfig?.element
             };
         }
     }
@@ -159,6 +173,10 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                     const transformStyle = typeConfig.scale !== 1 
                         ? `transform: scale(${typeConfig.scale}); transform-origin: ${isSeparate ? 'center center' : 'left center'};`
                         : '';
+                    
+                    // Get element properties for this type
+                    const elementProps = typeConfig.element || {};
+                    
                     return html`
                         <div 
                             class="${itemClass}" 
@@ -166,10 +184,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                             @click=${() => this._showMoreInfo(item.entity.entity_id)}
                         >
                             <ha-icon icon="${item.icon}"></ha-icon>
-                            ${isMotionOrOccupancy
-                                ? html`<last-change-text-shp .entity=${item.entity}></last-change-text-shp>`
-                                : html`<analog-text-shp .entity=${item.entity} .gauge=${true}></analog-text-shp>`
-                            }
+                            ${this._renderCardElement(item.entity, typeConfig.element || {}, isMotionOrOccupancy)}
                         </div>
                     `;
                 })}
@@ -184,6 +199,51 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             composed: true,
         });
         this.dispatchEvent(event);
+    }
+
+    /**
+     * Render card element using standard card creation
+     * @param entity - The entity to display
+     * @param elementProps - Additional properties from config
+     * @param isMotionOrOccupancy - Whether this is a motion/occupancy sensor
+     * @returns Card element with hass set
+     */
+    private _renderCardElement(entity: HassEntity, elementProps: Record<string, any>, isMotionOrOccupancy: boolean) {
+        const entityId = entity.entity_id;
+        
+        // Determine card type and merge properties
+        let cardConfig: any;
+        if (isMotionOrOccupancy) {
+            // Use motion-sensor-shp with hide_icon: true
+            cardConfig = {
+                type: 'custom:motion-sensor-shp',
+                hide_icon: true,
+                ...elementProps
+            };
+        } else {
+            // Use analog-shp with gauge: true by default
+            cardConfig = {
+                type: 'custom:analog-shp',
+                gauge: true,
+                ...elementProps
+            };
+        }
+        
+        // Get or create card using shared utility
+        const card = getOrCreateElementCard(
+            entityId,
+            entityId,
+            cardConfig,
+            this._createCardElement,
+            this._elementCache
+        );
+        
+        // Update hass on card
+        if (card && this.hass) {
+            card.hass = this.hass;
+        }
+        
+        return card;
     }
 
     private _collectInfoBoxItems(): InfoBoxItem[] {
