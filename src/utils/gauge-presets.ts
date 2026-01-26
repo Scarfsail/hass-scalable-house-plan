@@ -218,9 +218,20 @@ export function resolveGaugeConfig(
     // Handle object configuration
     userConfig = gauge;
 
-    // Use preset if specified
-    if (userConfig.preset && GAUGE_PRESETS[userConfig.preset]) {
-      baseConfig = GAUGE_PRESETS[userConfig.preset];
+    // Determine which preset to use as base
+    let presetName: string | undefined;
+    
+    if (userConfig.preset) {
+      // User explicitly specified a preset
+      presetName = userConfig.preset;
+    } else {
+      // Auto-detect preset from entity when user doesn't specify one
+      presetName = getPresetFromEntity(entity);
+    }
+    
+    // Load the preset if available
+    if (presetName && GAUGE_PRESETS[presetName]) {
+      baseConfig = GAUGE_PRESETS[presetName];
     }
   }
 
