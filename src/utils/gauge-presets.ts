@@ -21,7 +21,7 @@ export interface GaugePreset {
  * User-facing gauge configuration with optional preset and overrides.
  */
 export interface GaugeConfig {
-  preset?: 'battery' | 'humidity' | 'temperature_indoor' | 'temperature_outdoor';
+  preset?: 'battery' | 'humidity' | 'temperature_indoor' | 'temperature_outdoor' | 'temperature_pool';
   min?: number;
   max?: number;
   thresholds?: GaugeThreshold[];
@@ -85,6 +85,16 @@ export const GAUGE_PRESETS: Record<string, GaugePreset> = {
       { value: 22, color: '#4CAF50' },  // Green (comfortable)
       { value: 24, color: '#FF9800' },  // Orange (warm)
       { value: 26, color: '#F44336' },  // Red (hot)
+    ],
+  },
+  temperature_pool: {
+    min: 25,
+    max: 35,
+    thresholds: [
+      { value: 25, color: '#2196F3' },  // Blue (cold)
+      { value: 28, color: '#4CAF50' },  // Green (comfortable)
+      { value: 31, color: '#FF9800' },  // Orange (warm)
+      { value: 33, color: '#F44336' },  // Red (hot)
     ],
   },
   temperature_outdoor: {
