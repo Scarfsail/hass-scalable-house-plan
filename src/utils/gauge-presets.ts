@@ -27,6 +27,7 @@ export interface GaugeConfig {
   thresholds?: GaugeThreshold[];
   height?: number;
   position?: 'bottom' | 'background';
+  color?: string; // Scriptable color that overrides threshold-based colors
 }
 
 /**
@@ -38,6 +39,7 @@ export interface ResolvedGaugeConfig {
   thresholds: GaugeThreshold[];
   height: number;
   position: 'bottom' | 'background';
+  color?: string; // Scriptable color that overrides threshold-based colors
 }
 
 /**
@@ -257,6 +259,7 @@ export function resolveGaugeConfig(
     thresholds: userConfig.thresholds ?? baseConfig?.thresholds ?? [],
     height: userConfig.height ?? DEFAULT_GAUGE_HEIGHT,
     position: userConfig.position ?? DEFAULT_GAUGE_POSITION,
+    color: userConfig.color, // Pass through the scriptable color
   };
 
   // Validate that we have valid thresholds

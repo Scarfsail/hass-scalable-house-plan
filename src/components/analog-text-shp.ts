@@ -2,12 +2,15 @@ import { LitElement, html, css, TemplateResult } from 'lit-element';
 import { customElement, property } from "lit/decorators.js";
 import { styleMap } from 'lit/directives/style-map.js';
 import type { HassEntity } from 'home-assistant-js-websocket';
-import { shortenNumberAndAddPrefixUnits, ShortenNumberPrefixType } from '../utils';
+import { shortenNumberAndAddPrefixUnits, ShortenNumberPrefixType, evalJsTemplate } from '../utils';
 import type { GaugeConfig, ResolvedGaugeConfig } from '../utils/gauge-presets';
 import { resolveGaugeConfig, getColorForValue, calculateBarWidth } from '../utils/gauge-presets';
+import type { HomeAssistant } from '../../hass-frontend/src/types';
 
 @customElement('analog-text-shp')
 class AnalogText extends LitElement {
+
+  @property({ attribute: false }) public hass?: HomeAssistant;
 
   @property({ attribute: false }) public entity?: HassEntity;
 
@@ -131,7 +134,7 @@ class AnalogText extends LitElement {
 
   private renderGaugeBar(value: number, config: ResolvedGaugeConfig): TemplateResult {
     const widthPercent = calculateBarWidth(value, config.min, config.max);
-    const color = getColorForValue(value, config.thresholds);
+    const color = this.getGaugeColor(value, config);
 
     return html`
       <div class="gauge-bar-container" style=${styleMap({ height: `${config.height}px` })}>
@@ -156,7 +159,7 @@ class AnalogText extends LitElement {
   private renderBackgroundGauge(textHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
     const value = parseFloat(this.entity!.state);
     const widthPercent = calculateBarWidth(value, gaugeConfig.min, gaugeConfig.max);
-    const color = getColorForValue(value, gaugeConfig.thresholds);
+    const color = this.getGaugeColor(value, gaugeConfig);
 
     return html`
       <div class="gauge-container-background">
@@ -170,5 +173,20 @@ class AnalogText extends LitElement {
         <div class="text-overlay">${textHtml}</div>
       </div>
     `;
+  }
+  /**
+   * Get the gauge color, checking for scriptable color first, then falling back to thresholds
+   */
+  private getGaugeColor(value: number, config: ResolvedGaugeConfig): string {
+    // If a custom color is defined, use it (supports JS templates)
+    if (config.color && this.hass && this.entity) {
+      const evaluatedColor = evalJsTemplate(this, this.hass, this.entity, config.color);
+      if (evaluatedColor) {
+        return evaluatedColor;
+      }
+    }
+
+    // Fall back to threshold-based color
+    return getColorForValue(value, config.thresholds);
   }
 }

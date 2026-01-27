@@ -85,7 +85,7 @@ class AnalogBar extends ElementEntityBase<AnalogBarConfig> {
 
         ${fontSize > 0 ?
         html`<div style=${styleMap({ position: "absolute", left: `4px`, width: `${p.width - 4}px`, ...getValueVerticalPosition(valueHeight) })}>
-            <analog-text-shp .entity=${entity} .shorten_and_use_prefix=${this._config?.shorten_and_use_prefix} .decimals=${this._config?.decimals}></analog-text-shp>
+            <analog-text-shp .hass=${this.hass} .entity=${entity} .shorten_and_use_prefix=${this._config?.shorten_and_use_prefix} .decimals=${this._config?.decimals}></analog-text-shp>
         </div>`: null}
     </div>
     `;
