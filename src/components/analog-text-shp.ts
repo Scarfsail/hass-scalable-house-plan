@@ -18,6 +18,8 @@ class AnalogText extends LitElement {
 
   @property({ attribute: false }) public decimals?: number;
 
+  @property({ attribute: false }) public negate?: boolean;
+
   @property({ attribute: false }) public gauge?: boolean | GaugeConfig;
 
   static styles = css`
@@ -155,7 +157,10 @@ class AnalogText extends LitElement {
     if (!this.entity)
       return html`<div>No entity defined</div>`
 
-    const value = parseFloat(this.entity.state);
+    let value = parseFloat(this.entity.state);
+    if (this.negate) {
+      value = -value;
+    }
     const gaugeConfig = this.resolveGaugeSettings();
 
     // No gauge configured - render text only (existing behavior)
