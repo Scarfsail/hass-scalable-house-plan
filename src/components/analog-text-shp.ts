@@ -61,20 +61,12 @@ class AnalogText extends LitElement {
             width: 100%;
         }
         
-        .gauge-container-left.has-width {
-            width: var(--gauge-width);
-        }
-        
         .gauge-container-right {
             display: flex;
             flex-direction: row-reverse;
             gap: var(--gauge-gap, 4px);
             align-items: center;
             width: 100%;
-        }
-        
-        .gauge-container-right.has-width {
-            width: var(--gauge-width);
         }
         
         .gauge-container-background {
@@ -178,7 +170,12 @@ class AnalogText extends LitElement {
       return this.renderBackgroundGauge(textHtml, gaugeConfig);
     }
 
-    const barHtml = this.renderGaugeBar(value, gaugeConfig);
+    // For left/right positions, width controls the gauge bar width
+    // For other positions, width controls the container width
+    const barWidth = (gaugeConfig.position === 'left' || gaugeConfig.position === 'right') 
+      ? gaugeConfig.width 
+      : undefined;
+    const barHtml = this.renderGaugeBar(value, gaugeConfig, barWidth);
 
     switch (gaugeConfig.position) {
       case 'top':
@@ -212,12 +209,17 @@ class AnalogText extends LitElement {
     return resolveGaugeConfig(this.gauge, this.entity);
   }
 
-  private renderGaugeBar(value: number, config: ResolvedGaugeConfig): TemplateResult {
+  private renderGaugeBar(value: number, config: ResolvedGaugeConfig, barWidth?: string | number): TemplateResult {
     const widthPercent = calculateBarWidth(value, config.min, config.max);
     const color = this.getGaugeColor(value, config);
 
+    const containerStyles: any = { height: `${config.height}px` };
+    if (barWidth !== undefined) {
+      containerStyles.width = typeof barWidth === 'number' ? `${barWidth}px` : barWidth;
+    }
+
     return html`
-      <div class="gauge-bar-container" style=${styleMap({ height: `${config.height}px` })}>
+      <div class="gauge-bar-container" style=${styleMap(containerStyles)}>
         <div class="gauge-bar-background"></div>
         <div class="gauge-bar-fill" style=${styleMap({
           width: `${widthPercent}%`,
@@ -262,35 +264,23 @@ class AnalogText extends LitElement {
   }
 
   private renderLeftGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
-    const hasWidth = gaugeConfig.width !== undefined;
-    const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
-    const containerClass = hasWidth ? 'gauge-container-left has-width' : 'gauge-container-left';
-    const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
-    const containerStyle = hasWidth 
-      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any) 
-      : styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
+    const containerStyle = styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
 
     return html`
-      <div class="${containerClass}" style=${containerStyle}>
+      <div class="gauge-container-left" style=${containerStyle}>
         ${barHtml}
-        <div class="text-content ${textAlignClass}">${textHtml}</div>
+        <div class="text-content">${textHtml}</div>
       </div>
     `;
   }
 
   private renderRightGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
-    const hasWidth = gaugeConfig.width !== undefined;
-    const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
-    const containerClass = hasWidth ? 'gauge-container-right has-width' : 'gauge-container-right';
-    const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
-    const containerStyle = hasWidth 
-      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any) 
-      : styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
+    const containerStyle = styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
 
     return html`
-      <div class="${containerClass}" style=${containerStyle}>
+      <div class="gauge-container-right" style=${containerStyle}>
         ${barHtml}
-        <div class="text-content ${textAlignClass}">${textHtml}</div>
+        <div class="text-content">${textHtml}</div>
       </div>
     `;
   }
