@@ -34,11 +34,46 @@ class AnalogText extends LitElement {
         .gauge-container-bottom {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: var(--gauge-gap, 4px);
             width: 100%;
         }
         
         .gauge-container-bottom.has-width {
+            width: var(--gauge-width);
+        }
+        
+        .gauge-container-top {
+            display: flex;
+            flex-direction: column-reverse;
+            gap: var(--gauge-gap, 4px);
+            width: 100%;
+        }
+        
+        .gauge-container-top.has-width {
+            width: var(--gauge-width);
+        }
+        
+        .gauge-container-left {
+            display: flex;
+            flex-direction: row;
+            gap: var(--gauge-gap, 4px);
+            align-items: center;
+            width: 100%;
+        }
+        
+        .gauge-container-left.has-width {
+            width: var(--gauge-width);
+        }
+        
+        .gauge-container-right {
+            display: flex;
+            flex-direction: row-reverse;
+            gap: var(--gauge-gap, 4px);
+            align-items: center;
+            width: 100%;
+        }
+        
+        .gauge-container-right.has-width {
             width: var(--gauge-width);
         }
         
@@ -144,7 +179,18 @@ class AnalogText extends LitElement {
     }
 
     const barHtml = this.renderGaugeBar(value, gaugeConfig);
-    return this.renderBottomGauge(textHtml, barHtml);
+
+    switch (gaugeConfig.position) {
+      case 'top':
+        return this.renderTopGauge(textHtml, barHtml, gaugeConfig);
+      case 'left':
+        return this.renderLeftGauge(textHtml, barHtml, gaugeConfig);
+      case 'right':
+        return this.renderRightGauge(textHtml, barHtml, gaugeConfig);
+      case 'bottom':
+      default:
+        return this.renderBottomGauge(textHtml, barHtml, gaugeConfig);
+    }
   }
 
   private renderText(value: number): TemplateResult {
@@ -181,18 +227,70 @@ class AnalogText extends LitElement {
     `;
   }
 
-  private renderBottomGauge(textHtml: TemplateResult, barHtml: TemplateResult): TemplateResult {
-    const gaugeConfig = this.resolveGaugeSettings();
-    const hasWidth = gaugeConfig?.width !== undefined;
-    const textAlignClass = hasWidth ? `align-${gaugeConfig!.text_position}` : '';
+  private renderBottomGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+    const hasWidth = gaugeConfig.width !== undefined;
+    const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
     const containerClass = hasWidth ? 'gauge-container-bottom has-width' : 'gauge-container-bottom';
-    const widthValue = hasWidth ? (typeof gaugeConfig!.width === 'number' ? `${gaugeConfig!.width}px` : gaugeConfig!.width) : undefined;
-    const containerStyle = hasWidth ? styleMap({ '--gauge-width': widthValue } as any) : styleMap({});
+    const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
+    const containerStyle = hasWidth 
+      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any) 
+      : styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
 
     return html`
       <div class="${containerClass}" style=${containerStyle}>
         <div class="text-content ${textAlignClass}">${textHtml}</div>
         ${barHtml}
+      </div>
+    `;
+  }
+
+  private renderTopGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+    const hasWidth = gaugeConfig.width !== undefined;
+    const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
+    const containerClass = hasWidth ? 'gauge-container-top has-width' : 'gauge-container-top';
+    const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
+    const containerStyle = hasWidth 
+      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any) 
+      : styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
+
+    return html`
+      <div class="${containerClass}" style=${containerStyle}>
+        <div class="text-content ${textAlignClass}">${textHtml}</div>
+        ${barHtml}
+      </div>
+    `;
+  }
+
+  private renderLeftGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+    const hasWidth = gaugeConfig.width !== undefined;
+    const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
+    const containerClass = hasWidth ? 'gauge-container-left has-width' : 'gauge-container-left';
+    const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
+    const containerStyle = hasWidth 
+      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any) 
+      : styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
+
+    return html`
+      <div class="${containerClass}" style=${containerStyle}>
+        ${barHtml}
+        <div class="text-content ${textAlignClass}">${textHtml}</div>
+      </div>
+    `;
+  }
+
+  private renderRightGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+    const hasWidth = gaugeConfig.width !== undefined;
+    const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
+    const containerClass = hasWidth ? 'gauge-container-right has-width' : 'gauge-container-right';
+    const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
+    const containerStyle = hasWidth 
+      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any) 
+      : styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
+
+    return html`
+      <div class="${containerClass}" style=${containerStyle}>
+        ${barHtml}
+        <div class="text-content ${textAlignClass}">${textHtml}</div>
       </div>
     `;
   }

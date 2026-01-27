@@ -26,7 +26,8 @@ export interface GaugeConfig {
   max?: number;
   thresholds?: GaugeThreshold[];
   height?: number;
-  position?: 'bottom' | 'background';
+  position?: 'left' | 'right' | 'top' | 'bottom' | 'background';
+  gap?: number; // Gap between text and gauge in pixels (default: 4)
   color?: string; // Scriptable color that overrides threshold-based colors
   width?: string | number; // Fixed width for the gauge container (e.g., '100px', '100%', 100)
   text_position?: 'start' | 'center' | 'end'; // Text alignment within the width-constrained container
@@ -40,7 +41,8 @@ export interface ResolvedGaugeConfig {
   max: number;
   thresholds: GaugeThreshold[];
   height: number;
-  position: 'bottom' | 'background';
+  position: 'left' | 'right' | 'top' | 'bottom' | 'background';
+  gap: number; // Gap between text and gauge in pixels
   color?: string; // Scriptable color that overrides threshold-based colors
   width?: string | number; // Fixed width for the gauge container (e.g., '100px', '100%', 100)
   text_position: 'start' | 'center' | 'end'; // Text alignment within the width-constrained container
@@ -55,6 +57,11 @@ const DEFAULT_GAUGE_HEIGHT = 4;
  * Default gauge bar position.
  */
 const DEFAULT_GAUGE_POSITION = 'bottom';
+
+/**
+ * Default gap between text and gauge in pixels.
+ */
+const DEFAULT_GAUGE_GAP = 4;
 
 /**
  * Default fallback color when no thresholds are defined.
@@ -268,6 +275,7 @@ export function resolveGaugeConfig(
     thresholds: userConfig.thresholds ?? baseConfig?.thresholds ?? [],
     height: userConfig.height ?? DEFAULT_GAUGE_HEIGHT,
     position: userConfig.position ?? DEFAULT_GAUGE_POSITION,
+    gap: userConfig.gap ?? DEFAULT_GAUGE_GAP,
     color: userConfig.color, // Pass through the scriptable color
     width: userConfig.width, // Pass through width as-is
     text_position: userConfig.text_position ?? 'end', // Default to 'end' (right-aligned)
