@@ -246,7 +246,7 @@ export function resolveGaugeConfig(
   }
 
   // No base config and no manual min/max/thresholds = invalid
-  if (!baseConfig && (!userConfig.min || !userConfig.max || !userConfig.thresholds)) {
+  if (!baseConfig && (userConfig.min === undefined || userConfig.max === undefined || !userConfig.thresholds)) {
     return null;
   }
 
