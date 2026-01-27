@@ -251,8 +251,13 @@ export function resolveGaugeConfig(
     }
   }
 
-  // No base config and no manual min/max/thresholds = invalid
-  if (!baseConfig && (userConfig.min === undefined || userConfig.max === undefined || !userConfig.thresholds)) {
+  // No base config and no manual min/max = invalid (unless color is defined, then thresholds are optional)
+  if (!baseConfig && (userConfig.min === undefined || userConfig.max === undefined)) {
+    return null;
+  }
+
+  // If no thresholds and no color, we need a base config for thresholds
+  if (!baseConfig && !userConfig.thresholds && !userConfig.color) {
     return null;
   }
 
@@ -268,8 +273,8 @@ export function resolveGaugeConfig(
     text_position: userConfig.text_position ?? 'end', // Default to 'end' (right-aligned)
   };
 
-  // Validate that we have valid thresholds
-  if (!resolved.thresholds || resolved.thresholds.length === 0) {
+  // Validate that we have valid thresholds OR a custom color
+  if ((!resolved.thresholds || resolved.thresholds.length === 0) && !resolved.color) {
     return null;
   }
 
