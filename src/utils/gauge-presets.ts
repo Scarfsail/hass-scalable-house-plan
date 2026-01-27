@@ -28,6 +28,8 @@ export interface GaugeConfig {
   height?: number;
   position?: 'bottom' | 'background';
   color?: string; // Scriptable color that overrides threshold-based colors
+  width?: string | number; // Fixed width for the gauge container (e.g., '100px', '100%', 100)
+  text_position?: 'start' | 'center' | 'end'; // Text alignment within the width-constrained container
 }
 
 /**
@@ -40,6 +42,8 @@ export interface ResolvedGaugeConfig {
   height: number;
   position: 'bottom' | 'background';
   color?: string; // Scriptable color that overrides threshold-based colors
+  width?: string | number; // Fixed width for the gauge container (e.g., '100px', '100%', 100)
+  text_position: 'start' | 'center' | 'end'; // Text alignment within the width-constrained container
 }
 
 /**
@@ -260,6 +264,8 @@ export function resolveGaugeConfig(
     height: userConfig.height ?? DEFAULT_GAUGE_HEIGHT,
     position: userConfig.position ?? DEFAULT_GAUGE_POSITION,
     color: userConfig.color, // Pass through the scriptable color
+    width: userConfig.width, // Pass through width as-is
+    text_position: userConfig.text_position ?? 'end', // Default to 'end' (right-aligned)
   };
 
   // Validate that we have valid thresholds

@@ -38,9 +38,18 @@ class AnalogText extends LitElement {
             width: 100%;
         }
         
+        .gauge-container-bottom.has-width {
+            width: var(--gauge-width);
+        }
+        
         .gauge-container-background {
             position: relative;
             display: inline-block;
+        }
+        
+        .gauge-container-background.has-width {
+            display: block;
+            width: var(--gauge-width);
         }
         
         .gauge-bar-background-layer {
@@ -58,11 +67,35 @@ class AnalogText extends LitElement {
             line-height: 1;
         }
         
+        .text-content.align-start {
+            text-align: start;
+        }
+        
+        .text-content.align-center {
+            text-align: center;
+        }
+        
+        .text-content.align-end {
+            text-align: end;
+        }
+        
         .text-overlay {
             position: relative;
             z-index: 1;
             text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
             line-height: 1;
+        }
+        
+        .text-overlay.align-start {
+            text-align: start;
+        }
+        
+        .text-overlay.align-center {
+            text-align: center;
+        }
+        
+        .text-overlay.align-end {
+            text-align: end;
         }
         
         .gauge-bar-container {
@@ -148,9 +181,16 @@ class AnalogText extends LitElement {
   }
 
   private renderBottomGauge(textHtml: TemplateResult, barHtml: TemplateResult): TemplateResult {
+    const gaugeConfig = this.resolveGaugeSettings();
+    const hasWidth = gaugeConfig?.width !== undefined;
+    const textAlignClass = hasWidth ? `align-${gaugeConfig!.text_position}` : '';
+    const containerClass = hasWidth ? 'gauge-container-bottom has-width' : 'gauge-container-bottom';
+    const widthValue = hasWidth ? (typeof gaugeConfig!.width === 'number' ? `${gaugeConfig!.width}px` : gaugeConfig!.width) : undefined;
+    const containerStyle = hasWidth ? styleMap({ '--gauge-width': widthValue } as any) : styleMap({});
+
     return html`
-      <div class="gauge-container-bottom">
-        <div class="text-content">${textHtml}</div>
+      <div class="${containerClass}" style=${containerStyle}>
+        <div class="text-content ${textAlignClass}">${textHtml}</div>
         ${barHtml}
       </div>
     `;
@@ -161,8 +201,14 @@ class AnalogText extends LitElement {
     const widthPercent = calculateBarWidth(value, gaugeConfig.min, gaugeConfig.max);
     const color = this.getGaugeColor(value, gaugeConfig);
 
+    const hasWidth = gaugeConfig.width !== undefined;
+    const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
+    const containerClass = hasWidth ? 'gauge-container-background has-width' : 'gauge-container-background';
+    const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
+    const containerStyle = hasWidth ? styleMap({ '--gauge-width': widthValue } as any) : styleMap({});
+
     return html`
-      <div class="gauge-container-background">
+      <div class="${containerClass}" style=${containerStyle}>
         <div class="gauge-bar-background-layer">
           <div class="gauge-bar-background"></div>
           <div class="gauge-bar-fill" style=${styleMap({
@@ -170,7 +216,7 @@ class AnalogText extends LitElement {
             backgroundColor: color
           })}></div>
         </div>
-        <div class="text-overlay">${textHtml}</div>
+        <div class="text-overlay ${textAlignClass}">${textHtml}</div>
       </div>
     `;
   }
