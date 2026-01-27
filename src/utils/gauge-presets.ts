@@ -264,7 +264,7 @@ export function resolveGaugeConfig(
   }
 
   // If no thresholds and no color, we need a base config for thresholds
-  if (!baseConfig && !userConfig.thresholds && !userConfig.color) {
+  if (!baseConfig && !userConfig.thresholds && userConfig.color === undefined) {
     return null;
   }
 
@@ -282,7 +282,7 @@ export function resolveGaugeConfig(
   };
 
   // Validate that we have valid thresholds OR a custom color
-  if ((!resolved.thresholds || resolved.thresholds.length === 0) && !resolved.color) {
+  if ((!resolved.thresholds || resolved.thresholds.length === 0) && resolved.color === undefined) {
     return null;
   }
 
