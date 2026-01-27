@@ -112,6 +112,7 @@ class AnalogText extends LitElement {
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.2);
+            box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.25);
         }
         
         .gauge-bar-fill {
