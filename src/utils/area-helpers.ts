@@ -1,5 +1,5 @@
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room } from "../cards/scalable-house-plan";
+import type { Room } from "../cards/types";
 
 /**
  * Get display name for an area by its area_id

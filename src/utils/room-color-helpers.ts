@@ -1,5 +1,6 @@
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, ScalableHousePlanConfig, EntityConfig } from "../cards/scalable-house-plan";
+import type { Room, EntityConfig } from "../cards/types";
+import type { ScalableHousePlanConfig } from "../cards/scalable-house-plan";
 
 /**
  * Result of dynamic color calculation

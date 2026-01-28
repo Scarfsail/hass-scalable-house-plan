@@ -4,3 +4,4 @@ export * from "./editor-rooms-shp";
 export * from "./editor-room-shp";
 export * from "./editor-elements-shp";
 export * from "./editor-element-shp";
+export * from "./editor-plan-section-shp";

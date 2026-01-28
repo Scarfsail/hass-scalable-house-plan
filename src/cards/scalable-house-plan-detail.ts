@@ -1,7 +1,8 @@
 import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, ScalableHousePlanConfig, RoomEntityCache, HouseCache } from "./scalable-house-plan";
+import type { Room, RoomEntityCache } from "./types";
+import type { ScalableHousePlanConfig, HouseCache } from "./scalable-house-plan";
 import { CreateCardElement, getCreateCardElement, getRoomName, getRoomIcon, getAreaEntities, getEntitiesNotOnDetailCount, applyScaleLimits, hasViewportChanged } from "../utils";
 import { getRoomBounds } from "../components/element-renderer-shp";
 import "../components/scalable-house-plan-room";

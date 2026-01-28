@@ -1,8 +1,8 @@
 import { LitElement, html, css, PropertyValues } from "lit-element";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
-import type { EntityConfig } from "../scalable-house-plan";
+import type { EntityConfig, PlanConfig, ElementConfig } from "../types";
 import { getAreaEntities } from "../../utils";
 import { getLocalizeFunction, type LocalizeFunction } from "../../localize";
 
@@ -14,6 +14,10 @@ export class EditorElementShp extends LitElement {
     @property({ type: Boolean }) isExpanded: boolean = false;
     @property({ type: String }) areaId?: string; // Optional area ID for filtering entities
     @property({ type: Boolean }) filterByArea?: boolean; // Toggle for area filtering (undefined = not initialized)
+    
+    @state() private _planSectionConfig?: Omit<PlanConfig, 'element'>;
+    @state() private _elementSectionConfig?: ElementConfig;
+    
     private _localize?: LocalizeFunction;
 
     // Track if this is a no-entity element
@@ -116,8 +120,51 @@ export class EditorElementShp extends LitElement {
         `
     ];
 
+    /**
+     * Split a full PlanConfig into separate plan and element sections
+     * This enables editing them independently in different UI sections
+     */
+    private _splitPlanConfig(fullPlan: PlanConfig): { 
+        planSection: Omit<PlanConfig, 'element'>, 
+        elementSection: ElementConfig 
+    } {
+        const { element, ...planSection } = fullPlan;
+        return { 
+            planSection, 
+            elementSection: element || {} 
+        };
+    }
+
+    /**
+     * Merge plan and element sections back into a complete PlanConfig
+     * Only includes element section if it has properties
+     */
+    private _mergePlanConfig(
+        planSection: Omit<PlanConfig, 'element'>, 
+        elementSection: ElementConfig
+    ): PlanConfig {
+        const result: PlanConfig = { ...planSection };
+        if (elementSection && Object.keys(elementSection).length > 0) {
+            result.element = elementSection;
+        }
+        return result;
+    }
+
     protected willUpdate(changedProperties: PropertyValues) {
         super.willUpdate(changedProperties);
+        
+        // Initialize split state variables when entity changes
+        if (changedProperties.has('entity')) {
+            const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
+            if (planConfig) {
+                const { planSection, elementSection } = this._splitPlanConfig(planConfig);
+                this._planSectionConfig = planSection;
+                this._elementSectionConfig = elementSection;
+            } else {
+                this._planSectionConfig = undefined;
+                this._elementSectionConfig = undefined;
+            }
+        }
         
         // Initialize filterByArea based on whether the entity is in the area
         // This only runs once when the component is first loaded

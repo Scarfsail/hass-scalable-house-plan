@@ -1,5 +1,5 @@
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, EntityConfig } from "../cards/scalable-house-plan";
+import type { Room, EntityConfig } from "../cards/types";
 import { getAreaEntities } from "./area-helpers";
 
 /**

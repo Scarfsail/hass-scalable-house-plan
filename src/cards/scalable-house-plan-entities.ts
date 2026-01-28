@@ -1,7 +1,7 @@
 import { LitElement, html, css } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, EntityConfig } from "./scalable-house-plan";
+import type { Room, EntityConfig } from "./types";
 import { getElementTypeForEntity, mergeElementProperties, getRoomName, getAreaEntities, getRoomIcon, groupEntitiesByCategory, getSortedCategories, EntityCategory, CATEGORY_DEFINITIONS, getRoomEntities } from "../utils";
 import { getLocalizeFunction, type LocalizeFunction } from "../localize";
 

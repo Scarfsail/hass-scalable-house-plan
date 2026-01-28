@@ -2,7 +2,8 @@ import { LitElement, html, svg, css, TemplateResult } from "lit-element";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import { actionHandler, type ActionHandlerEvent } from "../utils/action-handler";
-import type { Room, ScalableHousePlanConfig, EntityConfig, RoomEntityCache, HouseCache } from "../cards/scalable-house-plan";
+import type { Room, EntityConfig, RoomEntityCache } from "../cards/types";
+import type { ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getRoomEntities } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
 import { 

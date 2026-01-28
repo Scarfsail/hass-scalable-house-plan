@@ -3,7 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { sharedStyles } from "./shared-styles";
 import { DragDropMixin } from "./drag-drop-mixin";
-import type { Room } from "../scalable-house-plan";
+import type { Room } from "../types";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import { getLocalizeFunction } from "../../localize";
 import "./editor-room-shp";

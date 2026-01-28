@@ -1,0 +1,6 @@
+# Intro
+Currently, we could put individual entities / elements to a room. Position of each element is defined indepndently, it's not possible to create a position relation, so when I move one, the others will be also moved.
+
+# Proposal
+I want implement a new feature: Group. It should be a new hass custom component like info-box-shp. It will not be able to receive any entity. But It could contain other entities like in a room with the same definition as one entity in the room (which could contain just the plan section with empty entity field). We should also provide a graphical editor for the "element" part specifically for this component, so I could add/remove/duplicate more entities in the same as into a room. 
+It leads to me to a feature before this one - splitting the yaml editor for the entity's plan section in the visual editor to the actual plan section (like left, top, ...) and everything what's under the "element" section. And if the element supports a visual editor we should show it, if not we will show just yaml for that element, but it will be in a separete yaml text field than the actual plan yaml. Elaborate first on the second feature or even create a separate md file for it, we will start with that. THen we will get back to the group feature.

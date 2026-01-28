@@ -2,7 +2,7 @@ import { html, css, nothing } from "lit"
 import { customElement } from "lit/decorators.js";
 import { ElementBase, ElementBaseConfig } from "./base";
 import type { HassEntity } from "home-assistant-js-websocket";
-import type { InfoBoxTypeConfig } from "../cards/scalable-house-plan";
+import type { InfoBoxTypeConfig } from "../cards/types";
 import { getCreateCardElement, CreateCardElement } from "../utils/getCreateCardElement";
 import { getOrCreateElementCard } from "../utils/card-element-cache";
 

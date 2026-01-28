@@ -1,7 +1,8 @@
 import { html, TemplateResult } from "lit-element";
 import { keyed } from "lit/directives/keyed.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
-import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig, ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
+import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig } from "../cards/types";
+import type { ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds } from "../utils";
 import { getOrCreateElementCard } from "../utils/card-element-cache";
 

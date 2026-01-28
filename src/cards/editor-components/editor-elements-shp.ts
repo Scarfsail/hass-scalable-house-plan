@@ -4,7 +4,7 @@ import { repeat } from "lit/directives/repeat.js";
 import { sharedStyles } from "./shared-styles";
 import { DragDropMixin } from "./drag-drop-mixin";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
-import type { EntityConfig } from "../scalable-house-plan";
+import type { EntityConfig } from "../types";
 import { getLocalizeFunction, type LocalizeFunction } from "../../localize";
 import "./editor-element-shp";
 import { CrossContainerCoordinator } from "./cross-container-coordinator";
