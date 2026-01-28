@@ -5,6 +5,8 @@ import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { EntityConfig, PlanConfig, ElementConfig } from "../types";
 import { getAreaEntities } from "../../utils";
 import { getLocalizeFunction, type LocalizeFunction } from "../../localize";
+import "./editor-plan-section-shp";
+import "./editor-element-section-shp";
 
 @customElement("editor-element-shp")
 export class EditorElementShp extends LitElement {
@@ -17,6 +19,8 @@ export class EditorElementShp extends LitElement {
     
     @state() private _planSectionConfig?: Omit<PlanConfig, 'element'>;
     @state() private _elementSectionConfig?: ElementConfig;
+    @state() private _planSectionExpanded: boolean = true;
+    @state() private _elementSectionExpanded: boolean = true;
     
     private _localize?: LocalizeFunction;
 
@@ -116,6 +120,62 @@ export class EditorElementShp extends LitElement {
                 gap: 4px;
                 font-size: 12px;
                 color: var(--secondary-text-color);
+            }
+
+            /* Collapsible section styles */
+            .config-sections {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                margin-top: 16px;
+            }
+
+            .config-section {
+                border: 1px solid var(--divider-color);
+                border-radius: 8px;
+                overflow: hidden;
+            }
+
+            .config-section-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 12px;
+                background: var(--secondary-background-color);
+                cursor: pointer;
+                user-select: none;
+                transition: background 0.2s;
+            }
+
+            .config-section-header:hover {
+                background: var(--divider-color);
+            }
+
+            .config-section-header ha-icon {
+                --mdc-icon-size: 20px;
+                color: var(--primary-color);
+            }
+
+            .config-section-title {
+                flex: 1;
+                font-weight: 500;
+                font-size: 14px;
+                color: var(--primary-text-color);
+            }
+
+            .config-section-chevron {
+                --mdc-icon-size: 20px;
+                color: var(--secondary-text-color);
+                transition: transform 0.2s;
+            }
+
+            .config-section-chevron.expanded {
+                transform: rotate(180deg);
+            }
+
+            .config-section-content {
+                padding: 12px;
+                border-top: 1px solid var(--divider-color);
             }
         `
     ];
@@ -252,26 +312,65 @@ export class EditorElementShp extends LitElement {
                         </div>
                     ` : ''}
                     
-                    <div class="plan-section">
-                        <div class="plan-header">
-                            <div class="plan-label">
-                                ${this._isNoEntity 
-                                    ? this.localize('editor.plan_configuration_required') 
-                                    : this.localize('editor.plan_configuration_optional')}
-                            </div>
-                            <div class="no-entity-switch">
-                                <span>${this.localize('editor.no_entity')}</span>
-                                <ha-switch
-                                    .checked=${this._isNoEntity}
-                                    @change=${this._toggleNoEntity}
-                                ></ha-switch>
-                            </div>
+                    <!-- Configuration sections header with no-entity switch -->
+                    <div class="plan-header">
+                        <div class="plan-label">
+                            ${this._isNoEntity 
+                                ? this.localize('editor.plan_configuration_required') 
+                                : this.localize('editor.plan_configuration_optional')}
                         </div>
-                        <ha-yaml-editor
-                            .hass=${this.hass}
-                            .defaultValue=${planConfig || {}}
-                            @value-changed=${this._planChanged}
-                        ></ha-yaml-editor>
+                        <div class="no-entity-switch">
+                            <span>${this.localize('editor.no_entity')}</span>
+                            <ha-switch
+                                .checked=${this._isNoEntity}
+                                @change=${this._toggleNoEntity}
+                            ></ha-switch>
+                        </div>
+                    </div>
+
+                    <!-- Split configuration sections -->
+                    <div class="config-sections">
+                        <!-- Plan Section (Position & Layout) -->
+                        <div class="config-section">
+                            <div class="config-section-header" @click=${this._togglePlanSection}>
+                                <ha-icon icon="mdi:floor-plan"></ha-icon>
+                                <span class="config-section-title">${this.localize('editor.plan_section_title') || 'Plan (Position & Layout)'}</span>
+                                <ha-icon 
+                                    icon="mdi:chevron-down"
+                                    class="config-section-chevron ${this._planSectionExpanded ? 'expanded' : ''}"
+                                ></ha-icon>
+                            </div>
+                            ${this._planSectionExpanded ? html`
+                                <div class="config-section-content">
+                                    <editor-plan-section-shp
+                                        .hass=${this.hass}
+                                        .planSection=${this._planSectionConfig || {}}
+                                        @plan-changed=${this._onPlanSectionChanged}
+                                    ></editor-plan-section-shp>
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Element Section (Type & Properties) -->
+                        <div class="config-section">
+                            <div class="config-section-header" @click=${this._toggleElementSection}>
+                                <ha-icon icon="mdi:puzzle"></ha-icon>
+                                <span class="config-section-title">${this.localize('editor.element_section_title') || 'Element (Type & Properties)'}</span>
+                                <ha-icon 
+                                    icon="mdi:chevron-down"
+                                    class="config-section-chevron ${this._elementSectionExpanded ? 'expanded' : ''}"
+                                ></ha-icon>
+                            </div>
+                            ${this._elementSectionExpanded ? html`
+                                <div class="config-section-content">
+                                    <editor-element-section-shp
+                                        .hass=${this.hass}
+                                        .elementSection=${this._elementSectionConfig || {}}
+                                        @element-changed=${this._onElementSectionChanged}
+                                    ></editor-element-section-shp>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -356,17 +455,40 @@ export class EditorElementShp extends LitElement {
         return areaEntities;
     }
 
-    private _planChanged(ev: CustomEvent) {
-        const newPlan = ev.detail.value;
-        const entityId = typeof this.entity === 'string' ? this.entity : this.entity.entity;
+    private _onPlanSectionChanged(ev: CustomEvent) {
+        this._planSectionConfig = ev.detail.value;
+        this._updateFullConfig();
+    }
+
+    private _onElementSectionChanged(ev: CustomEvent) {
+        this._elementSectionConfig = ev.detail.value;
+        this._updateFullConfig();
+    }
+
+    private _updateFullConfig() {
+        const fullPlan = this._mergePlanConfig(
+            this._planSectionConfig || {},
+            this._elementSectionConfig || {}
+        );
+        const entityId = typeof this.entity === 'string' 
+            ? this.entity 
+            : this.entity.entity;
         
         // If plan is empty object, create entity-only config
-        const isEmpty = newPlan && Object.keys(newPlan).length === 0;
+        const isEmpty = Object.keys(fullPlan).length === 0;
         const updatedEntity = isEmpty 
             ? { entity: entityId }
-            : { entity: entityId, plan: newPlan };
+            : { entity: entityId, plan: fullPlan };
         
         this._dispatchUpdate(updatedEntity);
+    }
+
+    private _togglePlanSection() {
+        this._planSectionExpanded = !this._planSectionExpanded;
+    }
+
+    private _toggleElementSection() {
+        this._elementSectionExpanded = !this._elementSectionExpanded;
     }
 
     private _dispatchUpdate(updatedElement: EntityConfig) {
