@@ -502,21 +502,331 @@ export class EditorAnalogShp extends LitElement {
 5. **No-entity mode**: How does this affect the split?
    - **Answer**: Plan section stays same, Element section becomes required and prominent
 
-## Next Steps
+## Implementation Status
 
-✅ **Design Confirmed**: Approach approved with modifications:
-   - Plan section: YAML only (visual form deferred)
-   - Element section: Dynamic (visual editor if available, else YAML)
-   - Both sections expanded by default
-   - Interfaces extracted to separate `types.ts` file (better imports)
+✅ **Phases 1-4 Complete** (Committed: c639342):
+1. **Phase 1**: Extracted interfaces to `types.ts` and added split/merge logic ✅
+2. **Phase 2**: Created Plan Section YAML editor component ✅
+3. **Phase 3**: Created Element Section editor component (currently YAML only) ✅
+4. **Phase 4**: Integrated both sections into `editor-element-shp.ts` ✅
 
-### Implementation Order:
-1. **Phase 1**: Extract interfaces to `types.ts` and refactor data structure (split/merge logic) ✅ Ready to implement
-2. **Phase 2**: Create Plan Section YAML editor component
-3. **Phase 3**: Create Element Section dynamic editor component
-4. **Phase 4**: Integrate both into `editor-element-shp.ts`
-5. **Phase 5**: Add element-specific visual editors (analog-shp, etc.)
-6. **Future**: Add visual form for Plan section
+**Current State:**
+- Plan section: YAML editor with position/layout properties
+- Element section: YAML editor with element type and properties
+- Both sections independently collapsible (default: expanded)
+- Data structure unchanged (backward compatible)
+
+---
+
+## Phase 5: Element-Specific Visual Editors
+
+### Goal
+Detect if an element type has a visual editor available, and automatically use it instead of YAML when available.
+
+### Design Decisions
+
+#### 1. Visual Form for Plan Section
+**Status**: ⏸️ **ON HOLD** - Will be considered in the future
+- Current YAML editor is sufficient for MVP
+- More complex positioning UI requires careful UX design
+- Deferred to allow focus on element-specific editors first
+
+#### 2. Element Visual Editor Detection Strategy
+
+**Naming Convention:**
+- Element type: `custom:analog-shp` → Editor component: `editor-analog-shp`
+- Element type: `custom:badge-shp` → Editor component: `editor-badge-shp`
+- Pattern: Replace `custom:` with `editor-`
+
+**Detection Approach:**
+```typescript
+// Option A: Check if custom element is registered (RECOMMENDED)
+private _hasVisualEditor(elementType: string): boolean {
+    const editorName = this._getEditorName(elementType);
+    return customElements.get(editorName) !== undefined;
+}
+
+private _getEditorName(elementType: string): string {
+    // custom:analog-shp → editor-analog-shp
+    return elementType.replace('custom:', 'editor-');
+}
+```
+
+**Why Option A?**
+- ✅ No registry to maintain
+- ✅ Clean and automatic
+- ✅ Works with lazy-loaded editors
+- ✅ Same pattern Home Assistant uses
+
+**Alternative Options (Not Recommended):**
+- Option B: Maintain a static registry map - adds maintenance overhead
+- Option C: Try dynamic import and catch errors - adds complexity and error handling
+
+Go with option A
+
+#### 3. Editor Component Location
+
+**Structure:**
+```
+src/cards/editor-components/
+├── element-editors/          # NEW: Element-specific visual editors
+│   ├── editor-analog-shp.ts
+│   ├── editor-badge-shp.ts
+│   ├── editor-badges-shp.ts
+│   └── index.ts
+├── editor-element-section-shp.ts  # Modified to detect and load visual editors
+├── editor-plan-section-shp.ts
+└── ...
+```
+Create the visual editor just for the badges-shp, so I could test it.
+
+**Rationale:**
+- Keep element editors organized in subdirectory
+- Clear separation from general editor components
+- Easy to find and maintain
+- Index file for convenient imports
+
+I agree with the structure
+
+#### 4. UI Behavior
+
+**Default Behavior:**
+- If visual editor exists → Show visual editor by default
+- Always provide "Switch to YAML" toggle button
+- User can switch between visual and YAML modes
+- YAML mode is always available as fallback
+
+I agree
+
+**Toggle State:**
+- Local state per editor instance (not persisted across sessions)
+- Reset to visual mode when switching elements
+- Clear "Switch to YAML" / "Switch to Visual" button
+
+**Layout:**
+```
+┌─────────────────────────────────────────┐
+│ Element (Type & Properties)         ⌄  │
+├─────────────────────────────────────────┤
+│ Configure element properties...         │
+│                                          │
+│ [Visual Editor UI]                       │
+│   Entity: [sensor.temperature    ▼]     │
+│   Min Value: [0                  ]      │
+│   Max Value: [100                ]      │
+│                                          │
+│ [Switch to YAML]                         │
+└─────────────────────────────────────────┘
+```
+
+#### 5. Editor Interface Contract
+
+All element visual editors must follow this interface:
+
+```typescript
+interface ElementVisualEditor {
+    // Input: Current element configuration
+    @property({ type: Object }) elementSection: ElementConfig;
+    
+    // Output: Emit when configuration changes
+    // Event: 'element-changed' with detail: { value: ElementConfig }
+    
+    // Required: HomeAssistant instance for entity pickers, etc.
+    @property({ attribute: false }) hass: HomeAssistant;
+}
+```
+
+**Event Contract:**
+```typescript
+// Editor emits this when user changes configuration
+new CustomEvent('element-changed', {
+    detail: { value: updatedElementConfig },
+    bubbles: true,
+    composed: true
+});
+```
+
+### Implementation Plan
+
+#### Task 1: Update Element Section Editor Component
+
+**File**: `src/cards/editor-components/editor-element-section-shp.ts`
+
+**Changes:**
+1. Add state for tracking visual/YAML mode
+2. Add detection logic for visual editor availability
+3. Implement dynamic rendering based on mode
+4. Add toggle button between modes
+5. Handle dynamic import of visual editor if needed
+
+**Pseudocode:**
+```typescript
+@customElement("editor-element-section-shp")
+export class EditorElementSectionShp extends LitElement {
+    @property({ attribute: false }) public hass!: HomeAssistant;
+    @property({ type: Object }) public elementSection!: ElementConfig;
+    
+    @state() private _useYamlMode: boolean = false;
+    
+    private get _hasVisualEditor(): boolean {
+        const elementType = this.elementSection?.type;
+        if (!elementType || !elementType.startsWith('custom:')) {
+            return false;
+        }
+        
+        const editorName = elementType.replace('custom:', 'editor-');
+        return customElements.get(editorName) !== undefined;
+    }
+    
+    protected render() {
+        const showVisualEditor = this._hasVisualEditor && !this._useYamlMode;
+        
+        return html`
+            <div class="element-editor">
+                ${showVisualEditor 
+                    ? this._renderVisualEditor() 
+                    : this._renderYamlEditor()}
+                
+                ${this._hasVisualEditor ? html`
+                    <button @click=${this._toggleMode}>
+                        ${this._useYamlMode ? 'Switch to Visual' : 'Switch to YAML'}
+                    </button>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    private _renderVisualEditor() {
+        const elementType = this.elementSection?.type;
+        const editorName = elementType.replace('custom:', 'editor-');
+        
+        return html`
+            <${editorName}
+                .hass=${this.hass}
+                .elementSection=${this.elementSection}
+                @element-changed=${this._elementChanged}
+            ></${editorName}>
+        `;
+    }
+}
+```
+
+#### Task 2: Create Element Editor Infrastructure
+
+**File**: `src/cards/editor-components/element-editors/index.ts`
+
+```typescript
+// Export all element visual editors
+export * from './editor-analog-shp';
+export * from './editor-badge-shp';
+// ... more as they're created
+```
+
+**Import Strategy:**
+- Option A: Import all at once in parent component (simpler, larger bundle) ✅ **AGREED**
+- Option B: Lazy load editors when needed (complex, smaller initial bundle)
+- **Decision**: Use Option A for MVP. Simpler implementation, easier debugging. Can optimize with lazy loading later if bundle size becomes an issue.
+
+#### Task 3: Create First Visual Editor (Example: Analog)
+
+**File**: `src/cards/editor-components/element-editors/editor-analog-shp.ts`
+
+```typescript
+@customElement("editor-analog-shp")
+export class EditorAnalogShp extends LitElement {
+    @property({ attribute: false }) public hass!: HomeAssistant;
+    @property({ type: Object }) public elementSection!: ElementConfig;
+    
+    protected render() {
+        return html`
+            <ha-entity-picker
+                label="Value Entity"
+                .hass=${this.hass}
+                .value=${this.elementSection.value_entity || ''}
+                @value-changed=${this._valueEntityChanged}
+            ></ha-entity-picker>
+            
+            <ha-textfield
+                label="Min Value"
+                type="number"
+                .value=${this.elementSection.min ?? 0}
+                @input=${this._minChanged}
+            ></ha-textfield>
+            
+            <ha-textfield
+                label="Max Value"
+                type="number"
+                .value=${this.elementSection.max ?? 100}
+                @input=${this._maxChanged}
+            ></ha-textfield>
+            
+            <!-- Add more fields as needed -->
+        `;
+    }
+    
+    private _valueEntityChanged(ev: CustomEvent) {
+        this._updateConfig({ value_entity: ev.detail.value });
+    }
+    
+    private _minChanged(ev: Event) {
+        this._updateConfig({ min: Number((ev.target as HTMLInputElement).value) });
+    }
+    
+    private _updateConfig(changes: Partial<ElementConfig>) {
+        const updated = { ...this.elementSection, ...changes };
+        this.dispatchEvent(new CustomEvent('element-changed', {
+            detail: { value: updated },
+            bubbles: true,
+            composed: true
+        }));
+    }
+}
+```
+
+### Questions to Address Before Implementation
+
+1. **Q: Should we preserve user's YAML/Visual toggle preference?**
+   - A: No, for MVP. Always default to visual if available. Can add persistence later.
+
+2. **Q: What happens if element type changes while editor is open?**
+   - A: Re-detect and switch editor mode automatically. If new type has no visual editor, fall back to YAML.
+
+3. **Q: Should we create visual editors for all existing elements?**
+   - A: **No**. Start with `badges-shp` only. Others can use YAML until their editors are created on demand.
+
+4. **Q: How to handle element types we don't recognize?**
+   - A: Fall back to YAML editor (current behavior).
+
+5. **Q: Should editors validate configuration?**
+   - A: Yes, but basic validation only. Show error states on invalid fields.
+
+### Priority Element Editors to Create
+
+Based on current elements in `src/elements/`:
+
+**Phase 5 - Initial Implementation:**
+1. ✅ `editor-badges-shp` - Multiple badges group (START HERE)
+   - Most commonly used
+   - Good test case for the visual editor infrastructure
+   - Demonstrates the benefit of visual editing over YAML
+
+**Future Enhancements** (Create on demand):
+- `editor-analog-shp` - Analog gauge/indicator
+- `editor-badge-shp` - Single badge
+- `editor-icon-shp` - Icon display
+- `editor-button-shp` - Button element
+- `editor-state-shp` - State display
+- Other specialized elements
+
+**Rationale**: Start small with one editor to validate the infrastructure and approach. Add more editors incrementally based on user feedback and usage patterns.
+
+### Testing Strategy
+
+1. **Without visual editor**: Element section should show YAML (current behavior)
+2. **With visual editor**: Element section should show visual editor + toggle
+3. **Toggle functionality**: Switching between modes preserves data
+4. **Element type change**: Switching element type updates editor appropriately
+5. **Data integrity**: Ensure visual editor produces valid ElementConfig
 
 ---
 

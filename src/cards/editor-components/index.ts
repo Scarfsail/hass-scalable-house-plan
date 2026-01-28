@@ -6,3 +6,4 @@ export * from "./editor-elements-shp";
 export * from "./editor-element-shp";
 export * from "./editor-plan-section-shp";
 export * from "./editor-element-section-shp";
+export * from "./element-editors";
