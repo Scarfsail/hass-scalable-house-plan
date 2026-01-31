@@ -16,6 +16,7 @@ import "./element-editors"; // Import all element visual editors
 export class EditorElementSectionShp extends LitElement {
     @property({ attribute: false }) public hass!: HomeAssistant;
     @property({ type: Object }) public elementSection!: ElementConfig;
+    @property({ type: String }) public areaId?: string; // Area ID for entity filtering in nested editors
     
     @state() private _useYamlMode: boolean = false;
 
@@ -109,9 +110,11 @@ export class EditorElementSectionShp extends LitElement {
         const tag = unsafeStatic(editorName);
         
         // Use static-html to create the dynamic element
+        // Pass areaId for entity filtering in nested editors (e.g., group-shp)
         return staticHtml`<${tag}
             .hass=${this.hass}
             .elementSection=${this.elementSection}
+            .areaId=${this.areaId}
             @element-changed=${this._elementChanged}
         ></${tag}>`;
     }

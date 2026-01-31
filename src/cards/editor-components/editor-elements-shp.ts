@@ -122,6 +122,7 @@ export class EditorElementsShp extends LitElement {
     }
 
     private _handleElementToggle(e: CustomEvent) {
+        e.stopPropagation(); // Prevent bubbling to parent editor-elements-shp
         const index = e.detail.index;
         
         // Toggle the expansion state
@@ -137,6 +138,7 @@ export class EditorElementsShp extends LitElement {
     }
 
     private _handleElementUpdate(e: CustomEvent) {
+        e.stopPropagation(); // Prevent bubbling to parent editor-elements-shp
         // Update a single element at the given index
         const { index, element } = e.detail;
         const updatedElements = [...this.elements];
@@ -151,6 +153,7 @@ export class EditorElementsShp extends LitElement {
     }
 
     private _handleElementDuplicate(e: CustomEvent) {
+        e.stopPropagation(); // Prevent bubbling to parent editor-elements-shp
         const { index, element } = e.detail;
         
         // Create a deep copy of the element to avoid reference issues
@@ -193,6 +196,7 @@ export class EditorElementsShp extends LitElement {
     }
 
     private _handleElementRemove(e: CustomEvent) {
+        e.stopPropagation(); // Prevent bubbling to parent editor-elements-shp
         const event = new CustomEvent('elements-remove', {
             detail: e.detail,
             bubbles: true,

@@ -180,3 +180,14 @@ export function mergeElementProperties(
         ...(overrides || {})
     };
 }
+
+/**
+ * Check if an element configuration is a group-shp element
+ * 
+ * @param elementConfig - Element configuration with type property
+ * @returns true if the config is a group-shp element, false otherwise
+ */
+export function isGroupElementType(elementConfig: { type?: string }): boolean {
+    if (!elementConfig || !elementConfig.type) return false;
+    return elementConfig.type === 'custom:group-shp' || elementConfig.type === 'group-shp';
+}

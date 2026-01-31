@@ -1,0 +1,286 @@
+import { html, css, nothing } from "lit"
+import { customElement, property, state } from "lit/decorators.js";
+import { styleMap } from "lit/directives/style-map.js";
+import { ElementBase, ElementBaseConfig } from "./base";
+import type { HomeAssistant } from "../../hass-frontend/src/types";
+import type { EntityConfig } from "../cards/types";
+import type { CreateCardElement } from "../utils";
+import { getOrCreateElementCard } from "../utils/card-element-cache";
+import { getElementTypeForEntity, mergeElementProperties, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, isGroupElementType } from "../utils";
+
+export interface GroupElementConfig extends ElementBaseConfig {
+    children: EntityConfig[];
+    width: number;
+    height: number;
+    show_border?: boolean;
+}
+
+/**
+ * group-shp element
+ * 
+ * A container element that holds multiple child entities/elements positioned absolutely within it.
+ * The group acts as a single unit that can be positioned via plan configuration.
+ * 
+ * Key features:
+ * - Container with explicit width/height
+ * - Children positioned absolutely using their own plan.left/top/right/bottom
+ * - Optional border for visual debugging
+ * - Passes through hass and other context to children
+ */
+@customElement("group-shp")
+export class GroupElement extends ElementBase<GroupElementConfig> {
+    @property({ attribute: false }) public createCardElement?: CreateCardElement | null;
+    @property({ attribute: false }) public elementCards?: Map<string, any>;
+    @property({ attribute: false }) public mode?: 'overview' | 'detail';
+    
+    // Cache for child element cards
+    private _childElementCache = new Map<string, any>();
+    
+    // Cached filtered children (recomputed only when mode or config changes)
+    @state() private _filteredChildren: EntityConfig[] = [];
+    
+    // Cache for child position styles (cleared when config changes)
+    private _positionCache = new Map<string, Record<string, string>>();
+    
+    static override styles = css`
+        :host {
+            display: block;
+            position: relative; /* Ensure :host is a positioning context */
+        }
+
+        .group-container {
+            position: relative;
+            overflow: visible;
+            width: 100%;
+            height: 100%;
+            /* Don't set pointer-events - let children handle their own clicks */
+        }
+
+        .group-container.show-border {
+            border: 2px dashed orange;
+            box-sizing: border-box;
+        }
+
+        .child-wrapper {
+            position: absolute;
+            /* Children handle their own pointer events naturally */
+        }
+    `;
+
+    protected override willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
+        super.willUpdate(changedProperties);
+
+        // Recompute filtered children only when mode or config changes
+        if (changedProperties.has('mode') || changedProperties.has('_config')) {
+            const children = this._config?.children || [];
+            
+            // Filter children based on mode and plan.overview setting
+            // In overview mode, only show children with plan.overview !== false
+            this._filteredChildren = this.mode === 'overview'
+                ? children.filter((childConfig: EntityConfig) => {
+                    // String shorthand = detail-only, no overview
+                    if (typeof childConfig === 'string') return false;
+                    // Only include entities with plan section and overview !== false
+                    return childConfig.plan && (childConfig.plan.overview !== false);
+                })
+                : children;
+            
+            // Clear position cache when config changes
+            if (changedProperties.has('_config')) {
+                this._positionCache.clear();
+            }
+        }
+    }
+
+    protected override renderContent() {
+        if (!this._config || !this.hass) {
+            return nothing;
+        }
+
+        const { width = 100, height = 100, show_border = false } = this._config;
+
+        // Validate and sanitize dimensions
+        const validWidth = Math.max(1, width);
+        const validHeight = Math.max(1, height);
+
+        if (width !== validWidth || height !== validHeight) {
+            console.warn('group-shp: Invalid dimensions, using minimum values', { width, height, validWidth, validHeight });
+        }
+
+        // Set host dimensions directly for proper positioning context
+        this.style.width = `${validWidth}px`;
+        this.style.height = `${validHeight}px`;
+
+        return html`
+            <div class="group-container ${show_border ? 'show-border' : ''}">
+                ${this._filteredChildren.map((childConfig, index) => this._renderChild(childConfig, index))}
+            </div>
+        `;
+    }
+
+    /**
+     * Render a single child element
+     */
+    private _renderChild(childConfig: EntityConfig, index: number) {
+        if (!this.hass) return nothing;
+
+        // Extract entity and plan from EntityConfig
+        const entity = typeof childConfig === 'string' ? childConfig : childConfig.entity;
+        const plan = typeof childConfig === 'string' ? undefined : childConfig.plan;
+
+        // Validate that we have positioning information
+        if (!plan) {
+            console.warn(`group-shp: Child at index ${index} missing plan configuration`, childConfig);
+            return nothing;
+        }
+
+        // Validate no-entity elements have a type
+        if (!entity && (!plan.element || !plan.element.type)) {
+            console.warn(`group-shp: No-entity child at index ${index} missing element.type`, childConfig);
+            return nothing;
+        }
+
+        // Generate unique key for child (entity ID or generated key)
+        const uniqueKey = entity || `group-child-${index}-${plan.element?.type || 'unknown'}`;
+
+        // Get element type and merged config
+        const elementType = this._getElementType(entity, plan);
+        const elementConfig = this._buildElementConfig(entity, plan, elementType);
+
+        // Get or create the child element card
+        const card = this._getOrCreateChildCard(uniqueKey, entity, elementConfig);
+        if (card && this.hass) {
+            card.hass = this.hass;
+            
+            // For nested group-shp elements, pass through mode, createCardElement and elementCards
+            if (isGroupElementType(elementConfig)) {
+                card.mode = this.mode;
+                card.createCardElement = this.createCardElement;
+                card.elementCards = this.elementCards;
+            }
+        }
+
+        // Calculate child position styles
+        const childStyles = this._calculateChildPosition(plan, uniqueKey);
+
+        return html`
+            <div class="child-wrapper" style=${styleMap(childStyles)}>
+                ${card}
+            </div>
+        `;
+    }
+
+    /**
+     * Get element type for entity or from plan
+     */
+    private _getElementType(entity: string, plan: any): any {
+        if (entity) {
+            // Entity-based element
+            const deviceClass = this.hass?.states[entity]?.attributes?.device_class;
+            return getElementTypeForEntity(entity, deviceClass, 'plan');
+        } else {
+            // No-entity element - type specified in plan
+            return { type: plan.element.type };
+        }
+    }
+
+    /**
+     * Build merged element configuration
+     */
+    private _buildElementConfig(entity: string, plan: any, elementType: any): any {
+        // Merge default properties with user overrides
+        const elementConfig = mergeElementProperties(elementType, plan.element || {});
+
+        // CRITICAL: Remove positioning properties from elementConfig before passing to child element.
+        // 
+        // WHY: Positioning is handled by the child-wrapper div, NOT by the child element itself.
+        // If we don't remove these, the child element will try to position itself relative to the
+        // room (inherited behavior), resulting in incorrect double-offset placement.
+        // 
+        // EXAMPLE: If child has left:10 and wrapper has left:20, without this deletion the child
+        // would render at left:30 (20 from wrapper + 10 from element) instead of left:20.
+        delete elementConfig.left;
+        delete elementConfig.top;
+        delete elementConfig.right;
+        delete elementConfig.bottom;
+        delete elementConfig.width;
+        delete elementConfig.height;
+
+        // Add default tap_action and hold_action for entities (if not already set by user)
+        if (entity && this.hass && isEntityActionable(entity, this.hass)) {
+            if (!elementConfig.tap_action) {
+                elementConfig.tap_action = getDefaultTapAction(entity, this.hass);
+            }
+            if (!elementConfig.hold_action) {
+                elementConfig.hold_action = getDefaultHoldAction();
+            }
+        }
+
+        return elementConfig;
+    }
+
+    /**
+     * Get or create child element card
+     */
+    private _getOrCreateChildCard(uniqueKey: string, entity: string, elementConfig: any): any {
+        const elementCards = this.elementCards || this._childElementCache;
+        return getOrCreateElementCard(
+            uniqueKey,
+            entity,
+            elementConfig,
+            this.createCardElement || null,
+            elementCards
+        );
+    }
+
+    /**
+     * Calculate child position styles from plan configuration
+     * Supports left/top, right/bottom positioning
+     * Cached to avoid recreating style objects on every render
+     */
+    private _calculateChildPosition(plan: any, cacheKey: string): Record<string, string> {
+        // Check cache first
+        const cached = this._positionCache.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const styles: Record<string, string> = {
+            position: 'absolute'
+        };
+
+        // Handle horizontal positioning (using pixels, not percentages)
+        if (plan.left !== undefined) {
+            styles.left = `${plan.left}px`;
+        }
+        if (plan.right !== undefined) {
+            styles.right = `${plan.right}px`;
+        }
+
+        // Handle vertical positioning (using pixels, not percentages)
+        if (plan.top !== undefined) {
+            styles.top = `${plan.top}px`;
+        }
+        if (plan.bottom !== undefined) {
+            styles.bottom = `${plan.bottom}px`;
+        }
+
+        // Add width/height if specified
+        if (plan.width !== undefined) {
+            styles.width = `${plan.width}px`;
+        }
+        if (plan.height !== undefined) {
+            styles.height = `${plan.height}px`;
+        }
+
+        // Apply custom styles from plan (object format only)
+        if (plan.style && typeof plan.style === 'object') {
+            Object.assign(styles, plan.style);
+        }
+
+        // Cache the computed styles
+        this._positionCache.set(cacheKey, styles);
+
+        return styles;
+    }
+}

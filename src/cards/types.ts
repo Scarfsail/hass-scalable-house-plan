@@ -5,6 +5,8 @@
  * editor components, utility functions, and room/element renderers.
  */
 
+import type { ElementBaseConfig } from "../elements/base";
+
 export type PositionScalingMode = "plan" | "element" | "fixed";
 
 export interface InfoBoxPosition {
@@ -78,6 +80,23 @@ export interface ElementConfig {
 export type EntityConfig = string | {
     entity: string;  // Can be empty string for no-entity elements
     plan?: PlanConfig;
+}
+
+/**
+ * Configuration for the group-shp element.
+ * 
+ * A group is a container element that holds multiple child entities/elements
+ * with absolute positioning. The group itself can be positioned via plan config,
+ * and acts as a single unit in the room.
+ * 
+ * Children are positioned absolutely within the group using their own plan.left/top/right/bottom.
+ * Width and height are required to establish the container boundaries.
+ */
+export interface GroupElementConfig extends ElementBaseConfig {
+    children: EntityConfig[];  // Array of child entity configurations
+    width: number;             // Explicit width in pixels (required)
+    height: number;            // Explicit height in pixels (required)
+    show_border?: boolean;     // Optional: Show dashed border for debugging/editing (default: false)
 }
 
 export interface DynamicColorsConfig {

@@ -3,7 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { LovelaceCardConfig } from "../../hass-frontend/src/data/lovelace/config/card";
-import { getAreaEntities, getAllRoomEntityIds } from "../utils";
+import { getAreaEntities, getAllRoomEntityIds, analyzeRoomEntities, isGroupShp } from "../utils";
 import "./scalable-house-plan-overview";
 import "./scalable-house-plan-detail";
 import "./scalable-house-plan-entities";
@@ -186,61 +186,13 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             // Get all entity IDs (uses getAllRoomEntityIds logic)
             const allEntityIds = getAllRoomEntityIds(this.hass, room, areaEntityIds);
 
-            // Categorize entities for dynamic color calculation (extracted from room component logic)
-            const motionSensorIds: string[] = [];
-            const ambientLightIds: string[] = [];
-            const lightIds: string[] = [];
-            const occupancySensorIds: string[] = [];
-
-            // Get all entity configs (explicit + area)
-            const explicitEntityIds = new Set(
-                room.entities.map(cfg => typeof cfg === 'string' ? cfg : cfg.entity)
-            );
-
-            const allEntityConfigs: EntityConfig[] = [
-                ...room.entities,
-                ...areaEntityIds
-                    .filter(entityId => !explicitEntityIds.has(entityId))
-                    .map(entityId => entityId as EntityConfig)
-            ];
-
-            // Categorize entities by type
-            for (const entityConfig of allEntityConfigs) {
-                const entityId = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
-                if (!entityId) continue;
-
-                // Skip entities opted out of dynamic colors
-                const optedOut = typeof entityConfig !== 'string' && entityConfig.plan?.disable_dynamic_color;
-                if (optedOut) continue;
-
-                const stateObj = this.hass.states[entityId];
-                if (!stateObj) continue;
-
-                const [domain] = entityId.split('.');
-                const deviceClass = stateObj.attributes?.device_class;
-
-                // Motion sensors
-                if (domain === 'binary_sensor' && (deviceClass === 'motion' || deviceClass === 'occupancy')) {
-                    if (deviceClass === 'motion') {
-                        motionSensorIds.push(entityId);
-                    } else {
-                        occupancySensorIds.push(entityId);
-                    }
-                }
-
-                // Lights (categorize ambient vs normal)
-                if (domain === 'light') {
-                    // Check if entity is configured as ambient light via plan.light
-                    const lightType = typeof entityConfig !== 'string' ? entityConfig.plan?.light : undefined;
-                    
-                    if (lightType === 'ambient') {
-                        ambientLightIds.push(entityId);
-                    } else {
-                        // Default to normal light if not specified or explicitly 'normal'
-                        lightIds.push(entityId);
-                    }
-                }
-            }
+            // Analyze and categorize entities in a single traversal (optimization)
+            const {
+                motionSensorIds,
+                ambientLightIds,
+                lightIds,
+                occupancySensorIds
+            } = analyzeRoomEntities(this.hass, room, areaEntityIds);
 
             // Store in cache
             this._roomEntityCache.set(room.name, {

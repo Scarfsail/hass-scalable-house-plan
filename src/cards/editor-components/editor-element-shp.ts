@@ -366,6 +366,7 @@ export class EditorElementShp extends LitElement {
                                     <editor-element-section-shp
                                         .hass=${this.hass}
                                         .elementSection=${this._elementSectionConfig || {}}
+                                        .areaId=${this.areaId}
                                         @element-changed=${this._onElementSectionChanged}
                                     ></editor-element-section-shp>
                                 </div>

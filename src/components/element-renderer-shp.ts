@@ -3,7 +3,7 @@ import { keyed } from "lit/directives/keyed.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig } from "../cards/types";
 import type { ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
-import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds } from "../utils";
+import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds, isGroupElementType } from "../utils";
 import { getOrCreateElementCard } from "../utils/card-element-cache";
 
 /**
@@ -375,6 +375,14 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
         const card = getOrCreateElementCard(uniqueKey, entity, elementConfig, createCardElement, elementCards);
         if (card && hass) {
             card.hass = hass;
+            
+            // For group-shp elements, pass through mode, createCardElement and elementCards
+            // so they can render their children and filter based on overview setting
+            if (isGroupElementType(elementConfig)) {
+                card.mode = mode;
+                card.createCardElement = createCardElement;
+                card.elementCards = elementCards;
+            }
         }
 
         return keyed(uniqueKey, html`
