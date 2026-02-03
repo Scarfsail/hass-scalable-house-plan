@@ -25,6 +25,8 @@ export class ScalableHousePlanDetail extends LitElement {
     @property({ attribute: false }) public onShowEntities?: () => void;
     @property({ attribute: false }) public roomEntityCache?: Map<string, RoomEntityCache>;
     @property({ attribute: false }) public houseCache!: HouseCache;
+    @property({ type: Boolean }) public editorMode = false;
+    @property({ attribute: false }) public selectedElementKey?: string | null;
 
     @state() private _createCardElement: CreateCardElement = null;
     @state() private _entitiesNotOnDetailCount: number = 0;
@@ -215,6 +217,8 @@ export class ScalableHousePlanDetail extends LitElement {
                 .elementCards=${this._elementCards}
                 .cachedEntityIds=${this.roomEntityCache?.get(this.room.name)}
                 .houseCache=${this.houseCache}
+                .editorMode=${this.editorMode}
+                .selectedElementKey=${this.selectedElementKey}
             ></scalable-house-plan-room>
         `;
     }

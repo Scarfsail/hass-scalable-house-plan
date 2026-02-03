@@ -56,6 +56,8 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     dynamic_colors?: DynamicColorsConfig;  // Dynamic room color configuration
     info_box_defaults?: InfoBoxConfig;  // Default info box configuration for all rooms
     _previewRoomIndex?: number;  // Internal: room index to preview in detail view (not persisted, used during editing)
+    _editorMode?: boolean;  // Internal: interactive editor mode enabled (not persisted, used during editing)
+    _selectedElementKey?: string | null;  // Internal: currently selected element uniqueKey (not persisted, used during editing)
 }
 
 
@@ -67,6 +69,8 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     @state() private _selectedRoomIndex: number | null = null;
     @state() private _currentView: 'overview' | 'detail' | 'entities' = 'overview';
+    @state() private _editorMode = false;
+    @state() private _selectedElementKey: string | null = null;
 
     // Performance optimization: Cache entity IDs per room to avoid expensive lookups
     private _roomEntityCache: Map<string, RoomEntityCache> = new Map();
@@ -155,6 +159,12 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             this._selectedRoomIndex = null;
             this._currentView = 'overview';
         }
+
+        // Update editor mode state (used during editing)
+        if (this._isEditMode()) {
+            this._editorMode = config._editorMode || false;
+            this._selectedElementKey = config._selectedElementKey || null;
+        }
     }
 
     /**
@@ -241,6 +251,8 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
                 .roomEntityCache=${this._roomEntityCache}
                 .houseCache=${this._houseCache}
+                .editorMode=${this._editorMode}
+                .selectedElementKey=${this._selectedElementKey}
             ></scalable-house-plan-overview>
         `;
         
@@ -258,6 +270,8 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                         .onShowEntities=${() => this._openEntitiesView()}
                         .roomEntityCache=${this._roomEntityCache}
                         .houseCache=${this._houseCache}
+                        .editorMode=${this._editorMode}
+                        .selectedElementKey=${this._selectedElementKey}
                     ></scalable-house-plan-detail>
                 </div>
             </div>

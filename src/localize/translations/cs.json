@@ -17,6 +17,7 @@
   },
   "editor": {
     "loading": "Načítání...",
+    "house_plan_editor": "Editor půdorysu domu",
     "basic_configuration": "Základní konfigurace",
     "image_url": "URL obrázku",
     "image_url_placeholder": "https://example.com/image.png",

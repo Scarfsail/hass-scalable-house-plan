@@ -58,6 +58,8 @@ export class ScalableHousePlanRoom extends LitElement {
     @property({ attribute: false }) public onClick?: (room: Room) => void;
     @property({ attribute: false }) public cachedEntityIds?: RoomEntityCache;  // Pre-computed entity IDs from parent
     @property({ attribute: false }) public houseCache!: HouseCache;
+    @property({ type: Boolean }) public editorMode = false;
+    @property({ attribute: false }) public selectedElementKey?: string | null;
 
     // Constants
     private static readonly DEFAULT_ROOM_COLOR = 'rgba(128, 128, 128, 0.2)';
@@ -160,6 +162,26 @@ export class ScalableHousePlanRoom extends LitElement {
 
             .element-wrapper {
                 position: absolute;
+            }
+
+            /* Interactive Editor Mode - Selected Element Styles */
+            .selected-element {
+                outline: 3px solid var(--primary-color) !important;
+                outline-offset: 2px;
+                border-radius: 4px;
+                transition: outline 0.2s ease;
+                z-index: 1000;
+                position: relative;
+            }
+
+            .selected-element::after {
+                content: '';
+                position: absolute;
+                inset: -2px;
+                border-radius: 4px;
+                background: var(--primary-color);
+                opacity: 0.1;
+                pointer-events: none;
             }
 
             .room-polygon {
@@ -430,7 +452,12 @@ export class ScalableHousePlanRoom extends LitElement {
             infoBoxCache: this._infoBoxCache,
             cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds,  // Use cached IDs from parent
             elementsClickable,  // Control element clickability
-            houseCache: this.houseCache
+            houseCache: this.houseCache,
+            editorMode: this.editorMode,
+            selectedElementKey: this.selectedElementKey,
+            onElementClick: (uniqueKey: string, elementIndex: number) => {
+                this._handleElementClick(uniqueKey, elementIndex);
+            }
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
@@ -547,7 +574,12 @@ export class ScalableHousePlanRoom extends LitElement {
             infoBoxCache: this._infoBoxCache,
             cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds,  // Use cached IDs from parent
             elementsClickable: true,  // Elements always clickable in detail view
-            houseCache: this.houseCache
+            houseCache: this.houseCache,
+            editorMode: this.editorMode,
+            selectedElementKey: this.selectedElementKey,
+            onElementClick: (uniqueKey: string, elementIndex: number) => {
+                this._handleElementClick(uniqueKey, elementIndex);
+            }
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
@@ -643,7 +675,7 @@ export class ScalableHousePlanRoom extends LitElement {
      */
     private _handleAction(event: ActionHandlerEvent) {
         event.stopPropagation();
-        
+
         if (event.detail.action === 'tap') {
             // Regular click - navigate to detail view
             if (this.onClick) {
@@ -653,6 +685,35 @@ export class ScalableHousePlanRoom extends LitElement {
             // Long press - toggle lights
             this._toggleRoomLights();
         }
+    }
+
+    /**
+     * Handle element click in editor mode
+     * Emits element-selected event that bubbles up to editor
+     * Uses window-level event to cross HA editor/preview boundary
+     */
+    private _handleElementClick(uniqueKey: string, elementIndex: number): void {
+        // Dispatch to window for HA editor to catch (editor and preview are in separate DOM contexts)
+        const windowEvent = new CustomEvent('scalable-house-plan-element-selected', {
+            detail: {
+                uniqueKey: uniqueKey,
+                elementIndex: elementIndex
+            },
+            bubbles: true,
+            composed: true
+        });
+        window.dispatchEvent(windowEvent);
+
+        // Also dispatch locally for potential future use
+        const localEvent = new CustomEvent('element-selected', {
+            detail: {
+                uniqueKey: uniqueKey,
+                elementIndex: elementIndex
+            },
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(localEvent);
     }
 
     /**

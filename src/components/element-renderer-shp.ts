@@ -29,6 +29,9 @@ export interface ElementRendererOptions {
     cachedInfoBoxEntityIds?: string[];  // Pre-computed entity IDs for info box (avoids expensive getAllRoomEntityIds call)
     elementsClickable?: boolean;  // Whether elements should be clickable (controls pointer-events)
     houseCache: HouseCache;  // Element renderer caches (required)
+    editorMode?: boolean;  // Interactive editor mode: enable click-to-select behavior
+    selectedElementKey?: string | null;  // Currently selected element uniqueKey
+    onElementClick?: (uniqueKey: string, elementIndex: number) => void;  // Click callback for element selection
 }
 
 /**
@@ -332,7 +335,7 @@ function calculatePositionStyles(
  * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
  */
 export function renderElements(options: ElementRendererOptions): unknown[] {
-    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, elementsClickable = false, houseCache } = options;
+    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, elementsClickable = false, houseCache, editorMode = false, selectedElementKey, onElementClick } = options;
     
     // Extract caches from HouseCache
     const metadataCache = houseCache.elementMetadata;
@@ -375,7 +378,7 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
         const card = getOrCreateElementCard(uniqueKey, entity, elementConfig, createCardElement, elementCards);
         if (card && hass) {
             card.hass = hass;
-            
+
             // For group-shp elements, pass through mode, createCardElement and elementCards
             // so they can render their children and filter based on overview setting
             if (isGroupElementType(elementConfig)) {
@@ -383,10 +386,35 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                 card.createCardElement = createCardElement;
                 card.elementCards = elementCards;
             }
+
+            // Disable pointer events on card in editor mode so wrapper catches clicks
+            if (editorMode) {
+                card.style.pointerEvents = 'none';
+            } else if (card.style.pointerEvents === 'none') {
+                // Re-enable pointer events when not in editor mode
+                card.style.pointerEvents = '';
+            }
         }
 
+        // Handle element click in editor mode
+        const handleClick = (e: MouseEvent) => {
+            if (editorMode && onElementClick) {
+                e.stopPropagation();
+                e.preventDefault();
+                const elementIndex = elements.findIndex(el => el.uniqueKey === uniqueKey);
+                onElementClick(uniqueKey, elementIndex);
+            }
+        };
+
+        // Determine if this element is selected
+        const isSelected = uniqueKey === selectedElementKey;
+
         return keyed(uniqueKey, html`
-            <div class="element-wrapper" style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin}; pointer-events: ${elementsClickable ? 'auto' : 'none'};">
+            <div
+                class="element-wrapper ${isSelected ? 'selected-element' : ''}"
+                style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin}; pointer-events: ${elementsClickable || editorMode ? 'auto' : 'none'}; ${editorMode ? 'cursor: pointer;' : ''}"
+                @click=${handleClick}
+            >
                 ${card}
             </div>
         `);

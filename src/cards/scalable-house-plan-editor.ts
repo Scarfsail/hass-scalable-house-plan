@@ -15,6 +15,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     @state() private _config!: ScalableHousePlanConfig;
     @state() private _expandedSections: Set<string> = new Set(['rooms']);
     @state() private _previewRoomIndex: number | null = null;
+    @state() private _editorMode = false;
+    @state() private _selectedElementKey: string | null = null;
     private _localize?: LocalizeFunction;
 
     // Lazy-load localize function and cache it
@@ -29,6 +31,15 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         super.connectedCallback();
         // Load ha-entity-picker once for all element editors
         await loadHaEntityPicker();
+        // Listen for element selection events from card preview (via window)
+        // HA editor and preview are in separate DOM contexts, so use window events
+        window.addEventListener('scalable-house-plan-element-selected', this._handleElementSelection as EventListener);
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        // Clean up event listener
+        window.removeEventListener('scalable-house-plan-element-selected', this._handleElementSelection as EventListener);
     }
 
     static styles = [
@@ -60,6 +71,25 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
         return html`
             <div class="card-config">
+                <!-- Editor Mode Toggle Header -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <ha-icon icon="mdi:home-floor-plan" style="--mdc-icon-size: 20px; color: var(--primary-color);"></ha-icon>
+                        <span style="font-size: 18px; font-weight: 600; color: var(--primary-text-color);">
+                            ${this.localize('editor.house_plan_editor')}
+                        </span>
+                    </div>
+                    <button
+                        class="icon-button ${this._editorMode ? 'toggled' : ''}"
+                        @click=${this._toggleEditorMode}
+                        title="${this._editorMode ? 'Switch to Preview Mode' : 'Switch to Editor Mode'}"
+                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 16px; ${this._editorMode ? 'background: var(--primary-color); color: white;' : ''}"
+                    >
+                        <ha-icon icon="mdi:${this._editorMode ? 'pencil' : 'eye'}"></ha-icon>
+                        <span style="font-size: 14px; font-weight: 500;">${this._editorMode ? 'Editor' : 'Preview'}</span>
+                    </button>
+                </div>
+
                 <!-- Basic Configuration Section -->
                 <div class="config-section collapsible-section">
                     <div class="section-header ${this._expandedSections.has('basic') ? 'expanded' : ''}" @click=${() => this._toggleSection('basic')}>
@@ -242,6 +272,28 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         this.requestUpdate();
     }
 
+    // Editor mode toggle handler
+    private _toggleEditorMode(): void {
+        this._editorMode = !this._editorMode;
+
+        // Clear selection when switching to Normal mode
+        if (!this._editorMode) {
+            this._selectedElementKey = null;
+        }
+
+        // Update preview with new mode state
+        this._configChanged();
+    }
+
+    // Handle element selection from preview
+    private _handleElementSelection = (ev: CustomEvent): void => {
+        const { uniqueKey } = ev.detail;
+        this._selectedElementKey = uniqueKey;
+
+        // Update preview with new selection
+        this._configChanged();
+    }
+
     // Room handlers
     private _handlePreviewDetail(ev: CustomEvent): void {
         const { roomIndex, showPreview } = ev.detail;
@@ -415,10 +467,12 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     private _configChanged(): void {
         const event = new CustomEvent("config-changed", {
-            detail: { 
+            detail: {
                 config: {
                     ...this._config,
-                    _previewRoomIndex: this._previewRoomIndex
+                    _previewRoomIndex: this._previewRoomIndex,
+                    _editorMode: this._editorMode,
+                    _selectedElementKey: this._selectedElementKey
                 }
             },
             bubbles: true,

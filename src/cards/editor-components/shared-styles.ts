@@ -373,4 +373,24 @@ export const sharedStyles = css`
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         transform: rotate(2deg);
     }
+
+    /* Interactive Editor Mode - Selected Element Styles */
+    .selected-element {
+        outline: 3px solid var(--primary-color) !important;
+        outline-offset: 2px;
+        border-radius: 4px;
+        transition: outline 0.2s ease;
+        z-index: 1000;
+        position: relative;
+    }
+
+    .selected-element::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: 4px;
+        background: var(--primary-color);
+        opacity: 0.1;
+        pointer-events: none;
+    }
 `;

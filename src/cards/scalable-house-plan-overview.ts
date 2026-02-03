@@ -17,6 +17,8 @@ export class ScalableHousePlanOverview extends LitElement {
     @property({ attribute: false }) public onRoomClick?: (room: Room, index: number) => void;
     @property({ attribute: false }) public roomEntityCache?: Map<string, RoomEntityCache>;
     @property({ attribute: false }) public houseCache!: HouseCache;
+    @property({ type: Boolean }) public editorMode = false;
+    @property({ attribute: false }) public selectedElementKey?: string | null;
 
     @state() private _createCardElement: CreateCardElement = null;
     // Cache for element cards across all rooms (key: entity_id, value: card element)
@@ -113,6 +115,8 @@ export class ScalableHousePlanOverview extends LitElement {
                 .showRoomBackgrounds=${this.config!.show_room_backgrounds}
                 .onClick=${() => this._handleRoomClick(room, index)}
                 .cachedEntityIds=${this.roomEntityCache?.get(room.name)}
+                .editorMode=${this.editorMode}
+                .selectedElementKey=${this.selectedElementKey}
             ></scalable-house-plan-room>
         `);
     }
