@@ -34,12 +34,16 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         // Listen for element selection events from card preview (via window)
         // HA editor and preview are in separate DOM contexts, so use window events
         window.addEventListener('scalable-house-plan-element-selected', this._handleElementSelection as EventListener);
+        // Phase 3: Listen for element focus events from editor panel
+        window.addEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
         // Clean up event listener
         window.removeEventListener('scalable-house-plan-element-selected', this._handleElementSelection as EventListener);
+        // Phase 3: Clean up element focus listener
+        window.removeEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
     }
 
     static styles = [
@@ -291,6 +295,16 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         this._selectedElementKey = uniqueKey;
 
         // Update preview with new selection
+        this._configChanged();
+    }
+
+    // Phase 3: Handle element focus from editor panel
+    private _handleElementFocus = (ev: CustomEvent): void => {
+        // Only update selection when in editor mode
+        if (!this._editorMode) return;
+
+        const { uniqueKey } = ev.detail;
+        this._selectedElementKey = uniqueKey;
         this._configChanged();
     }
 

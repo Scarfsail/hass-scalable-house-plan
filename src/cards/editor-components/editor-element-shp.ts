@@ -287,7 +287,7 @@ export class EditorElementShp extends LitElement {
                     </div>
                 </div>
                 
-                <div class="item-content ${this.isExpanded ? 'expanded' : ''}">
+                <div class="item-content ${this.isExpanded ? 'expanded' : ''}" @click=${this._handleContentClick}>
                     <!-- Entity Picker (hidden if no-entity mode) -->
                     ${!this._isNoEntity ? html`
                         <div class="entity-picker">
@@ -504,6 +504,56 @@ export class EditorElementShp extends LitElement {
         this.dispatchEvent(event);
     }
 
+    /**
+     * Generate uniqueKey following the same pattern as element-renderer-shp.ts
+     * Used for bi-directional sync between editor and preview
+     */
+    private _getUniqueKey(): string {
+        const entityId = typeof this.entity === 'string' ? this.entity : this.entity.entity;
+        const planConfig = typeof this.entity !== 'string' ? this.entity.plan : undefined;
+
+        if (entityId) {
+            return entityId;
+        }
+
+        // No-entity element: generate key using format elementType-left-top-right-bottom-room_id-mode
+        const elementType = planConfig?.element?.type || 'unknown';
+        const left = planConfig?.left !== undefined ? String(planConfig.left) : 'undefined';
+        const top = planConfig?.top !== undefined ? String(planConfig.top) : 'undefined';
+        const right = planConfig?.right !== undefined ? String(planConfig.right) : 'undefined';
+        const bottom = planConfig?.bottom !== undefined ? String(planConfig.bottom) : 'undefined';
+
+        // Include room_id if present (for info boxes to be unique per room)
+        const roomId = planConfig?.element?.room_id ? `-${planConfig.element.room_id}` : '';
+
+        // Include mode only for info boxes (they have mode-specific visibility settings)
+        const isInfoBox = elementType === 'custom:info-box-shp';
+        const mode = isInfoBox && planConfig?.element?.mode ? `-${planConfig.element.mode}` : '';
+
+        return `${elementType}-${left}-${top}-${right}-${bottom}${roomId}${mode}`;
+    }
+
+    /**
+     * Emit focus event to sync preview highlighting
+     */
+    private _emitFocusEvent(): void {
+        const focusEvent = new CustomEvent('scalable-house-plan-element-focused', {
+            detail: { uniqueKey: this._getUniqueKey() },
+            bubbles: true,
+            composed: true
+        });
+        window.dispatchEvent(focusEvent);
+    }
+
+    /**
+     * Handle click on expanded content area - emit focus event for already-expanded elements
+     */
+    private _handleContentClick(): void {
+        if (this.isExpanded) {
+            this._emitFocusEvent();
+        }
+    }
+
     private _toggleExpansion() {
         const event = new CustomEvent('element-toggle', {
             detail: { index: this.index },
@@ -511,6 +561,12 @@ export class EditorElementShp extends LitElement {
             composed: true
         });
         this.dispatchEvent(event);
+
+        // Phase 3: Emit focus event when expanding (for bi-directional sync)
+        // Only emit when expanding (isExpanded will become true after this toggle)
+        if (!this.isExpanded) {
+            this._emitFocusEvent();
+        }
     }
 
     private _toggleNoEntity(ev: Event) {
