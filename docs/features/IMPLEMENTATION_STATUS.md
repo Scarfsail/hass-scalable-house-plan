@@ -1,8 +1,8 @@
 # Interactive Editor Mode - Implementation Status
 
 **Feature:** Interactive Editor Mode for Scalable House Plan Card
-**Last Updated:** 2026-02-03
-**Current Phase:** Phase 4 (Ready to Start)
+**Last Updated:** 2026-02-04
+**Current Phase:** Phase 5 (Ready to Start)
 
 ---
 
@@ -11,9 +11,9 @@
 The Interactive Editor Mode feature allows users to click elements in the preview to select and edit them, with bi-directional sync between the preview and editor panel.
 
 **Total Phases:** 5
-**Completed:** 3
+**Completed:** 4
 **In Progress:** 0
-**Remaining:** 2
+**Remaining:** 1
 
 ---
 
@@ -112,45 +112,57 @@ The Interactive Editor Mode feature allows users to click elements in the previe
 
 ---
 
-### 🔄 Phase 4: Preview Selection → Editor Expansion (READY)
+### ✅ Phase 4: Preview Selection → Editor Expansion (COMPLETE)
 
-**Status:** 🔄 READY FOR IMPLEMENTATION
-**Documentation:** `docs/features/START_PHASE_4_HERE.md`
-**Reference:** `docs/features/feature_interactive_editor.md` (lines 1066-1105)
+**Status:** ✅ COMPLETE
+**Completion Date:** 2026-02-04
+**Documentation:** `docs/features/phase4_completion_summary.md`
 
-**What Will Be Done:**
-- Add `expandElementByEntityId()` method to editor-elements-shp
-- Add `expandElementInRoom()` method to editor-room-shp
-- Add `expandElementAtPath()` method to editor-rooms-shp
-- Wire up selection event to trigger expansion
-- Implement auto-scroll to expanded element
-- **Focus the Plan (Position & Layout) section** when clicking element in preview
+**What Was Done:**
+- Added `expandElementByKey()` method to editor-elements-shp (replaces entityId with uniqueKey)
+- Added `expandElementInRoom()` method to editor-room-shp
+- Added `expandElementAtPath()` method to editor-rooms-shp
+- Added `expandWithPlanFocus()` method to editor-element-shp
+- Wired up selection event to trigger expansion chain
+- Implemented auto-scroll to expanded element
+- **Plan (Position & Layout) section auto-focuses** when clicking element in preview
+- **Fixed group-shp support** by using uniqueKey instead of entityId for matching
 
-**Important UX Note:**
-When clicking an element in the house map preview (in Editor mode), the editor should:
-1. Auto-expand the corresponding element in the editor panel
-2. Auto-scroll to make it visible
-3. **Focus/expand the "Plan (Position & Layout)" section** specifically, as this is what users typically want to edit when clicking on a positioned element
+**Files Modified:**
+- `src/components/element-renderer-shp.ts` (~1 line) - Exported generateElementKey
+- `src/components/scalable-house-plan-room.ts` (~5 lines) - Added roomIndex property, updated event
+- `src/cards/scalable-house-plan-overview.ts` (~1 line) - Pass roomIndex to rooms
+- `src/cards/scalable-house-plan.ts` (~1 line) - Pass roomIndex to detail view
+- `src/cards/scalable-house-plan-detail.ts` (~2 lines) - Accept and pass roomIndex
+- `src/cards/editor-components/editor-element-shp.ts` (~8 lines) - Added expandWithPlanFocus()
+- `src/cards/editor-components/editor-elements-shp.ts` (~30 lines) - Added expandElementByKey()
+- `src/cards/editor-components/editor-room-shp.ts` (~15 lines) - Added expandElementInRoom()
+- `src/cards/editor-components/editor-rooms-shp.ts` (~15 lines) - Added expandElementAtPath()
+- `src/cards/scalable-house-plan-editor.ts` (~10 lines) - Wired up auto-expansion
 
-**Files to Modify:**
-- `src/cards/editor-components/editor-elements-shp.ts`
-- `src/cards/editor-components/editor-room-shp.ts`
-- `src/cards/editor-components/editor-rooms-shp.ts`
-- `src/cards/scalable-house-plan-editor.ts`
+**Actual Time:** ~90 minutes (including group-shp fix)
+**Actual LOC:** ~88 lines
 
-**Estimated Time:** 60-75 minutes
-**Estimated LOC:** ~80 lines
+**Key Technical Solutions:**
+- UniqueKey-based matching instead of entityId (supports no-entity elements like groups)
+- Expansion chain from rooms → room → elements → element
+- `updateComplete.then()` for DOM timing
+- Smooth scroll with `scrollIntoView({ behavior: 'smooth', block: 'nearest' })`
+- Plan section focus via `_planSectionExpanded = true`
 
-**Prerequisites:**
-- ✅ Phase 1 complete
-- ✅ Phase 2 complete
-- ✅ Phase 3 complete
+**Validation:** ✅ All acceptance criteria met
+- [x] Clicking element in preview expands it in editor
+- [x] Editor scrolls to expanded element
+- [x] Plan section auto-expands
+- [x] Works with all element types (including groups)
+- [x] Works when room is collapsed (auto-expands room first)
 
 ---
 
-### ⏳ Phase 5: Polish & Edge Cases (PENDING)
+### 🔄 Phase 5: Polish & Edge Cases (READY)
 
-**Status:** ⏳ PENDING (Phases 1-4 Required)
+**Status:** 🔄 READY FOR IMPLEMENTATION
+**Documentation:** `docs/features/START_PHASE_5_HERE.md`
 **Reference:** `docs/features/feature_interactive_editor.md` (lines 1107-1162)
 
 **What Will Be Done:**
@@ -175,7 +187,7 @@ When clicking an element in the house map preview (in Editor mode), the editor s
 - ✅ Phase 1 complete
 - ✅ Phase 2 complete
 - ✅ Phase 3 complete
-- ⏳ Phase 4 complete
+- ✅ Phase 4 complete
 
 ---
 
@@ -184,7 +196,7 @@ When clicking an element in the house map preview (in Editor mode), the editor s
 ### Must Have (from spec)
 - [x] Toggle control visible in main editor header
 - [x] Default mode is Normal (preserve current behavior)
-- [ ] In Editor mode, clicking element in preview expands it in editor
+- [x] In Editor mode, clicking element in preview expands it in editor
 - [x] In Editor mode, expanding element in editor highlights it in preview
 - [x] Selected element has colored outline (2-3px)
 - [x] Selection only works in detail view
@@ -195,10 +207,10 @@ When clicking an element in the house map preview (in Editor mode), the editor s
 - [x] Nested elements: clicking selects the innermost element
 
 ### Should Have
-- [ ] Editor panel scrolls to make expanded element visible
+- [x] Editor panel scrolls to make expanded element visible
 - [ ] Selection cleared when switching rooms
 - [ ] Clicking group empty space selects the group itself
-- [ ] Plan section auto-expands when element selected from preview
+- [x] Plan section auto-expands when element selected from preview
 
 ### Won't Have (This Release)
 - [ ] Drag and drop repositioning (planned for next iteration)
@@ -211,13 +223,13 @@ When clicking an element in the house map preview (in Editor mode), the editor s
 ## Quick Navigation
 
 ### Getting Started (New Context)
-1. Read `START_PHASE_4_HERE.md` - entry point for Phase 4
+1. Read `START_PHASE_5_HERE.md` - entry point for Phase 5
 2. Read this file (`IMPLEMENTATION_STATUS.md`) for context
-3. Start implementing Phase 4
+3. Start implementing Phase 5
 
 ### For Implementation
-- **Phase 1-3 Complete:** See respective completion summaries
-- **Phase 4 Next:** See `START_PHASE_4_HERE.md`
+- **Phase 1-4 Complete:** See respective completion summaries
+- **Phase 5 Next:** See `START_PHASE_5_HERE.md`
 - **Full Spec:** See `feature_interactive_editor.md`
 
 ### For Testing
@@ -234,12 +246,12 @@ When clicking an element in the house map preview (in Editor mode), the editor s
 | Phase 1 | 60 min | ~60 min | ✅ Complete |
 | Phase 2 | 55-70 min | ~90 min | ✅ Complete |
 | Phase 3 | 30-40 min | ~45 min | ✅ Complete |
-| Phase 4 | 60-75 min | - | 🔄 Ready |
-| Phase 5 | 90-120 min | - | ⏳ Pending |
-| **Total** | **5-6 hours** | ~3.25h | **60% Complete** |
+| Phase 4 | 60-75 min | ~90 min | ✅ Complete |
+| Phase 5 | 90-120 min | - | 🔄 Ready |
+| **Total** | **5-6 hours** | ~4.75h | **80% Complete** |
 
-**Time Spent:** ~195 minutes (~3.25 hours)
-**Remaining:** ~2.5-3.5 hours
+**Time Spent:** ~285 minutes (~4.75 hours)
+**Remaining:** ~1.5-2 hours
 
 ---
 
@@ -272,4 +284,4 @@ When clicking an element in the house map preview (in Editor mode), the editor s
 
 ---
 
-_Last Updated: 2026-02-03 | Next Review: After Phase 4 completion_
+_Last Updated: 2026-02-04 | Next Review: After Phase 5 completion_

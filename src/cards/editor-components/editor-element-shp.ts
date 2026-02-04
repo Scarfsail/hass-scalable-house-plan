@@ -635,4 +635,14 @@ export class EditorElementShp extends LitElement {
         });
         this.dispatchEvent(event);
     }
+
+    /**
+     * Phase 4: Public method to expand element with plan section focused
+     * Called from parent when element is clicked in preview
+     */
+    public expandWithPlanFocus(): void {
+        this.isExpanded = true;
+        this._planSectionExpanded = true;  // Ensure plan section is open
+        this.requestUpdate();
+    }
 }

@@ -117,6 +117,7 @@ export class ScalableHousePlanOverview extends LitElement {
                 .cachedEntityIds=${this.roomEntityCache?.get(room.name)}
                 .editorMode=${this.editorMode}
                 .selectedElementKey=${this.selectedElementKey}
+                .roomIndex=${index}
             ></scalable-house-plan-room>
         `);
     }

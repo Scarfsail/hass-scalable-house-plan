@@ -60,6 +60,7 @@ export class ScalableHousePlanRoom extends LitElement {
     @property({ attribute: false }) public houseCache!: HouseCache;
     @property({ type: Boolean }) public editorMode = false;
     @property({ attribute: false }) public selectedElementKey?: string | null;
+    @property({ type: Number }) public roomIndex?: number;
 
     // Constants
     private static readonly DEFAULT_ROOM_COLOR = 'rgba(128, 128, 128, 0.2)';
@@ -455,8 +456,8 @@ export class ScalableHousePlanRoom extends LitElement {
             houseCache: this.houseCache,
             editorMode: this.editorMode,
             selectedElementKey: this.selectedElementKey,
-            onElementClick: (uniqueKey: string, elementIndex: number) => {
-                this._handleElementClick(uniqueKey, elementIndex);
+            onElementClick: (uniqueKey: string, elementIndex: number, entityId: string) => {
+                this._handleElementClick(uniqueKey, elementIndex, entityId);
             }
         });
 
@@ -577,8 +578,8 @@ export class ScalableHousePlanRoom extends LitElement {
             houseCache: this.houseCache,
             editorMode: this.editorMode,
             selectedElementKey: this.selectedElementKey,
-            onElementClick: (uniqueKey: string, elementIndex: number) => {
-                this._handleElementClick(uniqueKey, elementIndex);
+            onElementClick: (uniqueKey: string, elementIndex: number, entityId: string) => {
+                this._handleElementClick(uniqueKey, elementIndex, entityId);
             }
         });
 
@@ -692,12 +693,14 @@ export class ScalableHousePlanRoom extends LitElement {
      * Emits element-selected event that bubbles up to editor
      * Uses window-level event to cross HA editor/preview boundary
      */
-    private _handleElementClick(uniqueKey: string, elementIndex: number): void {
+    private _handleElementClick(uniqueKey: string, elementIndex: number, entityId: string): void {
         // Dispatch to window for HA editor to catch (editor and preview are in separate DOM contexts)
         const windowEvent = new CustomEvent('scalable-house-plan-element-selected', {
             detail: {
                 uniqueKey: uniqueKey,
-                elementIndex: elementIndex
+                elementIndex: elementIndex,
+                roomIndex: this.roomIndex,
+                entityId: entityId
             },
             bubbles: true,
             composed: true
@@ -708,7 +711,9 @@ export class ScalableHousePlanRoom extends LitElement {
         const localEvent = new CustomEvent('element-selected', {
             detail: {
                 uniqueKey: uniqueKey,
-                elementIndex: elementIndex
+                elementIndex: elementIndex,
+                roomIndex: this.roomIndex,
+                entityId: entityId
             },
             bubbles: true,
             composed: true

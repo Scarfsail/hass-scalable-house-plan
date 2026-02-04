@@ -1,5 +1,5 @@
 import { LitElement, html, css } from "lit-element";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, state, query } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { Room } from "./types";
@@ -17,6 +17,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     @state() private _previewRoomIndex: number | null = null;
     @state() private _editorMode = false;
     @state() private _selectedElementKey: string | null = null;
+    @query('editor-rooms-shp') private _roomsEditor?: any;
     private _localize?: LocalizeFunction;
 
     // Lazy-load localize function and cache it
@@ -291,8 +292,15 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     // Handle element selection from preview
     private _handleElementSelection = (ev: CustomEvent): void => {
-        const { uniqueKey } = ev.detail;
+        const { uniqueKey, roomIndex } = ev.detail;
         this._selectedElementKey = uniqueKey;
+
+        // Auto-expand element in editor (Phase 4)
+        if (this._editorMode && roomIndex !== undefined && uniqueKey) {
+            this.updateComplete.then(() => {
+                this._roomsEditor?.expandElementAtPath(roomIndex, uniqueKey);
+            });
+        }
 
         // Update preview with new selection
         this._configChanged();

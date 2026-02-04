@@ -464,4 +464,20 @@ export class EditorRoomShp extends LitElement {
         });
         this.dispatchEvent(event);
     }
+
+    /**
+     * Phase 4: Public method to expand element in room
+     * Called from parent rooms editor when element is clicked in preview
+     */
+    public expandElementInRoom(uniqueKey: string): void {
+        // Ensure room is expanded first
+        this._expanded = true;
+        this.requestUpdate();
+
+        // Call child editor-elements-shp to expand the element
+        this.updateComplete.then(() => {
+            const elementsEditor = this.shadowRoot?.querySelector('editor-elements-shp');
+            (elementsEditor as any)?.expandElementByKey?.(uniqueKey);
+        });
+    }
 }

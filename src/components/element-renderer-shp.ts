@@ -31,7 +31,7 @@ export interface ElementRendererOptions {
     houseCache: HouseCache;  // Element renderer caches (required)
     editorMode?: boolean;  // Interactive editor mode: enable click-to-select behavior
     selectedElementKey?: string | null;  // Currently selected element uniqueKey
-    onElementClick?: (uniqueKey: string, elementIndex: number) => void;  // Click callback for element selection
+    onElementClick?: (uniqueKey: string, elementIndex: number, entity: string) => void;  // Click callback for element selection
 }
 
 /**
@@ -69,7 +69,7 @@ interface CachedElementStructure {
  * Generate unique key for no-entity elements based on type and position
  * Key format: elementType-left-top-right-bottom-room_id-mode (mode only for info boxes)
  */
-function generateElementKey(elementType: string, plan: any): string {
+export function generateElementKey(elementType: string, plan: any): string {
     const left = plan.left !== undefined ? String(plan.left) : 'undefined';
     const top = plan.top !== undefined ? String(plan.top) : 'undefined';
     const right = plan.right !== undefined ? String(plan.right) : 'undefined';
@@ -402,7 +402,8 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                 e.stopPropagation();
                 e.preventDefault();
                 const elementIndex = elements.findIndex(el => el.uniqueKey === uniqueKey);
-                onElementClick(uniqueKey, elementIndex);
+                const element = elements.find(el => el.uniqueKey === uniqueKey);
+                onElementClick(uniqueKey, elementIndex, element?.entity || '');
             }
         };
 

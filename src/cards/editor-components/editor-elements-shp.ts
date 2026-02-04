@@ -8,6 +8,8 @@ import type { EntityConfig } from "../types";
 import { getLocalizeFunction, type LocalizeFunction } from "../../localize";
 import "./editor-element-shp";
 import { CrossContainerCoordinator } from "./cross-container-coordinator";
+import { generateElementKey } from "../../components/element-renderer-shp";
+import { getElementTypeForEntity } from "../../utils";
 
 /**
  * Generate a stable key for an entity config
@@ -290,5 +292,49 @@ export class EditorElementsShp extends LitElement {
             this.dispatchEvent(event);
         }
         // If it was a cross-container move, the coordinator handles it
+    }
+
+    /**
+     * Phase 4: Public method to expand element by entity ID
+     * Called from parent room editor when element is clicked in preview
+     */
+    public expandElementByKey(uniqueKey: string): boolean {
+        if (!uniqueKey) return false;
+
+        // Find element by matching its uniqueKey
+        const elementIndex = this.elements.findIndex((el, index) => {
+            const entity = typeof el === 'string' ? el : el.entity;
+            const plan = typeof el === 'string' ? undefined : el.plan;
+
+            // For entity-based elements, uniqueKey is the entity ID
+            if (entity && entity === uniqueKey) {
+                return true;
+            }
+
+            // For no-entity elements, generate the key and compare
+            if (!entity && plan?.element?.type) {
+                const generatedKey = generateElementKey(plan.element.type, plan);
+                return generatedKey === uniqueKey;
+            }
+
+            return false;
+        });
+
+        if (elementIndex === -1) return false;
+
+        // Expand the element
+        this.expandedElements.add(elementIndex);
+        this.requestUpdate();
+
+        // Scroll into view after render
+        this.updateComplete.then(() => {
+            const elementComponent = this.shadowRoot?.querySelectorAll('editor-element-shp')[elementIndex];
+            if (elementComponent) {
+                (elementComponent as any).expandWithPlanFocus?.();
+                elementComponent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+
+        return true;
     }
 }

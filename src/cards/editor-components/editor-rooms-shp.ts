@@ -128,14 +128,30 @@ export class EditorRoomsShp extends LitElement {
     private _handleRoomsReorder(e: CustomEvent) {
         e.stopPropagation();
         const { oldIndex, newIndex } = e.detail;
-        
+
         const reorderedRooms = DragDropMixin.reorderArray(this.rooms, oldIndex, newIndex);
-        
+
         const event = new CustomEvent('rooms-reorder', {
             detail: { rooms: reorderedRooms },
             bubbles: true,
             composed: true
         });
         this.dispatchEvent(event);
+    }
+
+    /**
+     * Phase 4: Public method to expand element at specific room and entity path
+     * Called from main editor when element is clicked in preview
+     */
+    public expandElementAtPath(roomIndex: number, uniqueKey: string): void {
+        if (roomIndex < 0 || roomIndex >= this.rooms.length) return;
+
+        // Find room component by index
+        this.requestUpdate();
+        this.updateComplete.then(() => {
+            const roomComponents = this.shadowRoot?.querySelectorAll('editor-room-shp');
+            const roomComponent = roomComponents?.[roomIndex];
+            (roomComponent as any)?.expandElementInRoom?.(uniqueKey);
+        });
     }
 }

@@ -272,6 +272,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                         .houseCache=${this._houseCache}
                         .editorMode=${this._editorMode}
                         .selectedElementKey=${this._selectedElementKey}
+                        .roomIndex=${this._selectedRoomIndex}
                     ></scalable-house-plan-detail>
                 </div>
             </div>
