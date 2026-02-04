@@ -493,6 +493,7 @@ export class ScalableHousePlanRoom extends LitElement {
                         class="room-polygon overview motion-normal ${elementsClickable ? 'no-pointer-events' : ''}"
                         style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
                         @action=${elementsClickable ? null : this._handleAction}
+                        @click=${this.editorMode ? this._handleRoomBackgroundClick : null}
                         .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
                     <!-- Inverted gradient polygon - fades in when normal fades out -->
@@ -504,6 +505,7 @@ export class ScalableHousePlanRoom extends LitElement {
                         class="room-polygon overview motion-inverted ${elementsClickable ? 'no-pointer-events' : ''}"
                         style="cursor: ${elementsClickable ? 'default' : 'pointer'}; opacity: 0;"
                         @action=${elementsClickable ? null : this._handleAction}
+                        @click=${this.editorMode ? this._handleRoomBackgroundClick : null}
                         .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
                 ` : svg`
@@ -516,6 +518,7 @@ export class ScalableHousePlanRoom extends LitElement {
                         class="room-polygon overview ${elementsClickable ? 'no-pointer-events' : ''}"
                         style="cursor: ${elementsClickable ? 'default' : 'pointer'};"
                         @action=${elementsClickable ? null : this._handleAction}
+                        @click=${this.editorMode ? this._handleRoomBackgroundClick : null}
                         .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
                 `}
@@ -639,7 +642,7 @@ export class ScalableHousePlanRoom extends LitElement {
                                 stroke="${strokeColor}"
                                 stroke-width="2"
                                 class="room-polygon motion-normal"
-                                @click=${(e: Event) => e.stopPropagation()}
+                                @click=${this.editorMode ? this._handleRoomBackgroundClick : (e: Event) => e.stopPropagation()}
                             />
                             <!-- Inverted gradient polygon - fades in when normal fades out -->
                             <polygon 
@@ -649,7 +652,7 @@ export class ScalableHousePlanRoom extends LitElement {
                                 stroke-width="2"
                                 class="room-polygon motion-inverted"
                                 style="opacity: 0;"
-                                @click=${(e: Event) => e.stopPropagation()}
+                                @click=${this.editorMode ? this._handleRoomBackgroundClick : (e: Event) => e.stopPropagation()}
                             />
                         ` : svg`
                             <!-- Single polygon for non-motion states -->
@@ -659,7 +662,7 @@ export class ScalableHousePlanRoom extends LitElement {
                                 stroke="${strokeColor}"
                                 stroke-width="2"
                                 class="room-polygon"
-                                @click=${(e: Event) => e.stopPropagation()}
+                                @click=${this.editorMode ? this._handleRoomBackgroundClick : (e: Event) => e.stopPropagation()}
                             />
                         `}
                     </svg>
@@ -719,6 +722,31 @@ export class ScalableHousePlanRoom extends LitElement {
             composed: true
         });
         this.dispatchEvent(localEvent);
+    }
+
+    /**
+     * Handle room background click in editor mode
+     * Clears element selection by emitting null uniqueKey
+     */
+    private _handleRoomBackgroundClick(e: Event): void {
+        // Only handle in editor mode
+        if (!this.editorMode) return;
+        
+        // Stop event from propagating
+        e.stopPropagation();
+        
+        // Emit selection event with null to clear selection
+        const windowEvent = new CustomEvent('scalable-house-plan-element-selected', {
+            detail: {
+                uniqueKey: null,
+                elementIndex: -1,
+                roomIndex: this.roomIndex,
+                entityId: ''
+            },
+            bubbles: true,
+            composed: true
+        });
+        window.dispatchEvent(windowEvent);
     }
 
     /**

@@ -399,11 +399,26 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
         // Handle element click in editor mode
         const handleClick = (e: MouseEvent) => {
             if (editorMode && onElementClick) {
+                // Check if click came from a child element-wrapper (for nested groups)
+                // If so, don't handle this click - let the child handle it
+                const target = e.target as HTMLElement;
+                const currentWrapper = e.currentTarget as HTMLElement;
+                
+                // Find if there's an element-wrapper between target and currentTarget
+                let element = target;
+                while (element && element !== currentWrapper) {
+                    if (element.classList?.contains('element-wrapper') && element !== currentWrapper) {
+                        // Click came from a child element wrapper, ignore it
+                        return;
+                    }
+                    element = element.parentElement as HTMLElement;
+                }
+                
                 e.stopPropagation();
                 e.preventDefault();
                 const elementIndex = elements.findIndex(el => el.uniqueKey === uniqueKey);
-                const element = elements.find(el => el.uniqueKey === uniqueKey);
-                onElementClick(uniqueKey, elementIndex, element?.entity || '');
+                const elementData = elements.find(el => el.uniqueKey === uniqueKey);
+                onElementClick(uniqueKey, elementIndex, elementData?.entity || '');
             }
         };
 

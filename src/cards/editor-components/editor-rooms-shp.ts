@@ -21,6 +21,7 @@ function getRoomKey(room: Room, index: number): string {
 export class EditorRoomsShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
     @property({ attribute: false }) rooms: Room[] = [];
+    @property({ type: String }) selectedElementKey?: string | null; // Currently selected element key (for Task 4)
 
     static styles = [
         sharedStyles,
@@ -58,6 +59,7 @@ export class EditorRoomsShp extends LitElement {
                                     .hass=${this.hass}
                                     .room=${room}
                                     .roomIndex=${index}
+                                    .selectedElementKey=${this.selectedElementKey}
                                     @room-update=${this._handleRoomUpdate}
                                     @room-duplicate=${this._handleRoomDuplicate}
                                     @room-remove=${this._handleRoomRemove}

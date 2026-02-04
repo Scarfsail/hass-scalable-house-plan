@@ -122,6 +122,28 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 width: 100%;
                 height: 100%;
             }
+            
+            .edit-mode-badge {
+                position: absolute;
+                top: 12px;
+                right: 12px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 12px;
+                background: var(--primary-color, #03a9f4);
+                color: white;
+                border-radius: 16px;
+                font-size: 12px;
+                font-weight: 500;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                z-index: 10;
+                pointer-events: none;
+            }
+            
+            .edit-mode-badge ha-icon {
+                --mdc-icon-size: 16px;
+            }
         `;
     }
 
@@ -243,6 +265,14 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             `;
         }
 
+        // Edit mode badge
+        const editModeBadge = this._editorMode ? html`
+            <div class="edit-mode-badge">
+                <ha-icon icon="mdi:pencil"></ha-icon>
+                <span>Edit Mode</span>
+            </div>
+        ` : '';
+        
         // Always show overview as base layer
         const overviewHtml = html`
             <scalable-house-plan-overview
@@ -282,6 +312,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         return html`
             ${overviewHtml}
             ${detailHtml}
+            ${editModeBadge}
         `;
     }
 

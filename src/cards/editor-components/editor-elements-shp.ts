@@ -30,6 +30,7 @@ export class EditorElementsShp extends LitElement {
     @property({ type: Number }) groupIndex?: number;
     @property({ type: Boolean }) hideHeader: boolean = false; // Hide header when embedded
     @property({ type: String }) areaId?: string; // Optional area ID for filtering
+    @property({ type: String }) selectedElementKey?: string | null; // Currently selected element key (for Task 4)
     private _localize?: LocalizeFunction;
 
     private get localize(): LocalizeFunction {
@@ -199,6 +200,34 @@ export class EditorElementsShp extends LitElement {
 
     private _handleElementRemove(e: CustomEvent) {
         e.stopPropagation(); // Prevent bubbling to parent editor-elements-shp
+        
+        const removedIndex = e.detail.index;
+        const removedElement = this.elements[removedIndex];
+        
+        // Task 4: Check if removed element was selected, and clear selection if so
+        if (this.selectedElementKey && removedElement) {
+            const entity = typeof removedElement === 'string' ? removedElement : removedElement.entity;
+            const plan = typeof removedElement === 'string' ? undefined : removedElement.plan;
+            
+            // Generate unique key for removed element
+            let removedKey: string | null = null;
+            if (entity) {
+                removedKey = entity;
+            } else if (!entity && plan?.element?.type) {
+                removedKey = generateElementKey(plan.element.type, plan);
+            }
+            
+            // If removed element was selected, clear selection
+            if (removedKey === this.selectedElementKey) {
+                const clearEvent = new CustomEvent('scalable-house-plan-element-focused', {
+                    detail: { uniqueKey: null },
+                    bubbles: true,
+                    composed: true
+                });
+                window.dispatchEvent(clearEvent);
+            }
+        }
+        
         const event = new CustomEvent('elements-remove', {
             detail: e.detail,
             bubbles: true,

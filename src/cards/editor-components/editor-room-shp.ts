@@ -12,6 +12,7 @@ export class EditorRoomShp extends LitElement {
     @property({ attribute: false }) hass!: HomeAssistant;
     @property({ attribute: false }) room!: Room;
     @property({ type: Number }) roomIndex!: number;
+    @property({ type: String }) selectedElementKey?: string | null; // Currently selected element key (for Task 4)
     @state() private _expanded = false;
     @state() private _expandedSections: Set<string> = new Set(['entities']); // Only entities expanded by default
     @state() private _yamlMode = false;
@@ -307,6 +308,7 @@ export class EditorRoomShp extends LitElement {
                                     .elements=${this.room.entities || []}
                                     .areaId=${this.room.area}
                                     .hideHeader=${true}
+                                    .selectedElementKey=${this.selectedElementKey}
                                     @elements-add=${this._handleElementAdd}
                                     @elements-update=${this._handleElementsUpdate}
                                     @elements-remove=${this._handleElementRemove}

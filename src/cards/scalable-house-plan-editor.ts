@@ -255,6 +255,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                                 <editor-rooms-shp
                             .hass=${this.hass}
                             .rooms=${this._config.rooms || []}
+                            .selectedElementKey=${this._selectedElementKey}
                             @room-add=${this._addRoom}
                             @room-update=${this._updateRoom}
                             @room-remove=${this._removeRoom}
@@ -319,7 +320,19 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     // Room handlers
     private _handlePreviewDetail(ev: CustomEvent): void {
         const { roomIndex, showPreview } = ev.detail;
+        
+        // Clear selection when switching rooms (Task 3)
+        if (this._previewRoomIndex !== null && roomIndex !== this._previewRoomIndex) {
+            this._selectedElementKey = null;
+        }
+        
         this._previewRoomIndex = showPreview ? roomIndex : null;
+        
+        // Clear selection when hiding preview
+        if (!showPreview) {
+            this._selectedElementKey = null;
+        }
+        
         // Trigger config update to update the preview
         this._configChanged();
     }
