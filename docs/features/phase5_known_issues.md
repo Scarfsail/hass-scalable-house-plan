@@ -1,104 +1,114 @@
 # Phase 5 Known Issues
 
 **Date:** 2026-02-04
-**Status:** Known issues to be fixed in follow-up
+**Status:** ✅ All issues resolved - Phase 5 complete!
 
 ---
 
-## Issue 1: Nested Group Click Selection
+## ✅ Issue 1: Nested Group Click Selection (FIXED)
 
 **Problem:**
-When clicking on an element inside a group, the parent group gets selected instead of the child element.
+When clicking on an element inside a group, the parent group got selected instead of the child element.
 
 **Expected Behavior:**
-- Clicking on a child element inside a group should select the child element
-- Only clicking on the group's empty space should select the group itself
+- Click on a child element inside a group → Child element is selected and expanded in both the editor panel and highlighted in preview
+- Click on empty space in group → Group itself is selected
+- Works with multi-level nested groups (groups within groups)
 
-**Current Behavior:**
-- Clicking on a child element selects the parent group
-- The group element expands in the editor panel instead of the child
+**Root Cause:**
+The selection system was not passing parent group context when child elements were clicked. The editor couldn't navigate the nested hierarchy to find and expand child elements within groups.
 
-**Attempted Fix:**
-Added logic in `element-renderer-shp.ts` to check if click originated from a child element-wrapper, but it's not working as expected.
+**Solution Implemented:**
+1. Added `groupUniqueKey` property to `group-shp` to track the group's own uniqueKey
+2. Added `parentGroupKey` parameter to `onElementClick` callback to pass parent context
+3. Updated event emission to include `parentGroupKey` in 'scalable-house-plan-element-selected' event
+4. Enhanced `expandElementByKey` in editor-elements-shp to handle nested selections:
+   - First expands parent group if `parentGroupKey` provided
+   - Then finds nested editor-elements-shp inside group
+   - Finally expands child element within that nested list
+   - Supports multi-level nesting through recursion
 
-**Files Involved:**
-- `src/components/element-renderer-shp.ts` - Click handler logic
-- May need to investigate event propagation in group-shp component
+**Files Modified:**
+- `src/elements/group-shp.ts`
+- `src/components/element-renderer-shp.ts`
+- `src/components/scalable-house-plan-room.ts`
+- `src/cards/scalable-house-plan-editor.ts`
+- `src/cards/editor-components/editor-rooms-shp.ts`
+- `src/cards/editor-components/editor-room-shp.ts`
+- `src/cards/editor-components/editor-elements-shp.ts`
+
+**Result:**
+✅ Clicking a child element in preview selects and expands that child in the editor
+✅ Clicking group empty space selects the group
+✅ Works with multi-level nested groups
+✅ Child element is highlighted in preview when selected
 
 ---
 
-## Issue 2: Group Child Selection Not Highlighting in Preview
+## ✅ Issue 2: Group Child Selection and Highlighting (FIXED)
 
 **Problem:**
-When selecting an element inside a group from the editor panel (left side), the element is not highlighted in the preview (right side).
+When selecting an element inside a group from the editor panel (left side), the element was not being highlighted correctly in the preview (right side).
 
 **Expected Behavior:**
-- Expanding an element in the editor that is nested inside a group should:
-  1. Highlight that child element with blue outline in preview
-  2. Work the same way as non-nested elements
+- Expand a group in editor → Group outline highlighted in preview (blue border around entire group)
+- Expand a child element inside a group in editor → Child element highlighted in preview (blue border around child)
+- Both group and child highlighting should work independently
 
-**Current Behavior:**
-- Selecting/expanding a child element in the editor does not show the blue outline in preview
-- The highlight only works for top-level elements, not nested group children
+**Root Cause Same as Issue 1:**
+The selection system didn't support navigating nested group hierarchies. When expanding a child in the editor, the system couldn't properly communicate which specific child should be highlighted in the preview.
 
-**Suspected Cause:**
-- The `selectedElementKey` may not be properly passed down to nested group children
-- Group-shp component may not be passing through the selection state to its child elements
-- May need to recursively pass `selectedElementKey` through group hierarchy
+**Solution:**
+Same implementation as Issue 1 - the nested selection system handles both directions:
+- **Preview → Editor:** Click child in preview → expands child in editor
+- **Editor → Preview:** Expand child in editor → highlights child in preview
 
-**Files Involved:**
-- `src/elements/group-shp.ts` - Group element component
-- `src/components/element-renderer-shp.ts` - Element rendering and selection logic
-- May need to check how groups render their children
+The `selectedElementKey` property is now properly passed through the group hierarchy and applied to child wrappers, enabling correct highlighting at any nesting level.
 
----
+**Files Modified:**
+Same as Issue 1 (integrated solution)
 
-## Next Steps
-
-1. **Fix nested group click selection:**
-   - Debug event propagation in group elements
-   - Ensure only innermost clicked element is selected
-   - Test with multi-level nested groups
-
-2. **Fix group child highlight in preview:**
-   - Trace how `selectedElementKey` flows through group-shp
-   - Ensure groups pass selection state to children
-   - Verify element-renderer properly highlights nested elements
-
-3. **Test thoroughly:**
-   - Single nested element in group
-   - Multiple nested elements in group
-   - Multi-level nested groups (groups within groups)
-   - Switching selection between group and child elements
+**Result:**
+✅ Expanding a child element in editor highlights that child in preview
+✅ Expanding a group in editor highlights the group in preview  
+✅ Highlighting works at any nesting level
+✅ Visual feedback identical to top-level element selection
 
 ---
 
-## Testing Scenarios to Verify Fix
+## Testing Scenarios - Expected Results ✅
 
-### Scenario 1: Click Child Element in Preview
+### Scenario 1: Click Child Element in Preview ✅
 1. Have a group with child elements in preview
 2. Click on a child element (not empty space)
-3. ✅ Child element should be selected and highlighted
-4. ✅ Child element should expand in editor panel
-5. ❌ Currently: Group gets selected instead
+3. ✅ **Child element** is selected and expanded in editor panel
+4. ✅ **Child element** is highlighted with blue outline in preview
+5. ✅ Parent group is also expanded (to show the child)
 
-### Scenario 2: Click Group Empty Space in Preview
+### Scenario 2: Click Group Empty Space in Preview ✅  
 1. Have a group with child elements in preview
 2. Click on empty space within group (not on child)
-3. ✅ Group itself should be selected
-4. ✅ Group should expand in editor panel
+3. ✅ **Group** itself is selected and expanded in editor panel
+4. ✅ **Group** is highlighted with blue outline in preview
 
-### Scenario 3: Expand Child Element in Editor
-1. Have a group with child elements
+### Scenario 3: Expand Child Element in Editor ✅
+1. Have a group with child elements in editor panel
 2. Expand a child element in the editor panel (left side)
-3. ✅ Child element should be highlighted in preview with blue outline
-4. ❌ Currently: No highlight appears in preview
+3. ✅ **Child element** is highlighted in preview with blue outline
+4. ✅ Only the child is highlighted, not the parent group
 
-### Scenario 4: Multi-Level Nesting
+### Scenario 4: Expand Group in Editor ✅
+1. Have a group with child elements in editor panel
+2. Expand the group element in the editor panel (left side)
+3. ✅ **Group** is highlighted in preview with blue outline around entire group
+4. ✅ Children are not highlighted individually
+
+### Scenario 5: Multi-Level Nesting ✅
 1. Have a group within a group (nested groups)
-2. Click on innermost element
-3. ✅ Only innermost element should be selected
-4. Test selection at each nesting level
+2. Click on innermost element in preview
+3. ✅ Innermost element is selected and expanded in editor
+4. ✅ All parent groups are expanded to show the path
+5. ✅ Only the innermost element is highlighted in preview
 
 ---
 
@@ -110,13 +120,11 @@ When selecting an element inside a group from the editor panel (left side), the 
 - ✅ Task 3: Clear Selection on Room Switch - Working
 - ✅ Task 4: Clear Selection on Element Delete - Working
 - ✅ Task 5: Cursor Styles - Working (verified from Phase 2)
-
-**Known Issues:**
-- ❌ Issue 1: Nested group click selection incorrect
-- ❌ Issue 2: Group child selection not highlighting in preview
+- ✅ Issue 1: Nested Group Click Selection - Fixed
+- ✅ Issue 2: Group Child Highlight in Preview - Fixed
 
 **Overall Status:**
-Phase 5 is 90% complete. Core functionality works for non-nested elements. Issues only affect nested group scenarios.
+✅ **Phase 5 100% Complete** - All functionality working including nested group scenarios!
 
 ---
 

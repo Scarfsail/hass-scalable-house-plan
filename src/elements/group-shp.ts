@@ -32,6 +32,10 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
     @property({ attribute: false }) public createCardElement?: CreateCardElement | null;
     @property({ attribute: false }) public elementCards?: Map<string, any>;
     @property({ attribute: false }) public mode?: 'overview' | 'detail';
+    @property({ attribute: false }) public editorMode?: boolean;
+    @property({ attribute: false }) public selectedElementKey?: string;
+    @property({ attribute: false }) public onElementClick?: (uniqueKey: string, index: number, entity: string, parentGroupKey?: string) => void;
+    @property({ attribute: false }) public groupUniqueKey?: string; // This group's own uniqueKey (for nested selection)
     
     // Cache for child element cards
     private _childElementCache = new Map<string, any>();
@@ -64,6 +68,12 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         .child-wrapper {
             position: absolute;
             /* Children handle their own pointer events naturally */
+        }
+        
+        .child-wrapper.selected-element {
+            outline: 2px solid #2196F3;
+            outline-offset: 2px;
+            z-index: 1000;
         }
     `;
 
@@ -157,14 +167,60 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
                 card.mode = this.mode;
                 card.createCardElement = this.createCardElement;
                 card.elementCards = this.elementCards;
+                // Pass through editor-related properties for nested group selection
+                card.editorMode = this.editorMode;
+                card.selectedElementKey = this.selectedElementKey;
+                card.onElementClick = this.onElementClick;
+                card.groupUniqueKey = uniqueKey; // Set nested group's own uniqueKey
+            }
+            
+            // Disable pointer events on card in editor mode so wrapper catches clicks
+            // IMPORTANT: Don't disable pointer events on group-shp cards - they need to handle child clicks!
+            if (this.editorMode && !isGroupElementType(elementConfig)) {
+                card.style.pointerEvents = 'none';
+            } else if (card.style.pointerEvents === 'none') {
+                // Re-enable pointer events when not in editor mode
+                card.style.pointerEvents = '';
             }
         }
 
         // Calculate child position styles
         const childStyles = this._calculateChildPosition(plan, uniqueKey);
+        
+        // Handle element click in editor mode
+        // Pass both child's uniqueKey and parent group's uniqueKey for nested selection
+        const handleClick = (e: MouseEvent) => {
+            if (this.editorMode && this.onElementClick) {
+                // Check if click came from a nested child element-wrapper (for multi-level groups)
+                const target = e.target as HTMLElement;
+                const currentWrapper = e.currentTarget as HTMLElement;
+                
+                // Find if there's a child-wrapper between target and currentTarget
+                let element = target;
+                while (element && element !== currentWrapper) {
+                    if (element.classList?.contains('child-wrapper') && element !== currentWrapper) {
+                        // Click came from a nested child wrapper, ignore it
+                        return;
+                    }
+                    element = element.parentElement as HTMLElement;
+                }
+                
+                e.stopPropagation();
+                e.preventDefault();
+                // Pass child's uniqueKey, index, entity, AND parent group's uniqueKey
+                this.onElementClick(uniqueKey, index, entity || '', this.groupUniqueKey);
+            }
+        };
+        
+        // Determine if this child element is selected
+        const isSelected = uniqueKey === this.selectedElementKey;
 
         return html`
-            <div class="child-wrapper" style=${styleMap(childStyles)}>
+            <div 
+                class="child-wrapper ${isSelected ? 'selected-element' : ''}"
+                style=${styleMap(childStyles)}
+                @click=${handleClick}
+            >
                 ${card}
             </div>
         `;

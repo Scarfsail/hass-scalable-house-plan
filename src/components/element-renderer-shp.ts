@@ -31,7 +31,7 @@ export interface ElementRendererOptions {
     houseCache: HouseCache;  // Element renderer caches (required)
     editorMode?: boolean;  // Interactive editor mode: enable click-to-select behavior
     selectedElementKey?: string | null;  // Currently selected element uniqueKey
-    onElementClick?: (uniqueKey: string, elementIndex: number, entity: string) => void;  // Click callback for element selection
+    onElementClick?: (uniqueKey: string, elementIndex: number, entity: string, parentGroupKey?: string) => void;  // Click callback for element selection
 }
 
 /**
@@ -385,10 +385,16 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                 card.mode = mode;
                 card.createCardElement = createCardElement;
                 card.elementCards = elementCards;
+                // Pass through editor-related properties for nested group selection
+                card.editorMode = editorMode;
+                card.selectedElementKey = selectedElementKey;
+                card.onElementClick = onElementClick;
+                card.groupUniqueKey = uniqueKey; // Pass this group's uniqueKey for nested selection context
             }
 
             // Disable pointer events on card in editor mode so wrapper catches clicks
-            if (editorMode) {
+            // IMPORTANT: Don't disable pointer events on group-shp cards - they need to handle child clicks!
+            if (editorMode && !isGroupElementType(elementConfig)) {
                 card.style.pointerEvents = 'none';
             } else if (card.style.pointerEvents === 'none') {
                 // Re-enable pointer events when not in editor mode
@@ -404,11 +410,11 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                 const target = e.target as HTMLElement;
                 const currentWrapper = e.currentTarget as HTMLElement;
                 
-                // Find if there's an element-wrapper between target and currentTarget
+                // Find if there's an element-wrapper or child-wrapper between target and currentTarget
                 let element = target;
                 while (element && element !== currentWrapper) {
-                    if (element.classList?.contains('element-wrapper') && element !== currentWrapper) {
-                        // Click came from a child element wrapper, ignore it
+                    if ((element.classList?.contains('element-wrapper') || element.classList?.contains('child-wrapper')) && element !== currentWrapper) {
+                        // Click came from a nested wrapper, ignore it
                         return;
                     }
                     element = element.parentElement as HTMLElement;

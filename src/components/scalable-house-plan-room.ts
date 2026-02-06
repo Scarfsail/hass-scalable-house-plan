@@ -456,8 +456,8 @@ export class ScalableHousePlanRoom extends LitElement {
             houseCache: this.houseCache,
             editorMode: this.editorMode,
             selectedElementKey: this.selectedElementKey,
-            onElementClick: (uniqueKey: string, elementIndex: number, entityId: string) => {
-                this._handleElementClick(uniqueKey, elementIndex, entityId);
+            onElementClick: (uniqueKey: string, elementIndex: number, entityId: string, parentGroupKey?: string) => {
+                this._handleElementClick(uniqueKey, elementIndex, entityId, parentGroupKey);
             }
         });
 
@@ -581,8 +581,8 @@ export class ScalableHousePlanRoom extends LitElement {
             houseCache: this.houseCache,
             editorMode: this.editorMode,
             selectedElementKey: this.selectedElementKey,
-            onElementClick: (uniqueKey: string, elementIndex: number, entityId: string) => {
-                this._handleElementClick(uniqueKey, elementIndex, entityId);
+            onElementClick: (uniqueKey: string, elementIndex: number, entityId: string, parentGroupKey?: string) => {
+                this._handleElementClick(uniqueKey, elementIndex, entityId, parentGroupKey);
             }
         });
 
@@ -696,14 +696,15 @@ export class ScalableHousePlanRoom extends LitElement {
      * Emits element-selected event that bubbles up to editor
      * Uses window-level event to cross HA editor/preview boundary
      */
-    private _handleElementClick(uniqueKey: string, elementIndex: number, entityId: string): void {
+    private _handleElementClick(uniqueKey: string, elementIndex: number, entityId: string, parentGroupKey?: string): void {
         // Dispatch to window for HA editor to catch (editor and preview are in separate DOM contexts)
         const windowEvent = new CustomEvent('scalable-house-plan-element-selected', {
             detail: {
                 uniqueKey: uniqueKey,
                 elementIndex: elementIndex,
                 roomIndex: this.roomIndex,
-                entityId: entityId
+                entityId: entityId,
+                parentGroupKey: parentGroupKey  // Include parent group key for nested selections
             },
             bubbles: true,
             composed: true

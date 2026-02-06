@@ -327,28 +327,49 @@ export class EditorElementsShp extends LitElement {
      * Phase 4: Public method to expand element by entity ID
      * Called from parent room editor when element is clicked in preview
      */
-    public expandElementByKey(uniqueKey: string): boolean {
+    /**
+     * Phase 4 & 5: Public method to expand element by its uniqueKey
+     * Supports nested group child selection via parentGroupKey
+     * @param uniqueKey - The element's unique key to expand
+     * @param parentGroupKey - Optional parent group key for nested selections
+     */
+    public expandElementByKey(uniqueKey: string, parentGroupKey?: string): boolean {
         if (!uniqueKey) return false;
 
-        // Find element by matching its uniqueKey
-        const elementIndex = this.elements.findIndex((el, index) => {
-            const entity = typeof el === 'string' ? el : el.entity;
-            const plan = typeof el === 'string' ? undefined : el.plan;
+        // If parentGroupKey is provided, this is a nested group child selection
+        if (parentGroupKey) {
+            // Step 1: Find and expand the parent group
+            const groupIndex = this._findElementIndex(parentGroupKey);
+            if (groupIndex === -1) return false;
 
-            // For entity-based elements, uniqueKey is the entity ID
-            if (entity && entity === uniqueKey) {
-                return true;
-            }
+            // Expand the parent group
+            this.expandedElements.add(groupIndex);
+            this.requestUpdate();
 
-            // For no-entity elements, generate the key and compare
-            if (!entity && plan?.element?.type) {
-                const generatedKey = generateElementKey(plan.element.type, plan);
-                return generatedKey === uniqueKey;
-            }
+            // Step 2: Wait for render, then find the nested editor-elements-shp inside the group
+            this.updateComplete.then(() => {
+                const groupElement = this.shadowRoot?.querySelectorAll('editor-element-shp')[groupIndex];
+                if (!groupElement) return;
 
-            return false;
-        });
+                // Find the group's editor (editor-group-shp inside editor-element-section-shp)
+                const elementSection = groupElement.shadowRoot?.querySelector('editor-element-section-shp');
+                const groupEditor = elementSection?.shadowRoot?.querySelector('editor-group-shp');
+                
+                if (!groupEditor) return;
 
+                // Find the nested editor-elements-shp inside the group editor
+                const nestedElementsEditor = groupEditor.shadowRoot?.querySelector('editor-elements-shp');
+                if (nestedElementsEditor) {
+                    // Recursively expand the child element (supports multi-level nesting)
+                    (nestedElementsEditor as any).expandElementByKey?.(uniqueKey);
+                }
+            });
+
+            return true;
+        }
+
+        // No parentGroupKey - regular top-level element selection
+        const elementIndex = this._findElementIndex(uniqueKey);
         if (elementIndex === -1) return false;
 
         // Expand the element
@@ -365,5 +386,28 @@ export class EditorElementsShp extends LitElement {
         });
 
         return true;
+    }
+
+    /**
+     * Helper method to find element index by uniqueKey
+     */
+    private _findElementIndex(uniqueKey: string): number {
+        return this.elements.findIndex((el, index) => {
+            const entity = typeof el === 'string' ? el : el.entity;
+            const plan = typeof el === 'string' ? undefined : el.plan;
+
+            // For entity-based elements, uniqueKey is the entity ID
+            if (entity && entity === uniqueKey) {
+                return true;
+            }
+
+            // For no-entity elements, generate the key and compare
+            if (!entity && plan?.element?.type) {
+                const generatedKey = generateElementKey(plan.element.type, plan);
+                return generatedKey === uniqueKey;
+            }
+
+            return false;
+        });
     }
 }

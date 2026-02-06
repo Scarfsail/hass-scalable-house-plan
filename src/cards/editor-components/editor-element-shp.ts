@@ -287,7 +287,7 @@ export class EditorElementShp extends LitElement {
                     </div>
                 </div>
                 
-                <div class="item-content ${this.isExpanded ? 'expanded' : ''}" @click=${this._handleContentClick}>
+                <div class="item-content ${this.isExpanded ? 'expanded' : ''}" @focusin=${this._handleContentFocus}>
                     <!-- Entity Picker (hidden if no-entity mode) -->
                     ${!this._isNoEntity ? html`
                         <div class="entity-picker">
@@ -546,14 +546,9 @@ export class EditorElementShp extends LitElement {
     }
 
     /**
-     * Handle click on expanded content area - emit focus event for already-expanded elements
+     * Toggle expansion state
+     * Emits focus event when expanding to sync with preview
      */
-    private _handleContentClick(): void {
-        if (this.isExpanded) {
-            this._emitFocusEvent();
-        }
-    }
-
     private _toggleExpansion() {
         const event = new CustomEvent('element-toggle', {
             detail: { index: this.index },
@@ -565,6 +560,32 @@ export class EditorElementShp extends LitElement {
         // Phase 3: Emit focus event when expanding (for bi-directional sync)
         // Only emit when expanding (isExpanded will become true after this toggle)
         if (!this.isExpanded) {
+            this._emitFocusEvent();
+        }
+    }
+
+    /**
+     * Handle focus on any editing field (YAML editor, plan inputs, etc.)
+     * Emits focus event to highlight element in preview while editing
+     * Ignores focus from nested children (e.g., child elements inside groups)
+     */
+    private _handleContentFocus(e: FocusEvent): void {
+        if (this.isExpanded) {
+            // Check if focus came from a nested editor-element-shp (child element in a group)
+            // Use composedPath() to traverse shadow DOM boundaries
+            const path = e.composedPath();
+            const currentContent = e.currentTarget as HTMLElement;
+            const currentContentIndex = path.indexOf(currentContent);
+            
+            // Look for editor-element-shp elements in the path between target and currentTarget
+            for (let i = 0; i < currentContentIndex; i++) {
+                const element = path[i] as HTMLElement;
+                if (element.tagName === 'EDITOR-ELEMENT-SHP') {
+                    return; // Don't emit focus, let child handle it
+                }
+            }
+            
+            // User is interacting with THIS element's editor field - highlight in preview
             this._emitFocusEvent();
         }
     }

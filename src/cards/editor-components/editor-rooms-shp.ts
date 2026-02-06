@@ -144,8 +144,9 @@ export class EditorRoomsShp extends LitElement {
     /**
      * Phase 4: Public method to expand element at specific room and entity path
      * Called from main editor when element is clicked in preview
+     * @param parentGroupKey - Optional parent group key for nested selections
      */
-    public expandElementAtPath(roomIndex: number, uniqueKey: string): void {
+    public expandElementAtPath(roomIndex: number, uniqueKey: string, parentGroupKey?: string): void {
         if (roomIndex < 0 || roomIndex >= this.rooms.length) return;
 
         // Find room component by index
@@ -153,7 +154,7 @@ export class EditorRoomsShp extends LitElement {
         this.updateComplete.then(() => {
             const roomComponents = this.shadowRoot?.querySelectorAll('editor-room-shp');
             const roomComponent = roomComponents?.[roomIndex];
-            (roomComponent as any)?.expandElementInRoom?.(uniqueKey);
+            (roomComponent as any)?.expandElementInRoom?.(uniqueKey, parentGroupKey);
         });
     }
 }

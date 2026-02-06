@@ -293,13 +293,13 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     // Handle element selection from preview
     private _handleElementSelection = (ev: CustomEvent): void => {
-        const { uniqueKey, roomIndex } = ev.detail;
+        const { uniqueKey, roomIndex, parentGroupKey } = ev.detail;
         this._selectedElementKey = uniqueKey;
 
         // Auto-expand element in editor (Phase 4)
         if (this._editorMode && roomIndex !== undefined && uniqueKey) {
             this.updateComplete.then(() => {
-                this._roomsEditor?.expandElementAtPath(roomIndex, uniqueKey);
+                this._roomsEditor?.expandElementAtPath(roomIndex, uniqueKey, parentGroupKey);
             });
         }
 
