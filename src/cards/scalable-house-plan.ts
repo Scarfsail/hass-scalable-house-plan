@@ -269,7 +269,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         const editModeBadge = this._editorMode ? html`
             <div class="edit-mode-badge">
                 <ha-icon icon="mdi:pencil"></ha-icon>
-                <span>Edit Mode</span>
             </div>
         ` : '';
         

@@ -15,7 +15,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     @state() private _config!: ScalableHousePlanConfig;
     @state() private _expandedSections: Set<string> = new Set(['rooms']);
     @state() private _previewRoomIndex: number | null = null;
-    @state() private _editorMode = false;
+    @state() private _editorMode = true;
     @state() private _selectedElementKey: string | null = null;
     @query('editor-rooms-shp') private _roomsEditor?: any;
     private _localize?: LocalizeFunction;
@@ -84,15 +84,26 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             ${this.localize('editor.house_plan_editor')}
                         </span>
                     </div>
-                    <button
-                        class="icon-button ${this._editorMode ? 'toggled' : ''}"
-                        @click=${this._toggleEditorMode}
-                        title="${this._editorMode ? 'Switch to Preview Mode' : 'Switch to Editor Mode'}"
-                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 16px; ${this._editorMode ? 'background: var(--primary-color); color: white;' : ''}"
-                    >
-                        <ha-icon icon="mdi:${this._editorMode ? 'pencil' : 'eye'}"></ha-icon>
-                        <span style="font-size: 14px; font-weight: 500;">${this._editorMode ? 'Editor' : 'Preview'}</span>
-                    </button>
+                    <div style="display: flex; border-radius: 16px; overflow: hidden; border: 1px solid var(--divider-color);">
+                        <button
+                            class="icon-button ${!this._editorMode ? 'toggled' : ''}"
+                            @click=${() => this._setEditorMode(false)}
+                            title="${this.localize('editor.preview')}"
+                            style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 0; border: none; ${!this._editorMode ? 'background: var(--primary-color); color: white;' : 'background: transparent; color: var(--primary-text-color);'}"
+                        >
+                            <ha-icon icon="mdi:eye"></ha-icon>
+                            <span style="font-size: 14px; font-weight: 500;">${this.localize('editor.preview')}</span>
+                        </button>
+                        <button
+                            class="icon-button ${this._editorMode ? 'toggled' : ''}"
+                            @click=${() => this._setEditorMode(true)}
+                            title="${this.localize('editor.editor')}"
+                            style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 0; border: none; ${this._editorMode ? 'background: var(--primary-color); color: white;' : 'background: transparent; color: var(--primary-text-color);'}"
+                        >
+                            <ha-icon icon="mdi:pencil"></ha-icon>
+                            <span style="font-size: 14px; font-weight: 500;">${this.localize('editor.editor')}</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Basic Configuration Section -->
@@ -278,11 +289,11 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         this.requestUpdate();
     }
 
-    // Editor mode toggle handler
-    private _toggleEditorMode(): void {
-        this._editorMode = !this._editorMode;
+    // Editor mode setter handler
+    private _setEditorMode(mode: boolean): void {
+        this._editorMode = mode;
 
-        // Clear selection when switching to Normal mode
+        // Clear selection when switching to Preview mode
         if (!this._editorMode) {
             this._selectedElementKey = null;
         }
