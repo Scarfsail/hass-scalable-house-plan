@@ -365,7 +365,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
             if (parentGroupIndex >= 0) {
                 const parentGroup = room.entities[parentGroupIndex];
-                if (typeof parentGroup !== 'string' && parentGroup.plan?.element?.type === 'group-shp') {
+                if (typeof parentGroup !== 'string' && parentGroup.plan?.element?.type === 'custom:group-shp') {
                     const children = (parentGroup.plan.element as any).children || [];
                     entityIndex = this._findEntityIndex(children, uniqueKey);
                     if (entityIndex >= 0) {
@@ -389,71 +389,129 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             ? { entity: targetEntityConfig, plan: {} } 
             : { ...targetEntityConfig, plan: { ...(targetEntityConfig.plan || {}) } };
 
-        // Calculate position scales
-        const getPositionScale = (mode: PositionScalingMode): number => {
-            if (scaleRatio === 0) return scale;
-            switch (mode) {
-                case "element": return 1 + (scale - 1) * scaleRatio;
-                case "fixed": return 1;
-                case "plan":
-                default: return scale;
+        // Group children use simple pixel positioning (no scaling)
+        // Room elements use complex scaling calculations
+        if (isGroupChild) {
+            // SIMPLE PATH: Group child positions are raw pixels, no scaling
+            // Just add the delta directly (or negate for right/bottom)
+            
+            // Update horizontal position (left or right)
+            if (entityObj.plan?.left !== undefined) {
+                const oldValue = entityObj.plan.left;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    // Percentage value (rare for group children but supported)
+                    const oldPct = parseFloat(oldValue);
+                    const containerWidthPx = roomBoundsWidth * scale;
+                    const newPct = oldPct + (deltaXPx / containerWidthPx) * 100;
+                    entityObj.plan.left = `${Math.round(newPct * 10) / 10}%`;
+                } else {
+                    // Numeric (px) value - simple addition
+                    entityObj.plan.left = Math.round(Number(oldValue) + deltaXPx);
+                }
+            } else if (entityObj.plan?.right !== undefined) {
+                const oldValue = entityObj.plan.right;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    const oldPct = parseFloat(oldValue);
+                    const containerWidthPx = roomBoundsWidth * scale;
+                    const newPct = oldPct - (deltaXPx / containerWidthPx) * 100;
+                    entityObj.plan.right = `${Math.round(newPct * 10) / 10}%`;
+                } else {
+                    // Right anchor - negate delta
+                    entityObj.plan.right = Math.round(Number(oldValue) - deltaXPx);
+                }
             }
-        };
 
-        const horizontalScale = getPositionScale(entityObj.plan?.position_scaling_horizontal || 'plan');
-        const verticalScale = getPositionScale(entityObj.plan?.position_scaling_vertical || 'plan');
-
-        // Container dimensions in pixels
-        const containerWidthPx = roomBoundsWidth * scale;
-        const containerHeightPx = roomBoundsHeight * scale;
-
-        // Update horizontal position (left or right)
-        if (entityObj.plan?.left !== undefined) {
-            const oldValue = entityObj.plan.left;
-            if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
-                // Percentage value
-                const oldPct = parseFloat(oldValue);
-                const newPct = oldPct + (deltaXPx / containerWidthPx) * 100;
-                entityObj.plan.left = `${Math.round(newPct * 10) / 10}%`;
-            } else {
-                // Numeric (px) value
-                const configDelta = deltaXPx / horizontalScale;
-                entityObj.plan.left = Math.round(Number(oldValue) + configDelta);
+            // Update vertical position (top or bottom)
+            if (entityObj.plan?.top !== undefined) {
+                const oldValue = entityObj.plan.top;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    const oldPct = parseFloat(oldValue);
+                    const containerHeightPx = roomBoundsHeight * scale;
+                    const newPct = oldPct + (deltaYPx / containerHeightPx) * 100;
+                    entityObj.plan.top = `${Math.round(newPct * 10) / 10}%`;
+                } else {
+                    // Numeric (px) value - simple addition
+                    entityObj.plan.top = Math.round(Number(oldValue) + deltaYPx);
+                }
+            } else if (entityObj.plan?.bottom !== undefined) {
+                const oldValue = entityObj.plan.bottom;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    const oldPct = parseFloat(oldValue);
+                    const containerHeightPx = roomBoundsHeight * scale;
+                    const newPct = oldPct - (deltaYPx / containerHeightPx) * 100;
+                    entityObj.plan.bottom = `${Math.round(newPct * 10) / 10}%`;
+                } else {
+                    // Bottom anchor - negate delta
+                    entityObj.plan.bottom = Math.round(Number(oldValue) - deltaYPx);
+                }
             }
-        } else if (entityObj.plan?.right !== undefined) {
-            // Right anchor - negate delta (moving right decreases right value)
-            const oldValue = entityObj.plan.right;
-            if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
-                const oldPct = parseFloat(oldValue);
-                const newPct = oldPct - (deltaXPx / containerWidthPx) * 100;
-                entityObj.plan.right = `${Math.round(newPct * 10) / 10}%`;
-            } else {
-                const configDelta = -deltaXPx / horizontalScale;
-                entityObj.plan.right = Math.round(Number(oldValue) + configDelta);
-            }
-        }
+        } else {
+            // COMPLEX PATH: Room elements use scaling calculations
+            const getPositionScale = (mode: PositionScalingMode): number => {
+                if (scaleRatio === 0) return scale;
+                switch (mode) {
+                    case "element": return 1 + (scale - 1) * scaleRatio;
+                    case "fixed": return 1;
+                    case "plan":
+                    default: return scale;
+                }
+            };
 
-        // Update vertical position (top or bottom)
-        if (entityObj.plan?.top !== undefined) {
-            const oldValue = entityObj.plan.top;
-            if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
-                const oldPct = parseFloat(oldValue);
-                const newPct = oldPct + (deltaYPx / containerHeightPx) * 100;
-                entityObj.plan.top = `${Math.round(newPct * 10) / 10}%`;
-            } else {
-                const configDelta = deltaYPx / verticalScale;
-                entityObj.plan.top = Math.round(Number(oldValue) + configDelta);
+            const horizontalScale = getPositionScale(entityObj.plan?.position_scaling_horizontal || 'plan');
+            const verticalScale = getPositionScale(entityObj.plan?.position_scaling_vertical || 'plan');
+
+            // Container dimensions in pixels
+            const containerWidthPx = roomBoundsWidth * scale;
+            const containerHeightPx = roomBoundsHeight * scale;
+
+            // Update horizontal position (left or right)
+            if (entityObj.plan?.left !== undefined) {
+                const oldValue = entityObj.plan.left;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    // Percentage value
+                    const oldPct = parseFloat(oldValue);
+                    const newPct = oldPct + (deltaXPx / containerWidthPx) * 100;
+                    entityObj.plan.left = `${Math.round(newPct * 10) / 10}%`;
+                } else {
+                    // Numeric (px) value
+                    const configDelta = deltaXPx / horizontalScale;
+                    entityObj.plan.left = Math.round(Number(oldValue) + configDelta);
+                }
+            } else if (entityObj.plan?.right !== undefined) {
+                // Right anchor - negate delta (moving right decreases right value)
+                const oldValue = entityObj.plan.right;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    const oldPct = parseFloat(oldValue);
+                    const newPct = oldPct - (deltaXPx / containerWidthPx) * 100;
+                    entityObj.plan.right = `${Math.round(newPct * 10) / 10}%`;
+                } else {
+                    const configDelta = -deltaXPx / horizontalScale;
+                    entityObj.plan.right = Math.round(Number(oldValue) + configDelta);
+                }
             }
-        } else if (entityObj.plan?.bottom !== undefined) {
-            // Bottom anchor - negate delta
-            const oldValue = entityObj.plan.bottom;
-            if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
-                const oldPct = parseFloat(oldValue);
-                const newPct = oldPct - (deltaYPx / containerHeightPx) * 100;
-                entityObj.plan.bottom = `${Math.round(newPct * 10) / 10}%`;
-            } else {
-                const configDelta = -deltaYPx / verticalScale;
-                entityObj.plan.bottom = Math.round(Number(oldValue) + configDelta);
+
+            // Update vertical position (top or bottom)
+            if (entityObj.plan?.top !== undefined) {
+                const oldValue = entityObj.plan.top;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    const oldPct = parseFloat(oldValue);
+                    const newPct = oldPct + (deltaYPx / containerHeightPx) * 100;
+                    entityObj.plan.top = `${Math.round(newPct * 10) / 10}%`;
+                } else {
+                    const configDelta = deltaYPx / verticalScale;
+                    entityObj.plan.top = Math.round(Number(oldValue) + configDelta);
+                }
+            } else if (entityObj.plan?.bottom !== undefined) {
+                // Bottom anchor - negate delta
+                const oldValue = entityObj.plan.bottom;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    const oldPct = parseFloat(oldValue);
+                    const newPct = oldPct - (deltaYPx / containerHeightPx) * 100;
+                    entityObj.plan.bottom = `${Math.round(newPct * 10) / 10}%`;
+                } else {
+                    const configDelta = -deltaYPx / verticalScale;
+                    entityObj.plan.bottom = Math.round(Number(oldValue) + configDelta);
+                }
             }
         }
 

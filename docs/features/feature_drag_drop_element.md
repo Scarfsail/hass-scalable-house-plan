@@ -678,36 +678,41 @@ function calculateNewPosition(
 - Fixed YAML editor reactivity by switching from `.defaultValue` to `.value` with `auto-update` in all editor components
 - Successfully handles both regular entities and groups (including nested group children via `parentGroupKey`)
 
-### Phase 3: Group child drag support (~30 lines) - READY FOR IMPLEMENTATION
+### Phase 3: Group child drag support (~30 lines) - ✅ COMPLETE
 **Goal**: Children inside groups can be dragged independently to reposition them within the group
 
 **Prerequisites**: Phase 2 complete ✅ (editor already handles `parentGroupKey` and group child updates)
 
-**What needs to be done**:
+**What was done**:
 
-1. ✅ **Backend support already complete** - Phase 2 implemented group child handling:
+1. ✅ **Backend support** - Phase 2 implemented group child handling:
    - Editor finds parent group by `parentGroupKey`
    - Locates child in `plan.element.children[]` array
    - Updates child's position values
    
-2. ❌ **Add drag handlers to child-wrapper in `group-shp.ts`** (~30 lines)
-   - Same pointer event pattern as room-level elements (see `element-renderer-shp.ts` lines 490-625)
-   - Apply to `.child-wrapper` divs during rendering (around line 220)
-   - Dispatch `scalable-house-plan-element-moved` with `parentGroupKey: this.groupUniqueKey`
-   - Children use pixel-based positioning (no percentage math needed)
+2. ✅ **Added drag handlers to child-wrapper in `group-shp.ts`**:
+   - Same pointer event pattern as room-level elements
+   - Applied to `.child-wrapper` divs during rendering
+   - Dispatches `scalable-house-plan-element-moved` with `parentGroupKey: this.groupUniqueKey`
+   - Children use pixel-based positioning (simpler than room elements)
    - Threshold, escape key, pointer capture - same as room elements
 
-**Key Differences from Room Elements**:
-- Add `parentGroupKey` to event detail
-- No percentage calculations (groups use absolute px positioning for children)
-- Simpler reverse math (just `newValue = oldValue + delta` for all cases)
+**Key fixes applied**:
+- ✅ Moved `dragState` to component-level `Map` to persist across re-renders (fixed drag interruptions)
+- ✅ Used simple pixel math for group children (no scaling calculations)
+- ✅ Fixed `uniqueKey` generation to use `generateElementKey()` for consistency
+- ✅ Fixed element type check: `'custom:group-shp'` instead of `'group-shp'`
 
-**Files to modify**:
-- `src/elements/group-shp.ts` - add drag handlers to child-wrapper rendering
+**Files modified**:
+- `src/elements/group-shp.ts` - added drag handlers and drag-related properties
+- `src/components/element-renderer-shp.ts` - pass drag properties to group elements
+- `src/cards/scalable-house-plan-editor.ts` - separate logic for group children vs room elements
 
-**Validation**: Group children can be dragged independently within their group; group container stays in place. Child positions update in config.
+**Validation**: ✅ Group children can be dragged smoothly within their group; group container stays in place. Child positions update in config and persist after reload.
 
-### Phase 4: Overview mode scaling adjustment (~10 lines)
+**Status**: ✅ **COMPLETE** (2026-02-07)
+
+### Phase 4: Overview mode scaling adjustment (~10 lines) - READY FOR IMPLEMENTATION
 **Goal**: Drag works correctly in overview mode despite parent CSS transform
 
 1. ❌ **Account for parent CSS scaling in pointermove/pointerup**

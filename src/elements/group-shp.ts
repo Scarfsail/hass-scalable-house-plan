@@ -7,6 +7,20 @@ import type { EntityConfig } from "../cards/types";
 import type { CreateCardElement } from "../utils";
 import { getOrCreateElementCard } from "../utils/card-element-cache";
 import { getElementTypeForEntity, mergeElementProperties, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, isGroupElementType } from "../utils";
+import type { ElementMovedEventDetail } from "../components/element-renderer-shp";
+import { generateElementKey } from "../components/element-renderer-shp";
+
+// Drag threshold in pixels before drag activates
+const DRAG_THRESHOLD = 5;
+
+// Drag state interface
+interface DragState {
+    state: 'idle' | 'pending' | 'dragging';
+    startX: number;
+    startY: number;
+    pointerId: number | null;
+    originalTransform: string;
+}
 
 export interface GroupElementConfig extends ElementBaseConfig {
     children: EntityConfig[];
@@ -36,6 +50,10 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
     @property({ attribute: false }) public selectedElementKey?: string;
     @property({ attribute: false }) public onElementClick?: (uniqueKey: string, index: number, entity: string, parentGroupKey?: string) => void;
     @property({ attribute: false }) public groupUniqueKey?: string; // This group's own uniqueKey (for nested selection)
+    @property({ attribute: false }) public scale?: number; // Current scale factor (for drag event)
+    @property({ attribute: false }) public scaleRatio?: number; // Element scaling ratio (for drag event)
+    @property({ attribute: false }) public roomIndex?: number; // Room index (for drag event)
+    @property({ attribute: false }) public roomBounds?: { minX: number; minY: number; width: number; height: number }; // Room bounds (for drag event)
     
     // Cache for child element cards
     private _childElementCache = new Map<string, any>();
@@ -45,6 +63,9 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
     
     // Cache for child position styles (cleared when config changes)
     private _positionCache = new Map<string, Record<string, string>>();
+    
+    // Drag states for each child (persists across re-renders)
+    private _dragStates = new Map<string, DragState>();
     
     static override styles = css`
         :host {
@@ -151,7 +172,9 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         }
 
         // Generate unique key for child (entity ID or generated key)
-        const uniqueKey = entity || `group-child-${index}-${plan.element?.type || 'unknown'}`;
+        // IMPORTANT: Use same key generation as element-renderer-shp for consistency
+        // This ensures the editor can find and update the child during drag-drop
+        const uniqueKey = entity || generateElementKey(plan.element?.type || 'unknown', plan);
 
         // Get element type and merged config
         const elementType = this._getElementType(entity, plan);
@@ -172,6 +195,11 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
                 card.selectedElementKey = this.selectedElementKey;
                 card.onElementClick = this.onElementClick;
                 card.groupUniqueKey = uniqueKey; // Set nested group's own uniqueKey
+                // Pass through drag-related properties for nested child drag support
+                card.scale = this.scale;
+                card.scaleRatio = this.scaleRatio;
+                card.roomIndex = this.roomIndex;
+                card.roomBounds = this.roomBounds;
             }
             
             // Disable pointer events on card in editor mode so wrapper catches clicks
@@ -186,6 +214,20 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
 
         // Calculate child position styles
         const childStyles = this._calculateChildPosition(plan, uniqueKey);
+        
+        // Drag state for this child (only in editor mode with plan)
+        // Use component-level Map to persist across re-renders
+        const isDraggable = this.editorMode && plan;
+        if (isDraggable && !this._dragStates.has(uniqueKey)) {
+            this._dragStates.set(uniqueKey, {
+                state: 'idle',
+                startX: 0,
+                startY: 0,
+                pointerId: null,
+                originalTransform: ''
+            });
+        }
+        const dragState = isDraggable ? this._dragStates.get(uniqueKey)! : null;
         
         // Handle element click in editor mode
         // Pass both child's uniqueKey and parent group's uniqueKey for nested selection
@@ -212,6 +254,121 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
             }
         };
         
+        // Drag handlers for editor mode
+        const handlePointerDown = (e: PointerEvent) => {
+            if (!dragState || !this.editorMode || !plan) return;
+            
+            // Check if click came from a nested child element (for multi-level groups)
+            const currentWrapper = e.currentTarget as HTMLElement;
+            for (const node of e.composedPath()) {
+                if (node === currentWrapper) break;
+                if (node instanceof HTMLElement && node.classList?.contains('child-wrapper')) {
+                    return;
+                }
+            }
+            
+            dragState.startX = e.clientX;
+            dragState.startY = e.clientY;
+            dragState.state = 'pending';
+            dragState.pointerId = e.pointerId;
+            dragState.originalTransform = childStyles.transform || '';
+            
+            const wrapper = e.currentTarget as HTMLElement;
+            wrapper.setPointerCapture(e.pointerId);
+        };
+        
+        const handlePointerMove = (e: PointerEvent) => {
+            if (!dragState) return;
+            if (dragState.state === 'idle') return;
+            if (dragState.pointerId !== e.pointerId) return;
+            
+            const dx = e.clientX - dragState.startX;
+            const dy = e.clientY - dragState.startY;
+            
+            // Check threshold before activating drag
+            if (dragState.state === 'pending') {
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < DRAG_THRESHOLD) return;
+                
+                dragState.state = 'dragging';
+            }
+            
+            // Apply translate to visual position
+            const wrapper = e.currentTarget as HTMLElement;
+            const translateTransform = `translate(${dx}px, ${dy}px)`;
+            const fullTransform = dragState.originalTransform
+                ? `${dragState.originalTransform} ${translateTransform}`
+                : translateTransform;
+            
+            wrapper.style.transform = fullTransform;
+            wrapper.style.cursor = 'grabbing';
+            
+            e.preventDefault();
+        };
+        
+        const handlePointerUp = (e: PointerEvent) => {
+            if (!dragState) return;
+            if (dragState.pointerId !== e.pointerId) return;
+            
+            const wrapper = e.currentTarget as HTMLElement;
+            wrapper.releasePointerCapture(e.pointerId);
+            
+            if (dragState.state === 'dragging') {
+                const dx = e.clientX - dragState.startX;
+                const dy = e.clientY - dragState.startY;
+                
+                // Reset visual transform
+                wrapper.style.transform = dragState.originalTransform;
+                wrapper.style.cursor = '';
+                
+                // Dispatch move event with all data needed for reverse calculation
+                // Include parentGroupKey to indicate this is a group child
+                const moveEvent = new CustomEvent<ElementMovedEventDetail>('scalable-house-plan-element-moved', {
+                    detail: {
+                        uniqueKey,
+                        roomIndex: this.roomIndex ?? -1,
+                        entityId: entity || '',
+                        deltaXPx: dx,
+                        deltaYPx: dy,
+                        scale: this.scale ?? 1,
+                        scaleRatio: this.scaleRatio ?? 0,
+                        roomBoundsWidth: this.roomBounds?.width ?? 0,
+                        roomBoundsHeight: this.roomBounds?.height ?? 0,
+                        parentGroupKey: this.groupUniqueKey
+                    }
+                });
+                window.dispatchEvent(moveEvent);
+                
+                // Prevent click handler from firing
+                e.stopPropagation();
+                e.preventDefault();
+            }
+            
+            dragState.state = 'idle';
+            dragState.pointerId = null;
+        };
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!dragState) return;
+            if (e.key === 'Escape' && dragState.state === 'dragging') {
+                const wrapper = document.querySelector(`[data-unique-key="${uniqueKey}"]`) as HTMLElement;
+                if (wrapper) {
+                    wrapper.style.transform = dragState.originalTransform;
+                    wrapper.style.cursor = '';
+                    if (dragState.pointerId !== null) {
+                        wrapper.releasePointerCapture(dragState.pointerId);
+                    }
+                }
+                dragState.state = 'idle';
+                dragState.pointerId = null;
+            }
+        };
+        
+        // Register escape handler only for draggable children
+        if (isDraggable) {
+            document.addEventListener('keydown', handleKeyDown);
+        }
+        
         // Determine if this child element is selected
         const isSelected = uniqueKey === this.selectedElementKey;
 
@@ -219,7 +376,11 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
             <div 
                 class="child-wrapper ${isSelected ? 'selected-element' : ''}"
                 style=${styleMap(childStyles)}
+                data-unique-key="${uniqueKey}"
                 @click=${handleClick}
+                @pointerdown=${isDraggable ? handlePointerDown : null}
+                @pointermove=${isDraggable ? handlePointerMove : null}
+                @pointerup=${isDraggable ? handlePointerUp : null}
             >
                 ${card}
             </div>

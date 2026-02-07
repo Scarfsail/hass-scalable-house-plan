@@ -420,6 +420,11 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                 card.selectedElementKey = selectedElementKey;
                 card.onElementClick = onElementClick;
                 card.groupUniqueKey = uniqueKey; // Pass this group's uniqueKey for nested selection context
+                // Pass through drag-related properties for child drag support
+                card.scale = scale;
+                card.scaleRatio = scaleRatio;
+                card.roomIndex = roomIndex;
+                card.roomBounds = roomBounds;
             }
 
             // Disable pointer events on card in editor mode so wrapper catches clicks
