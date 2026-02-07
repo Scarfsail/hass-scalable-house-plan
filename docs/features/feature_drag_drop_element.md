@@ -2,14 +2,15 @@
 
 ## Document Status
 
-- **Phase**: Ready for Implementation
-- **Last Updated**: 2026-02-06
+- **Phase**: Phase 3 Complete, Phase 4 Ready ✅
+- **Last Updated**: 2026-02-07
 - **Requirements**: Complete ✅
 - **Technical Design**: Complete ✅
-- **User Approval**:
-  - Requirements: Approved ✅
-  - Technical Design: Approved ✅
-  - Technical Design: Pending 🚧
+- **Implementation Status**:
+  - Phase 1: Complete ✅ (Visual drag, window event)
+  - Phase 2: Complete ✅ (Config updates on drop)
+  - Phase 3: Complete ✅ (Group child drag support)
+  - Phase 4: Ready for Implementation 🚧 (Overview mode scaling)
 
 ---
 
@@ -141,19 +142,19 @@ newConfigValue = (pixelOffset / containerPixelSize) * 100 → "<value>%"
 # Acceptance Criteria
 
 ## Must Have
-- [ ] User can drag an element in the house plan preview when editor is in edit mode
-- [ ] Dragging updates the element's position in the configuration
-- [ ] The original anchor properties are preserved (e.g., `right`/`bottom` stay as `right`/`bottom`)
-- [ ] The original units are preserved (number stays number, `"50%"` stays percentage format)
-- [ ] Visual feedback is shown during drag (element follows cursor)
-- [ ] Config-changed event fires after drop, so the config persists
-- [ ] Pressing Escape during drag cancels and returns the element to original position
-- [ ] The drag works in both overview and detail preview modes
+- [x] User can drag an element in the house plan preview when editor is in edit mode
+- [x] Dragging updates the element's position in the configuration
+- [x] The original anchor properties are preserved (e.g., `right`/`bottom` stay as `right`/`bottom`)
+- [x] The original units are preserved (number stays number, `"50%"` stays percentage format)
+- [x] Visual feedback is shown during drag (element follows cursor)
+- [x] Config-changed event fires after drop, so the config persists
+- [x] Pressing Escape during drag cancels and returns the element to original position
+- [ ] The drag works correctly in both overview and detail preview modes (Phase 4)
 
 ## Should Have
-- [ ] Cursor changes to `grab`/`grabbing` during hover and drag
-- [ ] Elements inside groups can be dragged to update their position within the group
-- [ ] Small movement threshold before drag activates (to distinguish from click-to-select)
+- [x] Cursor changes to `grab`/`grabbing` during hover and drag
+- [x] Elements inside groups can be dragged to update their position within the group
+- [x] Small movement threshold before drag activates (to distinguish from click-to-select)
 
 ## Won't Have (This Release)
 - [ ] Snap-to-grid or alignment guides
