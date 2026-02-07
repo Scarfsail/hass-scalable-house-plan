@@ -458,7 +458,8 @@ export class ScalableHousePlanRoom extends LitElement {
             selectedElementKey: this.selectedElementKey,
             onElementClick: (uniqueKey: string, elementIndex: number, entityId: string, parentGroupKey?: string) => {
                 this._handleElementClick(uniqueKey, elementIndex, entityId, parentGroupKey);
-            }
+            },
+            roomIndex: this.roomIndex
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
@@ -583,7 +584,8 @@ export class ScalableHousePlanRoom extends LitElement {
             selectedElementKey: this.selectedElementKey,
             onElementClick: (uniqueKey: string, elementIndex: number, entityId: string, parentGroupKey?: string) => {
                 this._handleElementClick(uniqueKey, elementIndex, entityId, parentGroupKey);
-            }
+            },
+            roomIndex: this.roomIndex
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();

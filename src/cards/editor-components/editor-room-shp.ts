@@ -147,7 +147,8 @@ export class EditorRoomShp extends LitElement {
                         ${this._yamlMode ? html`
                             <ha-yaml-editor
                                 .hass=${this.hass}
-                                .defaultValue=${this.room}
+                                .value=${this.room}
+                                auto-update
                                 @value-changed=${this._roomYamlChanged}
                             ></ha-yaml-editor>
                         ` : html`
@@ -229,7 +230,8 @@ export class EditorRoomShp extends LitElement {
                             <div class="section-content ${this._expandedSections.has('info_box') ? 'expanded' : ''}">
                                 <ha-yaml-editor
                                     .hass=${this.hass}
-                                    .defaultValue=${this.room.info_box || {}}
+                                    .value=${this.room.info_box || {}}
+                                    auto-update
                                     @value-changed=${this._infoBoxConfigChanged}
                                 ></ha-yaml-editor>
                             </div>

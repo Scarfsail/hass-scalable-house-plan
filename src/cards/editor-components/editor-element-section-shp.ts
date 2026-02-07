@@ -123,7 +123,8 @@ export class EditorElementSectionShp extends LitElement {
         return html`
             <ha-yaml-editor
                 .hass=${this.hass}
-                .defaultValue=${this.elementSection || {}}
+                .value=${this.elementSection || {}}
+                auto-update
                 @value-changed=${this._elementChanged}
             ></ha-yaml-editor>
         `;

@@ -496,18 +496,10 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                     if (node === currentWrapper) break;
                     if (node instanceof HTMLElement &&
                         (node.classList?.contains('element-wrapper') || node.classList?.contains('child-wrapper'))) {
-                        console.log(`[Drag] PointerDown on group ${uniqueKey} ignored — target is inside child wrapper`);
                         return;
                     }
                 }
             }
-            
-            console.log(`[Drag] PointerDown on ${uniqueKey}:`, {
-                button: e.button,
-                pointerId: e.pointerId,
-                clientX: e.clientX,
-                clientY: e.clientY
-            });
             
             dragState.startX = e.clientX;
             dragState.startY = e.clientY;
@@ -517,20 +509,12 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
             
             const wrapper = e.currentTarget as HTMLElement;
             wrapper.setPointerCapture(e.pointerId);
-            
-            console.log(`[Drag] State set to pending for ${uniqueKey}`);
         };
 
         const handlePointerMove = (e: PointerEvent) => {
             if (!dragState) return;
             if (dragState.state === 'idle') return;
-            if (dragState.pointerId !== e.pointerId) {
-                console.log(`[Drag] PointerMove ignored - wrong pointer ID:`, {
-                    expected: dragState.pointerId,
-                    received: e.pointerId
-                });
-                return;
-            }
+            if (dragState.pointerId !== e.pointerId) return;
             
             const dx = e.clientX - dragState.startX;
             const dy = e.clientY - dragState.startY;
@@ -541,7 +525,6 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                 if (distance < DRAG_THRESHOLD) return;
                 
                 dragState.state = 'dragging';
-                console.log(`[Drag] Drag activated for ${uniqueKey} (distance: ${distance}px)`);
             }
             
             // Apply translate to visual position
@@ -559,13 +542,6 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
 
         const handlePointerUp = (e: PointerEvent) => {
             if (!dragState) return;
-            
-            console.log(`[Drag] PointerUp on ${uniqueKey}:`, {
-                dragState: dragState.state,
-                pointerId: e.pointerId,
-                expectedPointerId: dragState.pointerId
-            });
-            
             if (dragState.pointerId !== e.pointerId) return;
             
             const wrapper = e.currentTarget as HTMLElement;
@@ -574,11 +550,6 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
             if (dragState.state === 'dragging') {
                 const dx = e.clientX - dragState.startX;
                 const dy = e.clientY - dragState.startY;
-                
-                console.log(`[Drag] Drag completed for ${uniqueKey}:`, {
-                    deltaX: dx,
-                    deltaY: dy
-                });
                 
                 // Reset visual transform
                 wrapper.style.transform = dragState.originalTransform;
@@ -600,8 +571,6 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                 });
                 window.dispatchEvent(moveEvent);
                 
-                console.log(`[Drag] Dispatched element-moved event for ${uniqueKey}`);
-                
                 // Prevent click handler from firing
                 e.stopPropagation();
                 e.preventDefault();
@@ -614,8 +583,6 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (!dragState) return;
             if (e.key === 'Escape' && dragState.state === 'dragging') {
-                console.log(`[Drag] Escape pressed, cancelling drag for ${uniqueKey}`);
-                
                 const wrapper = document.querySelector(`[data-unique-key="${uniqueKey}"]`) as HTMLElement;
                 if (wrapper) {
                     wrapper.style.transform = dragState.originalTransform;

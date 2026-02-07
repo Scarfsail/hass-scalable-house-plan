@@ -26,7 +26,8 @@ export class EditorPlanSectionShp extends LitElement {
         return html`
             <ha-yaml-editor
                 .hass=${this.hass}
-                .defaultValue=${this.planSection || {}}
+                .value=${this.planSection || {}}
+                auto-update
                 @value-changed=${this._planChanged}
             ></ha-yaml-editor>
         `;

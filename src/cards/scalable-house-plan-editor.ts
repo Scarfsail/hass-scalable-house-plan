@@ -2,10 +2,11 @@ import { LitElement, html, css } from "lit-element";
 import { customElement, property, state, query } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
-import type { Room } from "./types";
+import type { Room, EntityConfig, PositionScalingMode } from "./types";
 import type { ScalableHousePlanConfig } from "./scalable-house-plan";
 import { sharedStyles } from "./editor-components/shared-styles";
 import { loadHaEntityPicker } from "../utils/load-ha-elements";
+import { generateElementKey } from "../components/element-renderer-shp";
 import { getLocalizeFunction, type LocalizeFunction } from "../localize";
 import "./editor-components/editor-rooms-shp";
 
@@ -35,6 +36,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         // Listen for element selection events from card preview (via window)
         // HA editor and preview are in separate DOM contexts, so use window events
         window.addEventListener('scalable-house-plan-element-selected', this._handleElementSelection as EventListener);
+        // Phase 2: Listen for element moved events from card preview
+        window.addEventListener('scalable-house-plan-element-moved', this._handleElementMoved as EventListener);
         // Phase 3: Listen for element focus events from editor panel
         window.addEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
     }
@@ -43,6 +46,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         super.disconnectedCallback();
         // Clean up event listener
         window.removeEventListener('scalable-house-plan-element-selected', this._handleElementSelection as EventListener);
+        // Phase 2: Clean up element moved listener
+        window.removeEventListener('scalable-house-plan-element-moved', this._handleElementMoved as EventListener);
         // Phase 3: Clean up element focus listener
         window.removeEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
     }
@@ -237,7 +242,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                     <div class="section-content ${this._expandedSections.has('infoBoxDefaults') ? 'expanded' : ''}">
                         <ha-yaml-editor
                             .hass=${this.hass}
-                            .defaultValue=${this._config.info_box_defaults || {}}
+                            .value=${this._config.info_box_defaults || {}}
+                            auto-update
                             @value-changed=${this._infoBoxDefaultsChanged}
                         ></ha-yaml-editor>
                     </div>
@@ -325,6 +331,164 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
         const { uniqueKey } = ev.detail;
         this._selectedElementKey = uniqueKey;
+        this._configChanged();
+    }
+
+    // Phase 2: Handle element moved from preview - update config with new position
+    private _handleElementMoved = (ev: CustomEvent): void => {
+        const { 
+            uniqueKey, 
+            roomIndex, 
+            deltaXPx, 
+            deltaYPx, 
+            scale, 
+            scaleRatio, 
+            roomBoundsWidth, 
+            roomBoundsHeight,
+            parentGroupKey
+        } = ev.detail;
+
+        // Get room
+        const rooms = [...(this._config.rooms || [])];
+        if (roomIndex < 0 || roomIndex >= rooms.length) return;
+        const room = { ...rooms[roomIndex] };
+
+        // Find entity in room or group
+        let entityIndex = -1;
+        let targetEntityConfig: EntityConfig | null = null;
+        let isGroupChild = false;
+        let parentGroupIndex = -1;
+
+        if (parentGroupKey) {
+            // Element is inside a group - find parent group first
+            parentGroupIndex = this._findEntityIndex(room.entities, parentGroupKey);
+
+            if (parentGroupIndex >= 0) {
+                const parentGroup = room.entities[parentGroupIndex];
+                if (typeof parentGroup !== 'string' && parentGroup.plan?.element?.type === 'group-shp') {
+                    const children = (parentGroup.plan.element as any).children || [];
+                    entityIndex = this._findEntityIndex(children, uniqueKey);
+                    if (entityIndex >= 0) {
+                        targetEntityConfig = children[entityIndex];
+                        isGroupChild = true;
+                    }
+                }
+            }
+        } else {
+            // Root-level entity
+            entityIndex = this._findEntityIndex(room.entities, uniqueKey);
+            if (entityIndex >= 0) {
+                targetEntityConfig = room.entities[entityIndex];
+            }
+        }
+
+        if (!targetEntityConfig || entityIndex < 0) return;
+
+        // Convert string entity to object if needed
+        const entityObj = typeof targetEntityConfig === 'string' 
+            ? { entity: targetEntityConfig, plan: {} } 
+            : { ...targetEntityConfig, plan: { ...(targetEntityConfig.plan || {}) } };
+
+        // Calculate position scales
+        const getPositionScale = (mode: PositionScalingMode): number => {
+            if (scaleRatio === 0) return scale;
+            switch (mode) {
+                case "element": return 1 + (scale - 1) * scaleRatio;
+                case "fixed": return 1;
+                case "plan":
+                default: return scale;
+            }
+        };
+
+        const horizontalScale = getPositionScale(entityObj.plan?.position_scaling_horizontal || 'plan');
+        const verticalScale = getPositionScale(entityObj.plan?.position_scaling_vertical || 'plan');
+
+        // Container dimensions in pixels
+        const containerWidthPx = roomBoundsWidth * scale;
+        const containerHeightPx = roomBoundsHeight * scale;
+
+        // Update horizontal position (left or right)
+        if (entityObj.plan?.left !== undefined) {
+            const oldValue = entityObj.plan.left;
+            if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                // Percentage value
+                const oldPct = parseFloat(oldValue);
+                const newPct = oldPct + (deltaXPx / containerWidthPx) * 100;
+                entityObj.plan.left = `${Math.round(newPct * 10) / 10}%`;
+            } else {
+                // Numeric (px) value
+                const configDelta = deltaXPx / horizontalScale;
+                entityObj.plan.left = Math.round(Number(oldValue) + configDelta);
+            }
+        } else if (entityObj.plan?.right !== undefined) {
+            // Right anchor - negate delta (moving right decreases right value)
+            const oldValue = entityObj.plan.right;
+            if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                const oldPct = parseFloat(oldValue);
+                const newPct = oldPct - (deltaXPx / containerWidthPx) * 100;
+                entityObj.plan.right = `${Math.round(newPct * 10) / 10}%`;
+            } else {
+                const configDelta = -deltaXPx / horizontalScale;
+                entityObj.plan.right = Math.round(Number(oldValue) + configDelta);
+            }
+        }
+
+        // Update vertical position (top or bottom)
+        if (entityObj.plan?.top !== undefined) {
+            const oldValue = entityObj.plan.top;
+            if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                const oldPct = parseFloat(oldValue);
+                const newPct = oldPct + (deltaYPx / containerHeightPx) * 100;
+                entityObj.plan.top = `${Math.round(newPct * 10) / 10}%`;
+            } else {
+                const configDelta = deltaYPx / verticalScale;
+                entityObj.plan.top = Math.round(Number(oldValue) + configDelta);
+            }
+        } else if (entityObj.plan?.bottom !== undefined) {
+            // Bottom anchor - negate delta
+            const oldValue = entityObj.plan.bottom;
+            if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                const oldPct = parseFloat(oldValue);
+                const newPct = oldPct - (deltaYPx / containerHeightPx) * 100;
+                entityObj.plan.bottom = `${Math.round(newPct * 10) / 10}%`;
+            } else {
+                const configDelta = -deltaYPx / verticalScale;
+                entityObj.plan.bottom = Math.round(Number(oldValue) + configDelta);
+            }
+        }
+
+        // Update config
+        if (isGroupChild && parentGroupIndex >= 0) {
+            // Update child in group
+            const parentGroupEntity = room.entities[parentGroupIndex];
+            if (typeof parentGroupEntity !== 'string') {
+                const parentGroup = { ...parentGroupEntity };
+                const groupElement = { ...(parentGroup.plan?.element || {}) };
+                const children = [...((groupElement as any).children || [])];
+                children[entityIndex] = entityObj;
+                parentGroup.plan = {
+                    ...parentGroup.plan,
+                    element: {
+                        ...groupElement,
+                        children
+                    }
+                };
+                room.entities = [...room.entities];
+                room.entities[parentGroupIndex] = parentGroup;
+            }
+        } else {
+            // Update root entity
+            room.entities = [...room.entities];
+            room.entities[entityIndex] = entityObj;
+        }
+
+        // Update rooms array and config
+        rooms[roomIndex] = room;
+        this._config = {
+            ...this._config,
+            rooms
+        };
+
         this._configChanged();
     }
 
@@ -525,5 +689,21 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             composed: true,
         });
         this.dispatchEvent(event);
+    }
+
+    /** Find entity index by uniqueKey, matching both entity IDs and generated keys for no-entity elements */
+    private _findEntityIndex(entities: EntityConfig[], uniqueKey: string): number {
+        return entities.findIndex((el) => {
+            const entity = typeof el === 'string' ? el : el.entity;
+            if (entity && entity === uniqueKey) return true;
+            // For no-entity elements (groups, decorations), match by generated key
+            if (!entity) {
+                const plan = typeof el === 'string' ? undefined : el.plan;
+                if (plan?.element?.type) {
+                    return generateElementKey(plan.element.type, plan) === uniqueKey;
+                }
+            }
+            return false;
+        });
     }
 }
