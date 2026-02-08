@@ -282,8 +282,8 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
             if (dragState.state === 'idle') return;
             if (dragState.pointerId !== e.pointerId) return;
             
-            const dx = e.clientX - dragState.startX;
-            const dy = e.clientY - dragState.startY;
+            let dx = e.clientX - dragState.startX;
+            let dy = e.clientY - dragState.startY;
             
             // Check threshold before activating drag
             if (dragState.state === 'pending') {
@@ -293,11 +293,46 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
                 dragState.state = 'dragging';
             }
             
-            // Apply translate to visual position
+            // Compensate for parent CSS scale (overview mode) to prevent drift
+            // Walk up DOM tree through shadow boundaries to find scaled container
             const wrapper = e.currentTarget as HTMLElement;
+            let element: HTMLElement | null = wrapper;
+            for (let i = 0; i < 20 && element; i++) {
+                const nextElement: HTMLElement | null = element.parentElement;
+                if (nextElement) {
+                    element = nextElement;
+                } else {
+                    // Cross shadow DOM boundary
+                    const root = element.getRootNode();
+                    if (root instanceof ShadowRoot && root.host) {
+                        element = root.host as HTMLElement;
+                    } else {
+                        break;
+                    }
+                }
+                if (!element) break;
+                
+                const transform = window.getComputedStyle(element).transform;
+                if (transform && transform !== 'none') {
+                    try {
+                        const matrix = new DOMMatrix(transform);
+                        const scaleX = matrix.a;
+                        const scaleY = matrix.d;
+                        if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
+                            dx = dx / scaleX;
+                            dy = dy / scaleY;
+                            break;
+                        }
+                    } catch (e) {
+                        // Continue searching
+                    }
+                }
+            }
+            
+            // Apply translate - prepend so it happens in screen space before element scaling
             const translateTransform = `translate(${dx}px, ${dy}px)`;
             const fullTransform = dragState.originalTransform
-                ? `${dragState.originalTransform} ${translateTransform}`
+                ? `${translateTransform} ${dragState.originalTransform}`
                 : translateTransform;
             
             wrapper.style.transform = fullTransform;
@@ -314,6 +349,9 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
             wrapper.releasePointerCapture(e.pointerId);
             
             if (dragState.state === 'dragging') {
+                // Send RAW screen-space deltas (no CSS scale compensation)
+                // The visual drag (handlePointerMove) compensates for CSS scale,
+                // but the editor needs raw deltas to calculate config changes correctly
                 const dx = e.clientX - dragState.startX;
                 const dy = e.clientY - dragState.startY;
                 
@@ -321,8 +359,7 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
                 wrapper.style.transform = dragState.originalTransform;
                 wrapper.style.cursor = '';
                 
-                // Dispatch move event with all data needed for reverse calculation
-                // Include parentGroupKey to indicate this is a group child
+                // Dispatch move event with raw screen-space deltas
                 const moveEvent = new CustomEvent<ElementMovedEventDetail>('scalable-house-plan-element-moved', {
                     detail: {
                         uniqueKey,
