@@ -352,89 +352,153 @@ function calculatePositionStyles(
 }
 
 /**
- * Renders elements for a room
- * Element scaling is based on scaleRatio: elementScale = 1 + (planScale - 1) * scaleRatio
- * - scaleRatio = 0: elements keep original size (no scaling)
- * - scaleRatio = 1: elements scale fully with plan
- * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
+ * Get or create cached position data for an element
+ * Shared helper to avoid duplication between render paths
  */
-export function renderElements(options: ElementRendererOptions): unknown[] {
-    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, elementsClickable = false, houseCache, editorMode = false, viewId = 'default', selectedElementKey, onElementClick, roomIndex = 0 } = options;
+function preparePositionData(
+    uniqueKey: string,
+    plan: any,
+    scale: number,
+    scaleRatio: number,
+    boundsKey: string,
+    roomBounds: { width: number; height: number },
+    elementScale: number,
+    posCache: Map<string, any>
+): PositionCache {
+    const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, boundsKey, plan);
+    let positionData = posCache.get(positionCacheKey);
     
-    // Build a local set for this render's keys (don't touch the global one yet)
-    const currentKeys = new Set<string>();
+    if (!positionData) {
+        // Cache miss - calculate and store
+        positionData = calculatePositionStyles(plan, scale, scaleRatio, roomBounds, elementScale);
+        posCache.set(positionCacheKey, positionData);
+    }
     
-    // Extract position cache from HouseCache (only cache kept - self-invalidating via key)
-    const posCache = houseCache.position;
+    return positionData;
+}
+
+/**
+ * Get or create element card and set up basic properties
+ * Shared helper to avoid duplication between render paths
+ */
+function prepareElementCard(
+    uniqueKey: string,
+    entity: string,
+    elementConfig: any,
+    hass: HomeAssistant,
+    createCardElement: CreateCardElement | null,
+    elementCards: Map<string, any>,
+    mode: 'overview' | 'detail'
+): any {
+    const card = getOrCreateElementCard(uniqueKey, entity, elementConfig, createCardElement, elementCards);
     
-    // Calculate element scale: 1 + (planScale - 1) * scaleRatio
-    // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
-    // When scale=5, ratio=0: elementScale = 1 (no scaling)
-    // When scale=5, ratio=1: elementScale = 5 (full scaling)
-    const elementScale = 1 + (scale - 1) * scaleRatio;
+    if (card && hass) {
+        card.hass = hass;
 
-    // Generate bounds key for position cache
-    const boundsKey = getBoundsKey(roomBounds);
-
-    // Add info box element if enabled
-    const isOverview = !!originalRoom;
-    const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
-    const roomForInfoBox = originalRoom || room;
-    const infoBoxEntity = getOrCreateInfoBoxEntity(roomForInfoBox, config, hass, mode, infoBoxCache, cachedInfoBoxEntityIds);
+        // For group-shp elements, pass through mode, createCardElement and elementCards
+        if (isGroupElementType(elementConfig)) {
+            card.mode = mode;
+            card.createCardElement = createCardElement;
+            card.elementCards = elementCards;
+        }
+    }
     
-    const allEntities = infoBoxEntity ? [...(room.entities || []), infoBoxEntity] : (room.entities || []);
+    return card;
+}
 
-    // Build element structure fresh each render
-    // NOT cached: plan references go stale after drag-drop position changes
-    const elements = buildElementStructure(allEntities, hass, roomIndex);
+/**
+ * Renders elements optimized for normal (non-editor) view
+ * Zero editor overhead: no drag controllers, no selection, no click handlers
+ * 
+ * @param options - Configuration for rendering elements
+ * @param elements - Pre-built element structure
+ * @param posCache - Position cache from HouseCache
+ * @param boundsKey - Room bounds cache key
+ * @param elementScale - Calculated element scale factor
+ * @param mode - Current view mode ('overview' | 'detail')
+ * @returns Array of rendered Lit templates
+ */
+function renderReadOnlyElements(
+    options: ElementRendererOptions,
+    elements: Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }>,
+    posCache: Map<string, any>,
+    boundsKey: string,
+    elementScale: number,
+    mode: 'overview' | 'detail'
+): unknown[] {
+    const { hass, roomBounds, createCardElement, elementCards, scale = 1, scaleRatio = 0, elementsClickable } = options;
+    
+    return elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
+        // Get or create cached position styles (shared helper)
+        const positionData = preparePositionData(uniqueKey, plan, scale, scaleRatio, boundsKey, roomBounds, elementScale, posCache);
 
-    const renderedElements = elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
-        // Get or create cached position styles
-        const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, boundsKey, plan);
-        let positionData = posCache.get(positionCacheKey);
+        // Get or create the element card (shared helper)
+        const card = prepareElementCard(uniqueKey, entity, elementConfig, hass, createCardElement, elementCards, mode);
+
+        // Simple read-only template - minimal overhead
+        return keyed(uniqueKey, html`
+            <div
+                class="element-wrapper"
+                style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin}; pointer-events: ${elementsClickable ? 'auto' : 'none'};"
+                data-unique-key="${uniqueKey}"
+            >
+                ${card}
+            </div>
+        `);
+    });
+}
+
+/**
+ * Renders elements with full editor capabilities
+ * Includes drag controllers, selection highlighting, click handlers
+ * 
+ * @param options - Configuration for rendering elements
+ * @param elements - Pre-built element structure
+ * @param posCache - Position cache from HouseCache
+ * @param boundsKey - Room bounds cache key
+ * @param elementScale - Calculated element scale factor
+ * @param mode - Current view mode ('overview' | 'detail')
+ * @param currentKeys - Set to track active element keys for cleanup
+ * @returns Array of rendered Lit templates
+ */
+function renderEditableElements(
+    options: ElementRendererOptions,
+    elements: Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }>,
+    posCache: Map<string, any>,
+    boundsKey: string,
+    elementScale: number,
+    mode: 'overview' | 'detail',
+    currentKeys: Set<string>
+): unknown[] {
+    const { hass, roomBounds, createCardElement, elementCards, scale = 1, scaleRatio = 0, viewId = 'default', selectedElementKey, onElementClick, roomIndex = 0 } = options;
+
+    return elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
+        // Get or create cached position styles (shared helper)
+        const positionData = preparePositionData(uniqueKey, plan, scale, scaleRatio, boundsKey, roomBounds, elementScale, posCache);
+
+        // Get or create the element card (shared helper)
+        const card = prepareElementCard(uniqueKey, entity, elementConfig, hass, createCardElement, elementCards, mode);
         
-        if (!positionData) {
-            // Cache miss - calculate and store
-            positionData = calculatePositionStyles(plan, scale, scaleRatio, roomBounds, elementScale);
-            posCache.set(positionCacheKey, positionData);
+        // Editor-specific: Pass additional properties to group elements
+        if (card && isGroupElementType(elementConfig)) {
+            card.editorMode = true;
+            card.selectedElementKey = selectedElementKey;
+            card.onElementClick = onElementClick;
+            card.groupUniqueKey = uniqueKey;
+            card.scale = scale;
+            card.scaleRatio = scaleRatio;
+            card.roomIndex = roomIndex;
+            card.roomBounds = roomBounds;
         }
 
-        // Get or create the element card using unique key
-        const card = getOrCreateElementCard(uniqueKey, entity, elementConfig, createCardElement, elementCards);
-        if (card && hass) {
-            card.hass = hass;
-
-            // For group-shp elements, pass through mode, createCardElement and elementCards
-            // so they can render their children and filter based on overview setting
-            if (isGroupElementType(elementConfig)) {
-                card.mode = mode;
-                card.createCardElement = createCardElement;
-                card.elementCards = elementCards;
-                // Pass through editor-related properties for nested group selection
-                card.editorMode = editorMode;
-                card.selectedElementKey = selectedElementKey;
-                card.onElementClick = onElementClick;
-                card.groupUniqueKey = uniqueKey; // Pass this group's uniqueKey for nested selection context
-                // Pass through drag-related properties for child drag support
-                card.scale = scale;
-                card.scaleRatio = scaleRatio;
-                card.roomIndex = roomIndex;
-                card.roomBounds = roomBounds;
-            }
-
-            // Disable pointer events on card in editor mode so wrapper catches clicks
-            // IMPORTANT: Don't disable pointer events on group-shp cards - they need to handle child clicks!
-            if (editorMode && !isGroupElementType(elementConfig)) {
-                card.style.pointerEvents = 'none';
-            } else if (card.style.pointerEvents === 'none') {
-                // Re-enable pointer events when not in editor mode
-                card.style.pointerEvents = '';
-            }
+        // Editor-specific: Disable pointer events on non-group cards so wrapper catches clicks
+        if (card && !isGroupElementType(elementConfig)) {
+            card.style.pointerEvents = 'none';
         }
 
         // Handle element click in editor mode
         const handleClick = (e: MouseEvent) => {
-            if (editorMode && onElementClick) {
+            if (onElementClick) {
                 // Check if click came from a child element-wrapper (for nested groups)
                 // If so, don't handle this click - let the child handle it
                 const target = e.target as HTMLElement;
@@ -459,7 +523,7 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
         };
 
         // Drag controller setup (only in editor mode)
-        const isDraggable = editorMode && plan;
+        const isDraggable = plan;
 
         // Track this key as active in current render (ALWAYS, not just when creating)
         if (isDraggable) {
@@ -532,7 +596,7 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
         return keyed(uniqueKey, html`
             <div
                 class="element-wrapper ${isSelected ? 'selected-element' : ''}"
-                style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin}; pointer-events: ${elementsClickable || editorMode ? 'auto' : 'none'}; ${editorMode ? 'cursor: pointer;' : ''}"
+                style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin}; pointer-events: auto; cursor: pointer;"
                 data-unique-key="${uniqueKey}"
                 @pointerdown=${controller ? (e: PointerEvent) => controller.handlePointerDown(e) : null}
                 @pointermove=${controller ? (e: PointerEvent) => controller.handlePointerMove(e) : null}
@@ -543,6 +607,54 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
             </div>
         `);
     });
+}
+
+/**
+ * Renders elements for a room
+ * Routes to optimized read-only or full-featured editor path based on editorMode
+ * 
+ * Element scaling is based on scaleRatio: elementScale = 1 + (planScale - 1) * scaleRatio
+ * - scaleRatio = 0: elements keep original size (no scaling)
+ * - scaleRatio = 1: elements scale fully with plan
+ * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
+ */
+export function renderElements(options: ElementRendererOptions): unknown[] {
+    const { hass, room, roomBounds, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, houseCache, editorMode = false, roomIndex = 0 } = options;
+    
+    // Extract position cache from HouseCache (only cache kept - self-invalidating via key)
+    const posCache = houseCache.position;
+    
+    // Calculate element scale: 1 + (planScale - 1) * scaleRatio
+    // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
+    // When scale=5, ratio=0: elementScale = 1 (no scaling)
+    // When scale=5, ratio=1: elementScale = 5 (full scaling)
+    const elementScale = 1 + (scale - 1) * scaleRatio;
+
+    // Generate bounds key for position cache
+    const boundsKey = getBoundsKey(roomBounds);
+
+    // Add info box element if enabled
+    const isOverview = !!originalRoom;
+    const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
+    const roomForInfoBox = originalRoom || room;
+    const infoBoxEntity = getOrCreateInfoBoxEntity(roomForInfoBox, config, hass, mode, infoBoxCache, cachedInfoBoxEntityIds);
+    
+    const allEntities = infoBoxEntity ? [...(room.entities || []), infoBoxEntity] : (room.entities || []);
+
+    // Build element structure fresh each render
+    // NOT cached: plan references go stale after drag-drop position changes
+    const elements = buildElementStructure(allEntities, hass, roomIndex);
+
+    // Route to appropriate render path based on editor mode
+    // Normal view: Zero editor overhead (no drag, no selection, no click handlers)
+    // Editor view: Full features (drag controllers, selection, click handling, cleanup)
+    if (!editorMode) {
+        return renderReadOnlyElements(options, elements, posCache, boundsKey, elementScale, mode);
+    }
+
+    // Editor mode: Build tracking set for controller cleanup
+    const currentKeys = new Set<string>();
+    const renderedElements = renderEditableElements(options, elements, posCache, boundsKey, elementScale, mode, currentKeys);
     
     // Cleanup: Remove controllers for keys that weren't in this render
     // This handles uniqueKey changes when elements are moved (position in key changes)
@@ -550,52 +662,52 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
     // During synchronous re-render (e.g., from handlePointerUp event), the old controller
     // may still be processing the drag with state='dragging'. Skip it and clean up next render.
     // OPTIMIZATION: Only run cleanup when element keys actually change (not on every render)
-    if (editorMode) {
-        // Update the global set for this room BEFORE cleanup so concurrent renders see it
-        currentKeysPerRoom.set(roomIndex, currentKeys);
-        
-        // Build view-specific keys for current render
-        const currentControllerKeys = new Set<string>();
-        currentKeys.forEach(key => currentControllerKeys.add(`${key}-${viewId}`));
-        
-        // Check if keys changed compared to previous render
-        const roomViewKey = `${roomIndex}-${viewId}`;
-        const previousKeys = previousKeysPerRoomView.get(roomViewKey);
-        
-        // Detect if keys changed (elements added/removed/moved)
-        const keysChanged = !previousKeys || 
-                           previousKeys.size !== currentControllerKeys.size ||
-                           ![...currentControllerKeys].every(k => previousKeys.has(k));
-        
-        if (keysChanged) {
-            const controllersToRemove: string[] = [];
-            dragControllers.forEach((controller, controllerKey) => {
-                const controllerRoom = dragControllerRoomIndex.get(controllerKey);
-                const inCurrentKeys = currentControllerKeys.has(controllerKey);
-                const state = controller.getState();
-                
-                // Only clean up controllers belonging to THIS room AND viewId
-                // Prevents cross-room and cross-view cleanup
-                if (controllerRoom === roomIndex && 
-                    !inCurrentKeys && 
-                    state === 'idle') {
-                    controller.detach();
-                    controllersToRemove.push(controllerKey);
-                }
-            });
+    const viewId = options.viewId || 'default';
+    
+    // Update the global set for this room BEFORE cleanup so concurrent renders see it
+    currentKeysPerRoom.set(roomIndex, currentKeys);
+    
+    // Build view-specific keys for current render
+    const currentControllerKeys = new Set<string>();
+    currentKeys.forEach(key => currentControllerKeys.add(`${key}-${viewId}`));
+    
+    // Check if keys changed compared to previous render
+    const roomViewKey = `${roomIndex}-${viewId}`;
+    const previousKeys = previousKeysPerRoomView.get(roomViewKey);
+    
+    // Detect if keys changed (elements added/removed/moved)
+    const keysChanged = !previousKeys || 
+                       previousKeys.size !== currentControllerKeys.size ||
+                       ![...currentControllerKeys].every(k => previousKeys.has(k));
+    
+    if (keysChanged) {
+        const controllersToRemove: string[] = [];
+        dragControllers.forEach((controller, controllerKey) => {
+            const controllerRoom = dragControllerRoomIndex.get(controllerKey);
+            const inCurrentKeys = currentControllerKeys.has(controllerKey);
+            const state = controller.getState();
             
-            controllersToRemove.forEach(controllerKey => {
-                dragControllers.delete(controllerKey);
-                dragControllerRoomIndex.delete(controllerKey);
-            });
-            
-            // Update previous keys for next render
-            previousKeysPerRoomView.set(roomViewKey, new Set(currentControllerKeys));
-        } else {
-            // No cleanup needed - keys unchanged
-            // Still update previousKeys reference (Set may be new instance)
-            previousKeysPerRoomView.set(roomViewKey, currentControllerKeys);
-        }
+            // Only clean up controllers belonging to THIS room AND viewId
+            // Prevents cross-room and cross-view cleanup
+            if (controllerRoom === roomIndex && 
+                !inCurrentKeys && 
+                state === 'idle') {
+                controller.detach();
+                controllersToRemove.push(controllerKey);
+            }
+        });
+        
+        controllersToRemove.forEach(controllerKey => {
+            dragControllers.delete(controllerKey);
+            dragControllerRoomIndex.delete(controllerKey);
+        });
+        
+        // Update previous keys for next render
+        previousKeysPerRoomView.set(roomViewKey, new Set(currentControllerKeys));
+    } else {
+        // No cleanup needed - keys unchanged
+        // Still update previousKeys reference (Set may be new instance)
+        previousKeysPerRoomView.set(roomViewKey, currentControllerKeys);
     }
     
     return renderedElements;

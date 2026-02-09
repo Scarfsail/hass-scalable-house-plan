@@ -164,9 +164,82 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
     }
 
     /**
-     * Render a single child element
+     * Prepare child element card - shared helper to avoid duplication
      */
-    private _renderChild(childConfig: EntityConfig, index: number, currentChildKeys: Set<string>) {
+    private _prepareChildCard(
+        uniqueKey: string,
+        entity: string,
+        elementConfig: any
+    ): any {
+        const card = this._getOrCreateChildCard(uniqueKey, entity, elementConfig);
+        
+        if (card && this.hass) {
+            card.hass = this.hass;
+            
+            // For nested group-shp elements, pass through mode, createCardElement and elementCards
+            if (isGroupElementType(elementConfig)) {
+                card.mode = this.mode;
+                card.createCardElement = this.createCardElement;
+                card.elementCards = this.elementCards;
+            }
+        }
+        
+        return card;
+    }
+
+    /**
+     * Render a single child element optimized for normal (non-editor) view
+     * Zero editor overhead: no drag controllers, no selection, no click handlers
+     */
+    private _renderReadOnlyChild(childConfig: EntityConfig, index: number): unknown {
+        if (!this.hass) return nothing;
+
+        // Extract entity and plan from EntityConfig
+        const entity = typeof childConfig === 'string' ? childConfig : childConfig.entity;
+        const plan = typeof childConfig === 'string' ? undefined : childConfig.plan;
+
+        // Validate that we have positioning information
+        if (!plan) {
+            console.warn(`group-shp: Child at index ${index} missing plan configuration`, childConfig);
+            return nothing;
+        }
+
+        // Validate no-entity elements have a type
+        if (!entity && (!plan.element || !plan.element.type)) {
+            console.warn(`group-shp: No-entity child at index ${index} missing element.type`, childConfig);
+            return nothing;
+        }
+
+        // Generate unique key for child (entity ID or generated key)
+        const uniqueKey = entity || generateElementKey(plan.element?.type || 'unknown', plan);
+
+        // Get element type and merged config
+        const elementType = this._getElementType(entity, plan);
+        const elementConfig = this._buildElementConfig(entity, plan, elementType);
+
+        // Get or create the child element card (shared helper)
+        const card = this._prepareChildCard(uniqueKey, entity, elementConfig);
+
+        // Calculate child position styles
+        const childStyles = this._calculateChildPosition(plan, uniqueKey);
+
+        // Simple read-only template - minimal overhead
+        return html`
+            <div 
+                class="child-wrapper"
+                style=${styleMap(childStyles)}
+                data-unique-key="${uniqueKey}"
+            >
+                ${card}
+            </div>
+        `;
+    }
+
+    /**
+     * Render a single child element with full editor capabilities
+     * Includes drag controllers, selection highlighting, click handlers
+     */
+    private _renderEditableChild(childConfig: EntityConfig, index: number, currentChildKeys: Set<string>): unknown {
         if (!this.hass) return nothing;
 
         // Extract entity and plan from EntityConfig
@@ -194,43 +267,31 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         const elementType = this._getElementType(entity, plan);
         const elementConfig = this._buildElementConfig(entity, plan, elementType);
 
-        // Get or create the child element card
-        const card = this._getOrCreateChildCard(uniqueKey, entity, elementConfig);
-        if (card && this.hass) {
-            card.hass = this.hass;
-            
-            // For nested group-shp elements, pass through mode, createCardElement and elementCards
-            if (isGroupElementType(elementConfig)) {
-                card.mode = this.mode;
-                card.createCardElement = this.createCardElement;
-                card.elementCards = this.elementCards;
-                // Pass through editor-related properties for nested group selection
-                card.editorMode = this.editorMode;
-                card.selectedElementKey = this.selectedElementKey;
-                card.onElementClick = this.onElementClick;
-                card.groupUniqueKey = uniqueKey; // Set nested group's own uniqueKey
-                // Pass through drag-related properties for nested child drag support
-                card.scale = this.scale;
-                card.scaleRatio = this.scaleRatio;
-                card.roomIndex = this.roomIndex;
-                card.roomBounds = this.roomBounds;
-            }
-            
-            // Disable pointer events on card in editor mode so wrapper catches clicks
-            // IMPORTANT: Don't disable pointer events on group-shp cards - they need to handle child clicks!
-            if (this.editorMode && !isGroupElementType(elementConfig)) {
-                card.style.pointerEvents = 'none';
-            } else if (card.style.pointerEvents === 'none') {
-                // Re-enable pointer events when not in editor mode
-                card.style.pointerEvents = '';
-            }
+        // Get or create the child element card (shared helper)
+        const card = this._prepareChildCard(uniqueKey, entity, elementConfig);
+        
+        // Editor-specific: Pass additional properties to nested group elements
+        if (card && isGroupElementType(elementConfig)) {
+            card.editorMode = true;
+            card.selectedElementKey = this.selectedElementKey;
+            card.onElementClick = this.onElementClick;
+            card.groupUniqueKey = uniqueKey;
+            card.scale = this.scale;
+            card.scaleRatio = this.scaleRatio;
+            card.roomIndex = this.roomIndex;
+            card.roomBounds = this.roomBounds;
+        }
+        
+        // Editor-specific: Disable pointer events on non-group cards so wrapper catches clicks
+        if (card && !isGroupElementType(elementConfig)) {
+            card.style.pointerEvents = 'none';
         }
 
         // Calculate child position styles
         const childStyles = this._calculateChildPosition(plan, uniqueKey);
         
         // Drag is enabled in editor mode with plan
-        const isDraggable = this.editorMode && plan;
+        const isDraggable = plan;
         
         // Track this key as active in current render (ALWAYS, not just when creating)
         if (isDraggable) {
@@ -261,7 +322,7 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         // Handle element click in editor mode
         // Pass both child's uniqueKey and parent group's uniqueKey for nested selection
         const handleClick = (e: MouseEvent) => {
-            if (this.editorMode && this.onElementClick) {
+            if (this.onElementClick) {
                 // Check if click came from a nested child element-wrapper (for multi-level groups)
                 const target = e.target as HTMLElement;
                 const currentWrapper = e.currentTarget as HTMLElement;
@@ -299,6 +360,21 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
                 ${card}
             </div>
         `;
+    }
+
+    /**
+     * Render a single child element
+     * Routes to optimized read-only or full-featured editor path based on editorMode
+     */
+    private _renderChild(childConfig: EntityConfig, index: number, currentChildKeys: Set<string>) {
+        // Route to appropriate render path based on editor mode
+        // Normal view: Zero editor overhead (no drag, no selection, no click handlers)
+        // Editor view: Full features (drag controllers, selection, click handling)
+        if (!this.editorMode) {
+            return this._renderReadOnlyChild(childConfig, index);
+        }
+        
+        return this._renderEditableChild(childConfig, index, currentChildKeys);
     }
 
     /**
