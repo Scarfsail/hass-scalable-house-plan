@@ -258,6 +258,103 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
     }
 
     /**
+     * Configure editor-specific properties for child card elements
+     * Sets properties needed for nested editing (editorMode, selection, etc.)
+     */
+    private _setupEditorCardProperties(card: any, elementConfig: any, uniqueKey: string): void {
+        if (!card) return;
+        
+        // Pass editor properties to nested group elements
+        if (isGroupElementType(elementConfig)) {
+            card.editorMode = true;
+            card.selectedElementKey = this.selectedElementKey;
+            card.onElementClick = this.onElementClick;
+            card.groupUniqueKey = uniqueKey;
+            card.scale = this.scale;
+            card.scaleRatio = this.scaleRatio;
+            card.roomIndex = this.roomIndex;
+            card.roomBounds = this.roomBounds;
+        }
+        
+        // Disable pointer events on non-group cards so wrapper catches clicks
+        if (!isGroupElementType(elementConfig)) {
+            card.style.pointerEvents = 'none';
+        }
+    }
+
+    /**
+     * Create click handler for child element selection with nested group support
+     * Prevents click handling when click originates from nested child wrapper
+     */
+    private _createChildClickHandler(uniqueKey: string, index: number, entity: string): ((e: MouseEvent) => void) | undefined {
+        if (!this.onElementClick) return undefined;
+        
+        // Capture in local variable for TypeScript type narrowing
+        const onElementClick = this.onElementClick;
+        const groupUniqueKey = this.groupUniqueKey;
+        
+        return (e: MouseEvent) => {
+            // Check if click came from a nested child element-wrapper (for multi-level groups)
+            const target = e.target as HTMLElement;
+            const currentWrapper = e.currentTarget as HTMLElement;
+            
+            // Find if there's a child-wrapper between target and currentTarget
+            let element = target;
+            while (element && element !== currentWrapper) {
+                if (element.classList?.contains('child-wrapper') && element !== currentWrapper) {
+                    // Click came from a nested child wrapper, ignore it
+                    return;
+                }
+                element = element.parentElement as HTMLElement;
+            }
+            
+            e.stopPropagation();
+            e.preventDefault();
+            // Pass child's uniqueKey, index, entity, AND parent group's uniqueKey
+            onElementClick(uniqueKey, index, entity || '', groupUniqueKey);
+        };
+    }
+
+    /**
+     * Setup or update drag controller for a child element
+     * Handles controller lifecycle and updates
+     */
+    private _setupDragController(
+        uniqueKey: string,
+        isDraggable: boolean,
+        entity: string,
+        positionTransform: string,
+        currentChildKeys: Set<string>
+    ): DragController | undefined {
+        if (!isDraggable) return undefined;
+        
+        // Track this key as active in current render
+        currentChildKeys.add(uniqueKey);
+        
+        // Get or create drag controller
+        if (!this._dragControllers.has(uniqueKey)) {
+            const controller = new DragController(
+                null as any, // wrapper not needed with direct binding
+                uniqueKey,
+                {
+                    roomIndex: this.roomIndex ?? -1,
+                    entityId: entity || '',
+                    scale: this.scale ?? 1,
+                    scaleRatio: this.scaleRatio ?? 0,
+                    roomBoundsWidth: this.roomBounds?.width ?? 0,
+                    roomBoundsHeight: this.roomBounds?.height ?? 0,
+                    parentGroupKey: this.groupUniqueKey,
+                    originalTransform: positionTransform || ''
+                }
+            );
+            controller.attach(); // Only attaches document keydown listener
+            this._dragControllers.set(uniqueKey, controller);
+        }
+        
+        return this._dragControllers.get(uniqueKey);
+    }
+
+    /**
      * Render a single child element with full editor capabilities
      * Includes drag controllers, selection highlighting, click handlers
      */
@@ -271,79 +368,18 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         // Get or create the child element card (shared helper)
         const card = this._prepareChildCard(uniqueKey, entity, elementConfig);
         
-        // Editor-specific: Pass additional properties to nested group elements
-        if (card && isGroupElementType(elementConfig)) {
-            card.editorMode = true;
-            card.selectedElementKey = this.selectedElementKey;
-            card.onElementClick = this.onElementClick;
-            card.groupUniqueKey = uniqueKey;
-            card.scale = this.scale;
-            card.scaleRatio = this.scaleRatio;
-            card.roomIndex = this.roomIndex;
-            card.roomBounds = this.roomBounds;
-        }
-        
-        // Editor-specific: Disable pointer events on non-group cards so wrapper catches clicks
-        if (card && !isGroupElementType(elementConfig)) {
-            card.style.pointerEvents = 'none';
-        }
+        // Setup editor-specific card properties (group elements only)
+        this._setupEditorCardProperties(card, elementConfig, uniqueKey);
 
         // Calculate child position styles
         const childStyles = this._calculateChildPosition(plan, uniqueKey);
         
-        // Drag is enabled in editor mode with plan
-        const isDraggable = plan;
+        // Setup drag controller for draggable elements
+        const isDraggable = !!plan;
+        const controller = this._setupDragController(uniqueKey, isDraggable, entity, childStyles.transform || '', currentChildKeys);
         
-        // Track this key as active in current render (ALWAYS, not just when creating)
-        if (isDraggable) {
-            currentChildKeys.add(uniqueKey);
-        }
-        
-        // Get or create drag controller
-        if (isDraggable && !this._dragControllers.has(uniqueKey)) {
-            const controller = new DragController(
-                null as any, // wrapper not needed with direct binding
-                uniqueKey,
-                {
-                    roomIndex: this.roomIndex ?? -1,
-                    entityId: entity || '',
-                    scale: this.scale ?? 1,
-                    scaleRatio: this.scaleRatio ?? 0,
-                    roomBoundsWidth: this.roomBounds?.width ?? 0,
-                    roomBoundsHeight: this.roomBounds?.height ?? 0,
-                    parentGroupKey: this.groupUniqueKey,
-                    originalTransform: childStyles.transform || ''
-                }
-            );
-            controller.attach(); // Only attaches document keydown listener
-            this._dragControllers.set(uniqueKey, controller);
-        }
-        const controller = isDraggable ? this._dragControllers.get(uniqueKey) : undefined;
-        
-        // Handle element click in editor mode
-        // Pass both child's uniqueKey and parent group's uniqueKey for nested selection
-        const handleClick = (e: MouseEvent) => {
-            if (this.onElementClick) {
-                // Check if click came from a nested child element-wrapper (for multi-level groups)
-                const target = e.target as HTMLElement;
-                const currentWrapper = e.currentTarget as HTMLElement;
-                
-                // Find if there's a child-wrapper between target and currentTarget
-                let element = target;
-                while (element && element !== currentWrapper) {
-                    if (element.classList?.contains('child-wrapper') && element !== currentWrapper) {
-                        // Click came from a nested child wrapper, ignore it
-                        return;
-                    }
-                    element = element.parentElement as HTMLElement;
-                }
-                
-                e.stopPropagation();
-                e.preventDefault();
-                // Pass child's uniqueKey, index, entity, AND parent group's uniqueKey
-                this.onElementClick(uniqueKey, index, entity || '', this.groupUniqueKey);
-            }
-        };
+        // Create click handler with nested group support
+        const handleClick = this._createChildClickHandler(uniqueKey, index, entity);
         
         // Determine if this child element is selected
         const isSelected = uniqueKey === this.selectedElementKey;

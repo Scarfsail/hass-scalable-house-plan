@@ -449,6 +449,185 @@ function renderReadOnlyElements(
 }
 
 /**
+ * Configure editor-specific properties for card elements
+ * Sets properties needed for nested editing (editorMode, selection, etc.)
+ * 
+ * @param card - The card element to configure
+ * @param elementConfig - Element configuration
+ * @param options - Editor-specific options
+ */
+function setupEditorCardProperties(
+    card: any,
+    elementConfig: any,
+    options: {
+        selectedElementKey?: string;
+        onElementClick?: (key: string, index: number, entity: string, parentKey?: string) => void;
+        uniqueKey: string;
+        scale: number;
+        scaleRatio: number;
+        roomIndex: number;
+        roomBounds: { width: number; height: number };
+    }
+): void {
+    if (!card) return;
+    
+    // Pass editor properties to nested group elements
+    if (isGroupElementType(elementConfig)) {
+        card.editorMode = true;
+        card.selectedElementKey = options.selectedElementKey;
+        card.onElementClick = options.onElementClick;
+        card.groupUniqueKey = options.uniqueKey;
+        card.scale = options.scale;
+        card.scaleRatio = options.scaleRatio;
+        card.roomIndex = options.roomIndex;
+        card.roomBounds = options.roomBounds;
+    }
+    
+    // Disable pointer events on non-group cards so wrapper catches clicks
+    if (!isGroupElementType(elementConfig)) {
+        card.style.pointerEvents = 'none';
+    }
+}
+
+/**
+ * Create click handler for element selection with nested group support
+ * Prevents click handling when click originates from nested wrapper
+ * 
+ * @param uniqueKey - Element's unique key
+ * @param elements - Array of all elements
+ * @param onElementClick - Callback for element click
+ * @returns Click handler function
+ */
+function createElementClickHandler(
+    uniqueKey: string,
+    elements: Array<{ entity: string; plan: any; uniqueKey: string }>,
+    onElementClick?: (key: string, index: number, entity: string, parentKey?: string) => void
+): ((e: MouseEvent) => void) | undefined {
+    if (!onElementClick) return undefined;
+    
+    // Capture in local variable for TypeScript type narrowing
+    const callback = onElementClick;
+    
+    return (e: MouseEvent) => {
+        // Check if click came from a child element-wrapper (for nested groups)
+        // If so, don't handle this click - let the child handle it
+        const target = e.target as HTMLElement;
+        const currentWrapper = e.currentTarget as HTMLElement;
+        
+        // Find if there's an element-wrapper or child-wrapper between target and currentTarget
+        let element = target;
+        while (element && element !== currentWrapper) {
+            if ((element.classList?.contains('element-wrapper') || element.classList?.contains('child-wrapper')) && element !== currentWrapper) {
+                // Click came from a nested wrapper, ignore it
+                return;
+            }
+            element = element.parentElement as HTMLElement;
+        }
+        
+        e.stopPropagation();
+        e.preventDefault();
+        const elementIndex = elements.findIndex(el => el.uniqueKey === uniqueKey);
+        const elementData = elements.find(el => el.uniqueKey === uniqueKey);
+        callback(uniqueKey, elementIndex, elementData?.entity || '');
+    };
+}
+
+/**
+ * Setup or update drag controller for an element
+ * Handles controller lifecycle, updates, and performance tracking
+ * 
+ * @param uniqueKey - Element's unique key
+ * @param isDraggable - Whether element can be dragged
+ * @param options - Configuration for drag controller
+ * @param currentKeys - Set to track active keys
+ * @param viewId - View identifier for controller separation
+ * @returns Drag controller instance if draggable, undefined otherwise
+ */
+function setupDragController(
+    uniqueKey: string,
+    isDraggable: boolean,
+    options: {
+        roomIndex: number;
+        entity: string;
+        scale: number;
+        scaleRatio: number;
+        roomBounds: { width: number; height: number };
+        elementConfig: any;
+        positionTransform: string;
+    },
+    currentKeys: Set<string>,
+    viewId: string = 'default'
+): DragController | undefined {
+    if (!isDraggable) return undefined;
+    
+    // Track this key as active in current render
+    currentKeys.add(uniqueKey);
+    
+    // Create view-specific controller key to separate controller instances per render context
+    // Use viewId to ensure main card and detail dialog have completely separate controllers
+    const controllerKey = `${uniqueKey}-${viewId}`;
+    
+    // Get or create drag controller (view-specific)
+    if (!dragControllers.has(controllerKey)) {
+        const controller = new DragController(
+            null as any, // wrapper not needed with direct binding
+            uniqueKey,
+            {
+                roomIndex: options.roomIndex,
+                entityId: options.entity,
+                scale: options.scale,
+                scaleRatio: options.scaleRatio,
+                roomBoundsWidth: options.roomBounds.width,
+                roomBoundsHeight: options.roomBounds.height,
+                isGroupElement: isGroupElementType(options.elementConfig),
+                originalTransform: options.positionTransform
+            }
+        );
+        controller.attach(); // Only attaches document keydown listener
+        dragControllers.set(controllerKey, controller);
+        dragControllerRoomIndex.set(controllerKey, options.roomIndex);
+    }
+    
+    const controller = dragControllers.get(controllerKey);
+    
+    // Update controller options only if values have changed (performance optimization)
+    if (controller) {
+        const currentOptions = controller.getOptions();
+        const needsUpdate = (
+            currentOptions.roomIndex !== options.roomIndex ||
+            currentOptions.entityId !== options.entity ||
+            currentOptions.scale !== options.scale ||
+            currentOptions.scaleRatio !== options.scaleRatio ||
+            currentOptions.roomBoundsWidth !== options.roomBounds.width ||
+            currentOptions.roomBoundsHeight !== options.roomBounds.height ||
+            currentOptions.isGroupElement !== isGroupElementType(options.elementConfig) ||
+            currentOptions.originalTransform !== options.positionTransform ||
+            currentOptions.parentGroupKey !== options.elementConfig.group
+        );
+        
+        if (needsUpdate) {
+            const updateStart = performance.now();
+            controller.updateOptions({
+                roomIndex: options.roomIndex,
+                entityId: options.entity,
+                scale: options.scale,
+                scaleRatio: options.scaleRatio,
+                roomBoundsWidth: options.roomBounds.width,
+                roomBoundsHeight: options.roomBounds.height,
+                isGroupElement: isGroupElementType(options.elementConfig),
+                originalTransform: options.positionTransform
+            });
+            const updateTime = performance.now() - updateStart;
+            if (updateTime > 1) {
+                console.log(`[PERF] updateOptions took ${updateTime.toFixed(2)}ms for ${uniqueKey}`);
+            }
+        }
+    }
+    
+    return controller;
+}
+
+/**
  * Renders elements with full editor capabilities
  * Includes drag controllers, selection highlighting, click handlers
  * 
@@ -479,116 +658,37 @@ function renderEditableElements(
         // Get or create the element card (shared helper)
         const card = prepareElementCard(uniqueKey, entity, elementConfig, hass, createCardElement, elementCards, mode);
         
-        // Editor-specific: Pass additional properties to group elements
-        if (card && isGroupElementType(elementConfig)) {
-            card.editorMode = true;
-            card.selectedElementKey = selectedElementKey;
-            card.onElementClick = onElementClick;
-            card.groupUniqueKey = uniqueKey;
-            card.scale = scale;
-            card.scaleRatio = scaleRatio;
-            card.roomIndex = roomIndex;
-            card.roomBounds = roomBounds;
-        }
+        // Setup editor-specific card properties (group elements only)
+        setupEditorCardProperties(card, elementConfig, {
+            selectedElementKey: selectedElementKey ?? undefined,
+            onElementClick,
+            uniqueKey,
+            scale,
+            scaleRatio,
+            roomIndex,
+            roomBounds
+        });
 
-        // Editor-specific: Disable pointer events on non-group cards so wrapper catches clicks
-        if (card && !isGroupElementType(elementConfig)) {
-            card.style.pointerEvents = 'none';
-        }
+        // Create click handler with nested group support
+        const handleClick = createElementClickHandler(uniqueKey, elements, onElementClick);
 
-        // Handle element click in editor mode
-        const handleClick = (e: MouseEvent) => {
-            if (onElementClick) {
-                // Check if click came from a child element-wrapper (for nested groups)
-                // If so, don't handle this click - let the child handle it
-                const target = e.target as HTMLElement;
-                const currentWrapper = e.currentTarget as HTMLElement;
-                
-                // Find if there's an element-wrapper or child-wrapper between target and currentTarget
-                let element = target;
-                while (element && element !== currentWrapper) {
-                    if ((element.classList?.contains('element-wrapper') || element.classList?.contains('child-wrapper')) && element !== currentWrapper) {
-                        // Click came from a nested wrapper, ignore it
-                        return;
-                    }
-                    element = element.parentElement as HTMLElement;
-                }
-                
-                e.stopPropagation();
-                e.preventDefault();
-                const elementIndex = elements.findIndex(el => el.uniqueKey === uniqueKey);
-                const elementData = elements.find(el => el.uniqueKey === uniqueKey);
-                onElementClick(uniqueKey, elementIndex, elementData?.entity || '');
-            }
-        };
-
-        // Drag controller setup (only in editor mode)
-        const isDraggable = plan;
-
-        // Track this key as active in current render (ALWAYS, not just when creating)
-        if (isDraggable) {
-            currentKeys.add(uniqueKey);
-        }
-
-        // Create view-specific controller key to separate controller instances per render context
-        // Use viewId to ensure main card and detail dialog have completely separate controllers
-        const controllerKey = `${uniqueKey}-${viewId}`;
-
-        // Get or create drag controller (view-specific)
-        if (isDraggable && !dragControllers.has(controllerKey)) {
-            const controller = new DragController(
-                null as any, // wrapper not needed with direct binding
-                uniqueKey,
-                {
-                    roomIndex,
-                    entityId: entity,
-                    scale,
-                    scaleRatio,
-                    roomBoundsWidth: roomBounds.width,
-                    roomBoundsHeight: roomBounds.height,
-                    isGroupElement: isGroupElementType(elementConfig),
-                    originalTransform: positionData.transform
-                }
-            );
-            controller.attach(); // Only attaches document keydown listener
-            dragControllers.set(controllerKey, controller);
-            dragControllerRoomIndex.set(controllerKey, roomIndex);
-        }
-        const controller = isDraggable ? dragControllers.get(controllerKey) : undefined;
-        
-        // Update controller options only if values have changed (performance optimization)
-        if (controller) {
-            const currentOptions = controller.getOptions();
-            const needsUpdate = (
-                currentOptions.roomIndex !== roomIndex ||
-                currentOptions.entityId !== entity ||
-                currentOptions.scale !== scale ||
-                currentOptions.scaleRatio !== scaleRatio ||
-                currentOptions.roomBoundsWidth !== roomBounds.width ||
-                currentOptions.roomBoundsHeight !== roomBounds.height ||
-                currentOptions.isGroupElement !== isGroupElementType(elementConfig) ||
-                currentOptions.originalTransform !== positionData.transform ||
-                currentOptions.parentGroupKey !== elementConfig.group
-            );
-            
-            if (needsUpdate) {
-                const updateStart = performance.now();
-                controller.updateOptions({
-                    roomIndex,
-                    entityId: entity,
-                    scale,
-                    scaleRatio,
-                    roomBoundsWidth: roomBounds.width,
-                    roomBoundsHeight: roomBounds.height,
-                    isGroupElement: isGroupElementType(elementConfig),
-                    originalTransform: positionData.transform
-                });
-                const updateTime = performance.now() - updateStart;
-                if (updateTime > 1) {
-                    console.log(`[PERF] updateOptions took ${updateTime.toFixed(2)}ms for ${uniqueKey}`);
-                }
-            }
-        }
+        // Setup drag controller for draggable elements
+        const isDraggable = !!plan;
+        const controller = setupDragController(
+            uniqueKey,
+            isDraggable,
+            {
+                roomIndex,
+                entity,
+                scale,
+                scaleRatio,
+                roomBounds,
+                elementConfig,
+                positionTransform: positionData.transform
+            },
+            currentKeys,
+            viewId
+        );
 
         // Determine if this element is selected
         const isSelected = uniqueKey === selectedElementKey;
