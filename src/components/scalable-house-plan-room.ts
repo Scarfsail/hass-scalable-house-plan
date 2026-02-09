@@ -732,27 +732,32 @@ export class ScalableHousePlanRoom extends LitElement {
 
     /**
      * Handle room background click in editor mode
-     * Clears element selection by emitting null uniqueKey
+     * In overview: toggles room detail preview (emulates eye icon click)
+     * In detail: clears element selection
      */
     private _handleRoomBackgroundClick(e: Event): void {
         // Only handle in editor mode
         if (!this.editorMode) return;
-        
+
         // Stop event from propagating
         e.stopPropagation();
-        
-        // Emit selection event with null to clear selection
-        const windowEvent = new CustomEvent('scalable-house-plan-element-selected', {
-            detail: {
-                uniqueKey: null,
-                elementIndex: -1,
-                roomIndex: this.roomIndex,
-                entityId: ''
-            },
-            bubbles: true,
-            composed: true
-        });
-        window.dispatchEvent(windowEvent);
+
+        if (this.mode === 'overview' && this.roomIndex !== undefined) {
+            // In overview mode: open room detail (emulate eye icon toggle)
+            window.dispatchEvent(new CustomEvent('scalable-house-plan-room-preview', {
+                detail: { roomIndex: this.roomIndex, showPreview: true }
+            }));
+        } else {
+            // In detail mode: clear element selection
+            window.dispatchEvent(new CustomEvent('scalable-house-plan-element-selected', {
+                detail: {
+                    uniqueKey: null,
+                    elementIndex: -1,
+                    roomIndex: this.roomIndex,
+                    entityId: ''
+                }
+            }));
+        }
     }
 
     /**

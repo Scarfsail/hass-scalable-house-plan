@@ -326,8 +326,15 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     private _closeRoomDetail() {
+        const closingRoomIndex = this._selectedRoomIndex;
         this._selectedRoomIndex = null;
         this._currentView = 'overview';
+        // In edit mode: notify editor to clear _previewRoomIndex (emulate eye icon toggle off)
+        if (this._isEditMode() && closingRoomIndex !== null) {
+            window.dispatchEvent(new CustomEvent('scalable-house-plan-room-preview', {
+                detail: { roomIndex: closingRoomIndex, showPreview: false }
+            }));
+        }
         // Only pop history when not in edit mode
         if (!this._isEditMode() && window.history.state?.view === 'room-detail') {
             history.back();

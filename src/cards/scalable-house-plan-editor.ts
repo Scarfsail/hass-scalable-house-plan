@@ -40,6 +40,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         window.addEventListener('scalable-house-plan-element-moved', this._handleElementMoved as EventListener);
         // Phase 3: Listen for element focus events from editor panel
         window.addEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
+        // Listen for room preview events from card preview (room click / back button)
+        window.addEventListener('scalable-house-plan-room-preview', this._handleRoomPreviewFromCard as EventListener);
         // Keyboard arrow controls for nudging selected elements
         document.addEventListener('keydown', this._handleKeyboardArrow);
     }
@@ -52,6 +54,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         window.removeEventListener('scalable-house-plan-element-moved', this._handleElementMoved as EventListener);
         // Phase 3: Clean up element focus listener
         window.removeEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
+        // Clean up room preview listener
+        window.removeEventListener('scalable-house-plan-room-preview', this._handleRoomPreviewFromCard as EventListener);
         // Clean up keyboard listener
         document.removeEventListener('keydown', this._handleKeyboardArrow);
     }
@@ -708,20 +712,51 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     // Room handlers
     private _handlePreviewDetail(ev: CustomEvent): void {
+        this._applyRoomPreview(ev.detail.roomIndex, ev.detail.showPreview);
+    }
+
+    /**
+     * Handle room preview events from the card preview (via window event).
+     * Triggered when user clicks a room polygon in overview (open detail)
+     * or clicks the back button in detail view (close detail).
+     */
+    private _handleRoomPreviewFromCard = (ev: CustomEvent): void => {
         const { roomIndex, showPreview } = ev.detail;
-        
-        // Clear selection when switching rooms (Task 3)
+        this._applyRoomPreview(roomIndex, showPreview);
+
+        // Sync eye icon state in the room editor component
+        this.updateComplete.then(() => {
+            // Guard: only sync if this still matches current preview state
+            const isStillRelevant = showPreview
+                ? this._previewRoomIndex === roomIndex
+                : this._previewRoomIndex === null;
+            if (!isStillRelevant) return;
+
+            const roomComponents = this._roomsEditor?.shadowRoot?.querySelectorAll('editor-room-shp');
+            const roomComponent = roomComponents?.[roomIndex] as any;
+            if (roomComponent) {
+                roomComponent._previewDetailView = showPreview;
+            }
+        });
+    }
+
+    /**
+     * Shared logic for toggling room detail preview.
+     * Used by both the eye icon (DOM event) and card preview clicks (window event).
+     */
+    private _applyRoomPreview(roomIndex: number, showPreview: boolean): void {
+        // Clear selection when switching rooms
         if (this._previewRoomIndex !== null && roomIndex !== this._previewRoomIndex) {
             this._selectedElementKey = null;
         }
-        
+
         this._previewRoomIndex = showPreview ? roomIndex : null;
-        
+
         // Clear selection when hiding preview
         if (!showPreview) {
             this._selectedElementKey = null;
         }
-        
+
         // Trigger config update to update the preview
         this._configChanged();
     }
