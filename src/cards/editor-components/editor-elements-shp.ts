@@ -31,6 +31,7 @@ export class EditorElementsShp extends LitElement {
     @property({ type: Boolean }) hideHeader: boolean = false; // Hide header when embedded
     @property({ type: String }) areaId?: string; // Optional area ID for filtering
     @property({ type: String }) selectedElementKey?: string | null; // Currently selected element key (for Task 4)
+    @property({ type: Number }) roomIndex?: number; // Room index for generating group keys
     private _localize?: LocalizeFunction;
 
     private get localize(): LocalizeFunction {
@@ -392,7 +393,15 @@ export class EditorElementsShp extends LitElement {
      * Helper method to find element index by uniqueKey
      */
     private _findElementIndex(uniqueKey: string): number {
-        return this.elements.findIndex((el, index) => {
+        // First, filter elements the same way buildElementStructure does
+        // This ensures elementIndex matches between renderer and editor
+        const filteredElements = this.elements.filter((entityConfig: EntityConfig) => {
+            if (typeof entityConfig === 'string') return false;
+            return !!(typeof entityConfig !== 'string' && entityConfig.plan);
+        });
+        
+        // Find in filtered array using filtered indices
+        const filteredIndex = filteredElements.findIndex((el, elementIndex) => {
             const entity = typeof el === 'string' ? el : el.entity;
             const plan = typeof el === 'string' ? undefined : el.plan;
 
@@ -403,11 +412,17 @@ export class EditorElementsShp extends LitElement {
 
             // For no-entity elements, generate the key and compare
             if (!entity && plan?.element?.type) {
-                const generatedKey = generateElementKey(plan.element.type, plan);
+                const generatedKey = generateElementKey(plan.element.type, plan, this.roomIndex, elementIndex);
                 return generatedKey === uniqueKey;
             }
 
             return false;
         });
+        
+        if (filteredIndex === -1) return -1;
+        
+        // Convert filtered index back to original array index
+        const filteredElement = filteredElements[filteredIndex];
+        return this.elements.indexOf(filteredElement);
     }
 }

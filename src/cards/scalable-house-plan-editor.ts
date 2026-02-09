@@ -361,13 +361,13 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
         if (parentGroupKey) {
             // Element is inside a group - find parent group first
-            parentGroupIndex = this._findEntityIndex(room.entities, parentGroupKey);
+            parentGroupIndex = this._findEntityIndex(room.entities, parentGroupKey, roomIndex);
 
             if (parentGroupIndex >= 0) {
                 const parentGroup = room.entities[parentGroupIndex];
                 if (typeof parentGroup !== 'string' && parentGroup.plan?.element?.type === 'custom:group-shp') {
                     const children = (parentGroup.plan.element as any).children || [];
-                    entityIndex = this._findEntityIndex(children, uniqueKey);
+                    entityIndex = this._findEntityIndex(children, uniqueKey, roomIndex);
                     if (entityIndex >= 0) {
                         targetEntityConfig = children[entityIndex];
                         isGroupChild = true;
@@ -376,7 +376,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             }
         } else {
             // Root-level entity
-            entityIndex = this._findEntityIndex(room.entities, uniqueKey);
+            entityIndex = this._findEntityIndex(room.entities, uniqueKey, roomIndex);
             if (entityIndex >= 0) {
                 targetEntityConfig = room.entities[entityIndex];
             }
@@ -750,18 +750,32 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     }
 
     /** Find entity index by uniqueKey, matching both entity IDs and generated keys for no-entity elements */
-    private _findEntityIndex(entities: EntityConfig[], uniqueKey: string): number {
-        return entities.findIndex((el) => {
+    private _findEntityIndex(entities: EntityConfig[], uniqueKey: string, roomIndex?: number): number {
+        // First, filter entities the same way buildElementStructure does
+        // This ensures elementIndex matches between renderer and editor
+        const filteredEntities = entities.filter((entityConfig: EntityConfig) => {
+            if (typeof entityConfig === 'string') return false;
+            return !!entityConfig.plan;
+        });
+        
+        // Find in filtered array using filtered indices
+        const filteredIndex = filteredEntities.findIndex((el, elementIndex) => {
             const entity = typeof el === 'string' ? el : el.entity;
             if (entity && entity === uniqueKey) return true;
             // For no-entity elements (groups, decorations), match by generated key
             if (!entity) {
                 const plan = typeof el === 'string' ? undefined : el.plan;
                 if (plan?.element?.type) {
-                    return generateElementKey(plan.element.type, plan) === uniqueKey;
+                    return generateElementKey(plan.element.type, plan, roomIndex, elementIndex) === uniqueKey;
                 }
             }
             return false;
         });
+        
+        if (filteredIndex === -1) return -1;
+        
+        // Convert filtered index back to original array index
+        const filteredElement = filteredEntities[filteredIndex];
+        return entities.indexOf(filteredElement);
     }
 }

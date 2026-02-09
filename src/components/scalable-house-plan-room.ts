@@ -61,6 +61,7 @@ export class ScalableHousePlanRoom extends LitElement {
     @property({ type: Boolean }) public editorMode = false;
     @property({ attribute: false }) public selectedElementKey?: string | null;
     @property({ type: Number }) public roomIndex?: number;
+    @property({ type: String }) public viewId?: string;  // Unique identifier for this render context (e.g., "main-card", "detail-dialog")
 
     // Constants
     private static readonly DEFAULT_ROOM_COLOR = 'rgba(128, 128, 128, 0.2)';
@@ -455,6 +456,7 @@ export class ScalableHousePlanRoom extends LitElement {
             elementsClickable,  // Control element clickability
             houseCache: this.houseCache,
             editorMode: this.editorMode,
+            viewId: this.viewId || 'default',  // Pass viewId to separate controllers
             selectedElementKey: this.selectedElementKey,
             onElementClick: (uniqueKey: string, elementIndex: number, entityId: string, parentGroupKey?: string) => {
                 this._handleElementClick(uniqueKey, elementIndex, entityId, parentGroupKey);
@@ -581,6 +583,7 @@ export class ScalableHousePlanRoom extends LitElement {
             elementsClickable: true,  // Elements always clickable in detail view
             houseCache: this.houseCache,
             editorMode: this.editorMode,
+            viewId: this.viewId || 'default',  // Pass viewId to separate controllers
             selectedElementKey: this.selectedElementKey,
             onElementClick: (uniqueKey: string, elementIndex: number, entityId: string, parentGroupKey?: string) => {
                 this._handleElementClick(uniqueKey, elementIndex, entityId, parentGroupKey);

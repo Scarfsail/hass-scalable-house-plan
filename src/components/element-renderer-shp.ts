@@ -1,6 +1,7 @@
 import { html, TemplateResult } from "lit-element";
 import { keyed } from "lit/directives/keyed.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
+import { DragController } from "../utils/drag-controller";
 import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig } from "../cards/types";
 import type { ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds, isGroupElementType } from "../utils";
@@ -16,17 +17,31 @@ import { getOrCreateElementCard } from "../utils/card-element-cache";
  */
 
 /**
- * Module-level drag state tracker to persist state across re-renders
+ * Module-level drag controller cache to manage controller lifecycle
+ * Key format: "${uniqueKey}-${viewContext}" where viewContext is "editor" or "overview"
+ * This ensures each view has its own controller instances
  */
-interface DragState {
-    state: 'idle' | 'pending' | 'dragging';
-    startX: number;
-    startY: number;
-    pointerId: number | null;
-    originalTransform: string;
-}
+const dragControllers = new Map<string, DragController>();
 
-const dragStateMap = new Map<string, DragState>();
+/**
+ * Track which room owns each drag controller.
+ * Prevents cross-room cleanup: Room A's render won't destroy Room B's controllers.
+ * Key format matches dragControllers
+ */
+const dragControllerRoomIndex = new Map<string, number>();
+
+/**
+ * Track current render's keys per room.
+ * Prevents cleanup during rapid successive renders of the same room.
+ */
+const currentKeysPerRoom = new Map<number, Set<string>>();
+
+/**
+ * Track previous render's keys per room+viewId.
+ * Used for change detection - only run cleanup when keys actually change.
+ * Key format: "${roomIndex}-${viewId}"
+ */
+const previousKeysPerRoomView = new Map<string, Set<string>>();
 
 /**
  * Event detail for element moved event
@@ -59,6 +74,7 @@ export interface ElementRendererOptions {
     elementsClickable?: boolean;  // Whether elements should be clickable (controls pointer-events)
     houseCache: HouseCache;  // Element renderer caches (required)
     editorMode?: boolean;  // Interactive editor mode: enable click-to-select behavior
+    viewId?: string;  // Unique identifier for the rendering view (e.g., "main-card", "detail-dialog"). Used to separate controller instances.
     selectedElementKey?: string | null;  // Currently selected element uniqueKey
     onElementClick?: (uniqueKey: string, elementIndex: number, entity: string, parentGroupKey?: string) => void;  // Click callback for element selection
     roomIndex?: number;  // Room index for drag event
@@ -97,9 +113,20 @@ interface CachedElementStructure {
 
 /**
  * Generate unique key for no-entity elements based on type and position
- * Key format: elementType-left-top-right-bottom-room_id-mode (mode only for info boxes)
+ * Key format: 
+ * - Groups: custom:group-shp-room{roomIndex}-element{elementIndex}
+ * - Others: elementType-left-top-right-bottom-room_id-mode (mode only for info boxes)
  */
-export function generateElementKey(elementType: string, plan: any): string {
+export function generateElementKey(elementType: string, plan: any, roomIndex?: number, elementIndex?: number): string {
+    // Use index-based keys for groups to prevent oscillation after drag
+    // Groups have no stable entity ID, and position-based keys cause uniqueKey to change
+    // when position updates, triggering controller recreation and position oscillation
+    const isGroup = elementType === 'custom:group-shp';
+    if (isGroup && roomIndex !== undefined && elementIndex !== undefined) {
+        return `${elementType}-room${roomIndex}-element${elementIndex}`;
+    }
+    
+    // Use position-based keys for non-group elements
     const left = plan.left !== undefined ? String(plan.left) : 'undefined';
     const top = plan.top !== undefined ? String(plan.top) : 'undefined';
     const right = plan.right !== undefined ? String(plan.right) : 'undefined';
@@ -116,35 +143,24 @@ export function generateElementKey(elementType: string, plan: any): string {
 }
 
 /**
- * Get or create cached element structure for a room
- * This avoids filtering/mapping room.entities on every render
+ * Build element structure for a room.
+ * 
+ * IMPORTANT: This is NOT cached. Caching plan references caused stale positions
+ * after drag-drop because the editor creates new plan objects (via spread) on each
+ * config update, but stale cached references still pointed to old positions.
+ * This operation is cheap (filter/map on small arrays) so caching is unnecessary.
  */
-function getOrCreateElementStructure(
-    roomName: string,
-    mode: 'overview' | 'detail',
+function buildElementStructure(
     allEntities: EntityConfig[],
     hass: HomeAssistant,
-    elementStructureCache: Map<string, CachedElementStructure>,
-    elementMetadataCache: Map<string, ElementMetadata>
+    roomIndex?: number
 ): Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }> {
-    // Include mode in cache key to separate overview and detail caches
-    const cacheKey = `${roomName}-${mode}`;
-    const cached = elementStructureCache.get(cacheKey);
-    
-    // Check if cache is valid
-    if (cached) {
-        return cached.elements;
-    }
-    
-    
-
-    // Compute element structure
-    const elements = allEntities
+    return allEntities
         .filter((entityConfig: EntityConfig) => {
             if (typeof entityConfig === 'string') return false;
             return !!entityConfig.plan;
         })
-        .map((entityConfig: EntityConfig) => {
+        .map((entityConfig: EntityConfig, elementIndex: number) => {
             const entity = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
             const plan = typeof entityConfig === 'string' ? undefined : entityConfig.plan;
             
@@ -156,74 +172,52 @@ function getOrCreateElementStructure(
                 return null;
             }
 
-            // Generate unique key
-            const uniqueKey = entity || generateElementKey(plan.element?.type || 'unknown', plan);
+            // Generate unique key (pass roomIndex and elementIndex for groups)
+            const uniqueKey = entity || generateElementKey(plan.element?.type || 'unknown', plan, roomIndex, elementIndex);
 
-            // Get cached element metadata (will be recomputed since we cleared the cache above)
-            const metadata = getOrCreateElementMetadata(uniqueKey, entity, plan, hass, elementMetadataCache);
+            // Build element metadata (always fresh to avoid stale elementConfig)
+            const metadata = buildElementMetadata(entity, plan, hass);
 
             return { entity, plan, elementConfig: metadata.elementConfig, uniqueKey };
         })
         .filter((el): el is { entity: string; plan: any; elementConfig: any; uniqueKey: string } => el !== null);
-    
-    // Store in cache
-    elementStructureCache.set(cacheKey, {
-        elements
-    });
-    
-    return elements;
 }
 
 /**
- * Get or create cached element metadata
- * @param cacheKey - Unique key for this element (entity ID or generated key)
- * @param entity - Entity ID (can be empty for no-entity elements)
- * @param plan - Plan configuration
- * @param hass - Home Assistant instance
- * @param elementMetadataCache - Cache map for element metadata
- * @returns Cached or newly computed element metadata
+ * Build element metadata (always fresh, not cached).
+ * 
+ * IMPORTANT: Not cached because plan.element can contain mutable data
+ * (e.g., group children positions) that changes after drag-drop.
+ * These operations are fast (string matching + object spread).
  */
-function getOrCreateElementMetadata(
-    cacheKey: string,
+function buildElementMetadata(
     entity: string,
     plan: any,
-    hass: HomeAssistant,
-    elementMetadataCache: Map<string, ElementMetadata>
+    hass: HomeAssistant
 ): ElementMetadata {
-    // Check cache first
-    let metadata = elementMetadataCache.get(cacheKey);
+    const deviceClass = entity && hass?.states[entity]?.attributes?.device_class;
+    const defaultElement = entity 
+        ? getElementTypeForEntity(entity, deviceClass, 'plan')
+        : { type: plan.element!.type as string };
     
-    if (!metadata) {
-        // Compute metadata (expensive operations)
-        const deviceClass = entity && hass?.states[entity]?.attributes?.device_class;
-        const defaultElement = entity 
-            ? getElementTypeForEntity(entity, deviceClass, 'plan')
-            : { type: plan.element!.type as string };
-        
-        // Merge default properties with user overrides
-        const elementConfig = mergeElementProperties(defaultElement, plan.element || {});
+    // Merge default properties with user overrides
+    const elementConfig = mergeElementProperties(defaultElement, plan.element || {});
 
-        // Add default tap_action and hold_action for entities (if not already set by user)
-        if (entity && isEntityActionable(entity, hass)) {
-            if (!elementConfig.tap_action) {
-                elementConfig.tap_action = getDefaultTapAction(entity, hass);
-            }
-            if (!elementConfig.hold_action) {
-                elementConfig.hold_action = getDefaultHoldAction();
-            }
+    // Add default tap_action and hold_action for entities (if not already set by user)
+    if (entity && isEntityActionable(entity, hass)) {
+        if (!elementConfig.tap_action) {
+            elementConfig.tap_action = getDefaultTapAction(entity, hass);
         }
-        
-        metadata = {
-            defaultElement,
-            elementConfig,
-            deviceClass
-        };
-        
-        // Store in cache
-        elementMetadataCache.set(cacheKey, metadata);
+        if (!elementConfig.hold_action) {
+            elementConfig.hold_action = getDefaultHoldAction();
+        }
     }
     
-    return metadata;
+    return {
+        defaultElement,
+        elementConfig,
+        deviceClass
+    };
 }
 
 /**
@@ -365,11 +359,12 @@ function calculatePositionStyles(
  * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
  */
 export function renderElements(options: ElementRendererOptions): unknown[] {
-    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, elementsClickable = false, houseCache, editorMode = false, selectedElementKey, onElementClick, roomIndex = 0 } = options;
+    const { hass, room, roomBounds, createCardElement, elementCards, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, elementsClickable = false, houseCache, editorMode = false, viewId = 'default', selectedElementKey, onElementClick, roomIndex = 0 } = options;
     
-    // Extract caches from HouseCache
-    const metadataCache = houseCache.elementMetadata;
-    const structureCache = houseCache.elementStructure;
+    // Build a local set for this render's keys (don't touch the global one yet)
+    const currentKeys = new Set<string>();
+    
+    // Extract position cache from HouseCache (only cache kept - self-invalidating via key)
     const posCache = houseCache.position;
     
     // Calculate element scale: 1 + (planScale - 1) * scaleRatio
@@ -389,9 +384,9 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
     
     const allEntities = infoBoxEntity ? [...(room.entities || []), infoBoxEntity] : (room.entities || []);
 
-    // Get or create cached element structure
-    // This avoids expensive filter/map operations on every render
-    const elements = getOrCreateElementStructure(room.name, mode, allEntities, hass, structureCache, metadataCache);
+    // Build element structure fresh each render
+    // NOT cached: plan references go stale after drag-drop position changes
+    const elements = buildElementStructure(allEntities, hass, roomIndex);
 
     const renderedElements = elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
         // Get or create cached position styles
@@ -463,184 +458,72 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
             }
         };
 
-        // Drag handlers for editor mode (only if element has plan config)
-        // Groups ARE draggable (the whole group moves), but pointerdown checks
-        // whether the event targets a child — if so, group drag is skipped.
+        // Drag controller setup (only in editor mode)
         const isDraggable = editorMode && plan;
-        const DRAG_THRESHOLD = 5; // pixels
-        
-        // Get or create drag state for this element (only if draggable)
-        let dragState: DragState | undefined;
+
+        // Track this key as active in current render (ALWAYS, not just when creating)
         if (isDraggable) {
-            if (!dragStateMap.has(uniqueKey)) {
-                dragStateMap.set(uniqueKey, {
-                    state: 'idle',
-                    startX: 0,
-                    startY: 0,
-                    pointerId: null,
-                    originalTransform: ''
-                });
-            }
-            dragState = dragStateMap.get(uniqueKey)!;
+            currentKeys.add(uniqueKey);
         }
 
-        const handlePointerDown = (e: PointerEvent) => {
-            if (!isDraggable || !dragState) return;
-            
-            // Primary button only
-            if (e.button !== 0) return;
-            
-            // For group elements: check if the pointer landed on a child wrapper.
-            // If so, don't start group drag — let the child handle it.
-            // IMPORTANT: Must use composedPath() because child-wrapper lives inside
-            // group-shp's shadow DOM. Regular e.target is retargeted to the shadow host,
-            // so a parentElement walk would never find the child-wrapper.
-            if (isGroupElementType(elementConfig)) {
-                const currentWrapper = e.currentTarget as HTMLElement;
-                for (const node of e.composedPath()) {
-                    if (node === currentWrapper) break;
-                    if (node instanceof HTMLElement &&
-                        (node.classList?.contains('element-wrapper') || node.classList?.contains('child-wrapper'))) {
-                        return;
-                    }
-                }
-            }
-            
-            dragState.startX = e.clientX;
-            dragState.startY = e.clientY;
-            dragState.state = 'pending';
-            dragState.pointerId = e.pointerId;
-            dragState.originalTransform = positionData.transform;
-            
-            const wrapper = e.currentTarget as HTMLElement;
-            wrapper.setPointerCapture(e.pointerId);
-        };
+        // Create view-specific controller key to separate controller instances per render context
+        // Use viewId to ensure main card and detail dialog have completely separate controllers
+        const controllerKey = `${uniqueKey}-${viewId}`;
 
-        const handlePointerMove = (e: PointerEvent) => {
-            if (!dragState) return;
-            if (dragState.state === 'idle') return;
-            if (dragState.pointerId !== e.pointerId) return;
-            
-            let dx = e.clientX - dragState.startX;
-            let dy = e.clientY - dragState.startY;
-            
-            // Check threshold before activating drag
-            if (dragState.state === 'pending') {
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < DRAG_THRESHOLD) return;
-                
-                dragState.state = 'dragging';
-            }
-            
-            // Compensate for parent CSS scale (overview mode) to prevent drift
-            // Walk up DOM tree through shadow boundaries to find scaled container
-            const wrapper = e.currentTarget as HTMLElement;
-            let element: HTMLElement | null = wrapper;
-            for (let i = 0; i < 20 && element; i++) {
-                const nextElement: HTMLElement | null = element.parentElement;
-                if (nextElement) {
-                    element = nextElement;
-                } else {
-                    // Cross shadow DOM boundary
-                    const root = element.getRootNode();
-                    if (root instanceof ShadowRoot && root.host) {
-                        element = root.host as HTMLElement;
-                    } else {
-                        break;
-                    }
+        // Get or create drag controller (view-specific)
+        if (isDraggable && !dragControllers.has(controllerKey)) {
+            const controller = new DragController(
+                null as any, // wrapper not needed with direct binding
+                uniqueKey,
+                {
+                    roomIndex,
+                    entityId: entity,
+                    scale,
+                    scaleRatio,
+                    roomBoundsWidth: roomBounds.width,
+                    roomBoundsHeight: roomBounds.height,
+                    isGroupElement: isGroupElementType(elementConfig),
+                    originalTransform: positionData.transform
                 }
-                if (!element) break;
-                
-                const transform = window.getComputedStyle(element).transform;
-                if (transform && transform !== 'none') {
-                    try {
-                        const matrix = new DOMMatrix(transform);
-                        const scaleX = matrix.a;
-                        const scaleY = matrix.d;
-                        if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
-                            dx = dx / scaleX;
-                            dy = dy / scaleY;
-                            break;
-                        }
-                    } catch (e) {
-                        // Continue searching
-                    }
-                }
-            }
+            );
+            controller.attach(); // Only attaches document keydown listener
+            dragControllers.set(controllerKey, controller);
+            dragControllerRoomIndex.set(controllerKey, roomIndex);
+        }
+        const controller = isDraggable ? dragControllers.get(controllerKey) : undefined;
+        
+        // Update controller options only if values have changed (performance optimization)
+        if (controller) {
+            const currentOptions = controller.getOptions();
+            const needsUpdate = (
+                currentOptions.roomIndex !== roomIndex ||
+                currentOptions.entityId !== entity ||
+                currentOptions.scale !== scale ||
+                currentOptions.scaleRatio !== scaleRatio ||
+                currentOptions.roomBoundsWidth !== roomBounds.width ||
+                currentOptions.roomBoundsHeight !== roomBounds.height ||
+                currentOptions.isGroupElement !== isGroupElementType(elementConfig) ||
+                currentOptions.originalTransform !== positionData.transform ||
+                currentOptions.parentGroupKey !== elementConfig.group
+            );
             
-            // Apply translate - prepend so it happens in screen space before element scaling
-            const translateTransform = `translate(${dx}px, ${dy}px)`;
-            const fullTransform = dragState.originalTransform 
-                ? `${translateTransform} ${dragState.originalTransform}` 
-                : translateTransform;
-            
-            wrapper.style.transform = fullTransform;
-            wrapper.style.cursor = 'grabbing';
-            
-            e.preventDefault();
-        };
-
-        const handlePointerUp = (e: PointerEvent) => {
-            if (!dragState) return;
-            if (dragState.pointerId !== e.pointerId) return;
-            
-            const wrapper = e.currentTarget as HTMLElement;
-            wrapper.releasePointerCapture(e.pointerId);
-            
-            if (dragState.state === 'dragging') {
-                const dx = e.clientX - dragState.startX;
-                const dy = e.clientY - dragState.startY;
-                
-                // Reset visual transform
-                wrapper.style.transform = dragState.originalTransform;
-                wrapper.style.cursor = '';
-                
-                // Dispatch move event with raw screen-space deltas
-                const moveEvent = new CustomEvent<ElementMovedEventDetail>('scalable-house-plan-element-moved', {
-                    detail: {
-                        uniqueKey,
-                        roomIndex,
-                        entityId: entity,
-                        deltaXPx: dx,
-                        deltaYPx: dy,
-                        scale,
-                        scaleRatio,
-                        roomBoundsWidth: roomBounds.width,
-                        roomBoundsHeight: roomBounds.height
-                    }
+            if (needsUpdate) {
+                const updateStart = performance.now();
+                controller.updateOptions({
+                    roomIndex,
+                    entityId: entity,
+                    scale,
+                    scaleRatio,
+                    roomBoundsWidth: roomBounds.width,
+                    roomBoundsHeight: roomBounds.height,
+                    isGroupElement: isGroupElementType(elementConfig),
+                    originalTransform: positionData.transform
                 });
-                window.dispatchEvent(moveEvent);
-                
-                // Prevent click handler from firing
-                e.stopPropagation();
-                e.preventDefault();
-            }
-            
-            dragState.state = 'idle';
-            dragState.pointerId = null;
-        };
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (!dragState) return;
-            if (e.key === 'Escape' && dragState.state === 'dragging') {
-                const wrapper = document.querySelector(`[data-unique-key="${uniqueKey}"]`) as HTMLElement;
-                if (wrapper) {
-                    wrapper.style.transform = dragState.originalTransform;
-                    wrapper.style.cursor = '';
-                    if (dragState.pointerId !== null) {
-                        wrapper.releasePointerCapture(dragState.pointerId);
-                    }
+                const updateTime = performance.now() - updateStart;
+                if (updateTime > 1) {
+                    console.log(`[PERF] updateOptions took ${updateTime.toFixed(2)}ms for ${uniqueKey}`);
                 }
-                dragState.state = 'idle';
-                dragState.pointerId = null;
             }
-        };
-
-        // Register escape handler only for draggable elements
-        if (isDraggable) {
-            // Note: We add a global keydown listener, which is not ideal but needed for escape handling
-            // This will be cleaned up when the element is removed
-            document.addEventListener('keydown', handleKeyDown);
         }
 
         // Determine if this element is selected
@@ -651,15 +534,69 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
                 class="element-wrapper ${isSelected ? 'selected-element' : ''}"
                 style="${positionData.styleString}; transform: ${positionData.transform}; transform-origin: ${positionData.transformOrigin}; pointer-events: ${elementsClickable || editorMode ? 'auto' : 'none'}; ${editorMode ? 'cursor: pointer;' : ''}"
                 data-unique-key="${uniqueKey}"
+                @pointerdown=${controller ? (e: PointerEvent) => controller.handlePointerDown(e) : null}
+                @pointermove=${controller ? (e: PointerEvent) => controller.handlePointerMove(e) : null}
+                @pointerup=${controller ? (e: PointerEvent) => controller.handlePointerUp(e) : null}
                 @click=${handleClick}
-                @pointerdown=${isDraggable ? handlePointerDown : null}
-                @pointermove=${isDraggable ? handlePointerMove : null}
-                @pointerup=${isDraggable ? handlePointerUp : null}
             >
                 ${card}
             </div>
         `);
     });
+    
+    // Cleanup: Remove controllers for keys that weren't in this render
+    // This handles uniqueKey changes when elements are moved (position in key changes)
+    // IMPORTANT: Only cleanup idle controllers to prevent interrupting active drags.
+    // During synchronous re-render (e.g., from handlePointerUp event), the old controller
+    // may still be processing the drag with state='dragging'. Skip it and clean up next render.
+    // OPTIMIZATION: Only run cleanup when element keys actually change (not on every render)
+    if (editorMode) {
+        // Update the global set for this room BEFORE cleanup so concurrent renders see it
+        currentKeysPerRoom.set(roomIndex, currentKeys);
+        
+        // Build view-specific keys for current render
+        const currentControllerKeys = new Set<string>();
+        currentKeys.forEach(key => currentControllerKeys.add(`${key}-${viewId}`));
+        
+        // Check if keys changed compared to previous render
+        const roomViewKey = `${roomIndex}-${viewId}`;
+        const previousKeys = previousKeysPerRoomView.get(roomViewKey);
+        
+        // Detect if keys changed (elements added/removed/moved)
+        const keysChanged = !previousKeys || 
+                           previousKeys.size !== currentControllerKeys.size ||
+                           ![...currentControllerKeys].every(k => previousKeys.has(k));
+        
+        if (keysChanged) {
+            const controllersToRemove: string[] = [];
+            dragControllers.forEach((controller, controllerKey) => {
+                const controllerRoom = dragControllerRoomIndex.get(controllerKey);
+                const inCurrentKeys = currentControllerKeys.has(controllerKey);
+                const state = controller.getState();
+                
+                // Only clean up controllers belonging to THIS room AND viewId
+                // Prevents cross-room and cross-view cleanup
+                if (controllerRoom === roomIndex && 
+                    !inCurrentKeys && 
+                    state === 'idle') {
+                    controller.detach();
+                    controllersToRemove.push(controllerKey);
+                }
+            });
+            
+            controllersToRemove.forEach(controllerKey => {
+                dragControllers.delete(controllerKey);
+                dragControllerRoomIndex.delete(controllerKey);
+            });
+            
+            // Update previous keys for next render
+            previousKeysPerRoomView.set(roomViewKey, new Set(currentControllerKeys));
+        } else {
+            // No cleanup needed - keys unchanged
+            // Still update previousKeys reference (Set may be new instance)
+            previousKeysPerRoomView.set(roomViewKey, currentControllerKeys);
+        }
+    }
     
     return renderedElements;
 }
@@ -736,6 +673,14 @@ function getOrCreateInfoBoxEntity(
  * @param cachedEntityIds - Pre-computed entity IDs (avoids expensive getAllRoomEntityIds call)
  * @returns EntityConfig for info box or null if disabled
  */
+/**
+ * Cleanup all drag controllers. Call when editor mode is disabled or component unmounts.
+ */
+export function cleanupDragControllers(): void {
+    dragControllers.forEach(controller => controller.detach());
+    dragControllers.clear();
+}
+
 function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undefined, hass: HomeAssistant, mode: 'overview' | 'detail', cachedEntityIds?: string[]): EntityConfig | null {
     // Merge defaults: code default -> house config -> room config
     const codeDefault: InfoBoxConfig = {

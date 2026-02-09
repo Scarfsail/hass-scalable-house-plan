@@ -118,6 +118,7 @@ export class ScalableHousePlanOverview extends LitElement {
                 .editorMode=${this.editorMode}
                 .selectedElementKey=${this.selectedElementKey}
                 .roomIndex=${index}
+                .viewId=${'main-card'}
             ></scalable-house-plan-room>
         `);
     }

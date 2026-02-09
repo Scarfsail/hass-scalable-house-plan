@@ -311,6 +311,7 @@ export class EditorRoomShp extends LitElement {
                                     .areaId=${this.room.area}
                                     .hideHeader=${true}
                                     .selectedElementKey=${this.selectedElementKey}
+                                    .roomIndex=${this.roomIndex}
                                     @elements-add=${this._handleElementAdd}
                                     @elements-update=${this._handleElementsUpdate}
                                     @elements-remove=${this._handleElementRemove}

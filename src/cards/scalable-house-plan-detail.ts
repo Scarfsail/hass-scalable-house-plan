@@ -221,6 +221,7 @@ export class ScalableHousePlanDetail extends LitElement {
                 .editorMode=${this.editorMode}
                 .selectedElementKey=${this.selectedElementKey}
                 .roomIndex=${this.roomIndex}
+                .viewId=${'detail-dialog'}
             ></scalable-house-plan-room>
         `;
     }

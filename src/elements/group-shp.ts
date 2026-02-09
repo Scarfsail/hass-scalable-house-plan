@@ -9,18 +9,7 @@ import { getOrCreateElementCard } from "../utils/card-element-cache";
 import { getElementTypeForEntity, mergeElementProperties, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, isGroupElementType } from "../utils";
 import type { ElementMovedEventDetail } from "../components/element-renderer-shp";
 import { generateElementKey } from "../components/element-renderer-shp";
-
-// Drag threshold in pixels before drag activates
-const DRAG_THRESHOLD = 5;
-
-// Drag state interface
-interface DragState {
-    state: 'idle' | 'pending' | 'dragging';
-    startX: number;
-    startY: number;
-    pointerId: number | null;
-    originalTransform: string;
-}
+import { DragController } from "../utils/drag-controller";
 
 export interface GroupElementConfig extends ElementBaseConfig {
     children: EntityConfig[];
@@ -64,8 +53,15 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
     // Cache for child position styles (cleared when config changes)
     private _positionCache = new Map<string, Record<string, string>>();
     
-    // Drag states for each child (persists across re-renders)
-    private _dragStates = new Map<string, DragState>();
+    // Drag controllers for each child (persists across re-renders)
+    private _dragControllers = new Map<string, DragController>();
+    
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        // Clean up drag controllers to prevent memory leaks
+        this._dragControllers.forEach(controller => controller.detach());
+        this._dragControllers.clear();
+    }
     
     static override styles = css`
         :host {
@@ -128,6 +124,9 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
             return nothing;
         }
 
+        // Track current render's child keys for controller cleanup
+        const currentChildKeys = new Set<string>();
+
         const { width = 100, height = 100, show_border = false } = this._config;
 
         // Validate and sanitize dimensions
@@ -142,9 +141,24 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         this.style.width = `${validWidth}px`;
         this.style.height = `${validHeight}px`;
 
+        const renderedChildren = this._filteredChildren.map((childConfig, index) => this._renderChild(childConfig, index, currentChildKeys));
+        
+        // Cleanup: Remove controllers for keys that weren't in this render
+        // Only cleanup idle controllers to avoid interrupting active drags
+        if (this.editorMode) {
+            const controllersToRemove: string[] = [];
+            this._dragControllers.forEach((controller, key) => {
+                if (!currentChildKeys.has(key) && controller.getState() === 'idle') {
+                    controller.detach();
+                    controllersToRemove.push(key);
+                }
+            });
+            controllersToRemove.forEach(key => this._dragControllers.delete(key));
+        }
+
         return html`
             <div class="group-container ${show_border ? 'show-border' : ''}">
-                ${this._filteredChildren.map((childConfig, index) => this._renderChild(childConfig, index))}
+                ${renderedChildren}
             </div>
         `;
     }
@@ -152,7 +166,7 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
     /**
      * Render a single child element
      */
-    private _renderChild(childConfig: EntityConfig, index: number) {
+    private _renderChild(childConfig: EntityConfig, index: number, currentChildKeys: Set<string>) {
         if (!this.hass) return nothing;
 
         // Extract entity and plan from EntityConfig
@@ -215,19 +229,34 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         // Calculate child position styles
         const childStyles = this._calculateChildPosition(plan, uniqueKey);
         
-        // Drag state for this child (only in editor mode with plan)
-        // Use component-level Map to persist across re-renders
+        // Drag is enabled in editor mode with plan
         const isDraggable = this.editorMode && plan;
-        if (isDraggable && !this._dragStates.has(uniqueKey)) {
-            this._dragStates.set(uniqueKey, {
-                state: 'idle',
-                startX: 0,
-                startY: 0,
-                pointerId: null,
-                originalTransform: ''
-            });
+        
+        // Track this key as active in current render (ALWAYS, not just when creating)
+        if (isDraggable) {
+            currentChildKeys.add(uniqueKey);
         }
-        const dragState = isDraggable ? this._dragStates.get(uniqueKey)! : null;
+        
+        // Get or create drag controller
+        if (isDraggable && !this._dragControllers.has(uniqueKey)) {
+            const controller = new DragController(
+                null as any, // wrapper not needed with direct binding
+                uniqueKey,
+                {
+                    roomIndex: this.roomIndex ?? -1,
+                    entityId: entity || '',
+                    scale: this.scale ?? 1,
+                    scaleRatio: this.scaleRatio ?? 0,
+                    roomBoundsWidth: this.roomBounds?.width ?? 0,
+                    roomBoundsHeight: this.roomBounds?.height ?? 0,
+                    parentGroupKey: this.groupUniqueKey,
+                    originalTransform: childStyles.transform || ''
+                }
+            );
+            controller.attach(); // Only attaches document keydown listener
+            this._dragControllers.set(uniqueKey, controller);
+        }
+        const controller = isDraggable ? this._dragControllers.get(uniqueKey) : undefined;
         
         // Handle element click in editor mode
         // Pass both child's uniqueKey and parent group's uniqueKey for nested selection
@@ -254,158 +283,6 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
             }
         };
         
-        // Drag handlers for editor mode
-        const handlePointerDown = (e: PointerEvent) => {
-            if (!dragState || !this.editorMode || !plan) return;
-            
-            // Check if click came from a nested child element (for multi-level groups)
-            const currentWrapper = e.currentTarget as HTMLElement;
-            for (const node of e.composedPath()) {
-                if (node === currentWrapper) break;
-                if (node instanceof HTMLElement && node.classList?.contains('child-wrapper')) {
-                    return;
-                }
-            }
-            
-            dragState.startX = e.clientX;
-            dragState.startY = e.clientY;
-            dragState.state = 'pending';
-            dragState.pointerId = e.pointerId;
-            dragState.originalTransform = childStyles.transform || '';
-            
-            const wrapper = e.currentTarget as HTMLElement;
-            wrapper.setPointerCapture(e.pointerId);
-        };
-        
-        const handlePointerMove = (e: PointerEvent) => {
-            if (!dragState) return;
-            if (dragState.state === 'idle') return;
-            if (dragState.pointerId !== e.pointerId) return;
-            
-            let dx = e.clientX - dragState.startX;
-            let dy = e.clientY - dragState.startY;
-            
-            // Check threshold before activating drag
-            if (dragState.state === 'pending') {
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < DRAG_THRESHOLD) return;
-                
-                dragState.state = 'dragging';
-            }
-            
-            // Compensate for parent CSS scale (overview mode) to prevent drift
-            // Walk up DOM tree through shadow boundaries to find scaled container
-            const wrapper = e.currentTarget as HTMLElement;
-            let element: HTMLElement | null = wrapper;
-            for (let i = 0; i < 20 && element; i++) {
-                const nextElement: HTMLElement | null = element.parentElement;
-                if (nextElement) {
-                    element = nextElement;
-                } else {
-                    // Cross shadow DOM boundary
-                    const root = element.getRootNode();
-                    if (root instanceof ShadowRoot && root.host) {
-                        element = root.host as HTMLElement;
-                    } else {
-                        break;
-                    }
-                }
-                if (!element) break;
-                
-                const transform = window.getComputedStyle(element).transform;
-                if (transform && transform !== 'none') {
-                    try {
-                        const matrix = new DOMMatrix(transform);
-                        const scaleX = matrix.a;
-                        const scaleY = matrix.d;
-                        if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
-                            dx = dx / scaleX;
-                            dy = dy / scaleY;
-                            break;
-                        }
-                    } catch (e) {
-                        // Continue searching
-                    }
-                }
-            }
-            
-            // Apply translate - prepend so it happens in screen space before element scaling
-            const translateTransform = `translate(${dx}px, ${dy}px)`;
-            const fullTransform = dragState.originalTransform
-                ? `${translateTransform} ${dragState.originalTransform}`
-                : translateTransform;
-            
-            wrapper.style.transform = fullTransform;
-            wrapper.style.cursor = 'grabbing';
-            
-            e.preventDefault();
-        };
-        
-        const handlePointerUp = (e: PointerEvent) => {
-            if (!dragState) return;
-            if (dragState.pointerId !== e.pointerId) return;
-            
-            const wrapper = e.currentTarget as HTMLElement;
-            wrapper.releasePointerCapture(e.pointerId);
-            
-            if (dragState.state === 'dragging') {
-                // Send RAW screen-space deltas (no CSS scale compensation)
-                // The visual drag (handlePointerMove) compensates for CSS scale,
-                // but the editor needs raw deltas to calculate config changes correctly
-                const dx = e.clientX - dragState.startX;
-                const dy = e.clientY - dragState.startY;
-                
-                // Reset visual transform
-                wrapper.style.transform = dragState.originalTransform;
-                wrapper.style.cursor = '';
-                
-                // Dispatch move event with raw screen-space deltas
-                const moveEvent = new CustomEvent<ElementMovedEventDetail>('scalable-house-plan-element-moved', {
-                    detail: {
-                        uniqueKey,
-                        roomIndex: this.roomIndex ?? -1,
-                        entityId: entity || '',
-                        deltaXPx: dx,
-                        deltaYPx: dy,
-                        scale: this.scale ?? 1,
-                        scaleRatio: this.scaleRatio ?? 0,
-                        roomBoundsWidth: this.roomBounds?.width ?? 0,
-                        roomBoundsHeight: this.roomBounds?.height ?? 0,
-                        parentGroupKey: this.groupUniqueKey
-                    }
-                });
-                window.dispatchEvent(moveEvent);
-                
-                // Prevent click handler from firing
-                e.stopPropagation();
-                e.preventDefault();
-            }
-            
-            dragState.state = 'idle';
-            dragState.pointerId = null;
-        };
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (!dragState) return;
-            if (e.key === 'Escape' && dragState.state === 'dragging') {
-                const wrapper = document.querySelector(`[data-unique-key="${uniqueKey}"]`) as HTMLElement;
-                if (wrapper) {
-                    wrapper.style.transform = dragState.originalTransform;
-                    wrapper.style.cursor = '';
-                    if (dragState.pointerId !== null) {
-                        wrapper.releasePointerCapture(dragState.pointerId);
-                    }
-                }
-                dragState.state = 'idle';
-                dragState.pointerId = null;
-            }
-        };
-        
-        // Register escape handler only for draggable children
-        if (isDraggable) {
-            document.addEventListener('keydown', handleKeyDown);
-        }
-        
         // Determine if this child element is selected
         const isSelected = uniqueKey === this.selectedElementKey;
 
@@ -414,10 +291,10 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
                 class="child-wrapper ${isSelected ? 'selected-element' : ''}"
                 style=${styleMap(childStyles)}
                 data-unique-key="${uniqueKey}"
+                @pointerdown=${controller ? (e: PointerEvent) => controller.handlePointerDown(e) : null}
+                @pointermove=${controller ? (e: PointerEvent) => controller.handlePointerMove(e) : null}
+                @pointerup=${controller ? (e: PointerEvent) => controller.handlePointerUp(e) : null}
                 @click=${handleClick}
-                @pointerdown=${isDraggable ? handlePointerDown : null}
-                @pointermove=${isDraggable ? handlePointerMove : null}
-                @pointerup=${isDraggable ? handlePointerUp : null}
             >
                 ${card}
             </div>
