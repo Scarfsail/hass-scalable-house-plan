@@ -40,6 +40,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         window.addEventListener('scalable-house-plan-element-moved', this._handleElementMoved as EventListener);
         // Phase 3: Listen for element focus events from editor panel
         window.addEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
+        // Keyboard arrow controls for nudging selected elements
+        document.addEventListener('keydown', this._handleKeyboardArrow);
     }
 
     disconnectedCallback() {
@@ -50,6 +52,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         window.removeEventListener('scalable-house-plan-element-moved', this._handleElementMoved as EventListener);
         // Phase 3: Clean up element focus listener
         window.removeEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
+        // Clean up keyboard listener
+        document.removeEventListener('keydown', this._handleKeyboardArrow);
     }
 
     static styles = [
@@ -331,6 +335,158 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
         const { uniqueKey } = ev.detail;
         this._selectedElementKey = uniqueKey;
+        this._configChanged();
+    }
+
+    // Handle keyboard arrow keys to nudge selected element by 1 unit
+    private _handleKeyboardArrow = (ev: KeyboardEvent): void => {
+        // Only handle arrow keys when:
+        // - Editor mode is active
+        // - An element is selected
+        // - A room is in preview (detail view)
+        // - Not typing in an input field
+        if (!this._editorMode || !this._selectedElementKey || this._previewRoomIndex === null) return;
+        
+        // Don't interfere with typing in input fields
+        const target = ev.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+        // Check for arrow keys
+        const arrowKeys: Record<string, { axis: 'x' | 'y', delta: number }> = {
+            'ArrowLeft': { axis: 'x', delta: -1 },
+            'ArrowRight': { axis: 'x', delta: 1 },
+            'ArrowUp': { axis: 'y', delta: -1 },
+            'ArrowDown': { axis: 'y', delta: 1 }
+        };
+
+        const movement = arrowKeys[ev.key];
+        if (!movement) return;
+
+        // Prevent default scrolling behavior
+        ev.preventDefault();
+
+        // Find the selected element in config
+        const roomIndex = this._previewRoomIndex;
+        const rooms = [...(this._config.rooms || [])];
+        if (roomIndex < 0 || roomIndex >= rooms.length) return;
+        const room = { ...rooms[roomIndex] };
+
+        // Find entity in room or group
+        let entityIndex = -1;
+        let targetEntityConfig: EntityConfig | null = null;
+        let isGroupChild = false;
+        let parentGroupIndex = -1;
+        let parentGroupKey: string | undefined;
+
+        // Try to find as root-level entity first
+        entityIndex = this._findEntityIndex(room.entities, this._selectedElementKey, roomIndex);
+        if (entityIndex >= 0) {
+            targetEntityConfig = room.entities[entityIndex];
+        } else {
+            // Search within groups
+            for (let i = 0; i < room.entities.length; i++) {
+                const entity = room.entities[i];
+                if (typeof entity !== 'string' && entity.plan?.element?.type === 'custom:group-shp') {
+                    const children = (entity.plan.element as any).children || [];
+                    const childIndex = this._findEntityIndex(children, this._selectedElementKey, roomIndex);
+                    if (childIndex >= 0) {
+                        entityIndex = childIndex;
+                        targetEntityConfig = children[childIndex];
+                        isGroupChild = true;
+                        parentGroupIndex = i;
+                        parentGroupKey = generateElementKey(entity.plan.element.type, entity.plan, roomIndex, i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!targetEntityConfig || entityIndex < 0) return;
+
+        // Convert string entity to object if needed
+        const entityObj = typeof targetEntityConfig === 'string' 
+            ? { entity: targetEntityConfig, plan: {} } 
+            : { ...targetEntityConfig, plan: { ...(targetEntityConfig.plan || {}) } };
+
+        // Update position by 1 unit based on arrow key direction
+        if (movement.axis === 'x') {
+            // Horizontal movement (left/right arrows)
+            if (entityObj.plan?.left !== undefined) {
+                const oldValue = entityObj.plan.left;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    // Percentage value: increment by 1%
+                    const oldPct = parseFloat(oldValue);
+                    entityObj.plan.left = `${Math.round((oldPct + movement.delta) * 10) / 10}%`;
+                } else {
+                    // Numeric (px) value: increment by 1
+                    entityObj.plan.left = Math.round(Number(oldValue) + movement.delta);
+                }
+            } else if (entityObj.plan?.right !== undefined) {
+                // Right anchor: moving right decreases right value (invert delta)
+                const oldValue = entityObj.plan.right;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    const oldPct = parseFloat(oldValue);
+                    entityObj.plan.right = `${Math.round((oldPct - movement.delta) * 10) / 10}%`;
+                } else {
+                    entityObj.plan.right = Math.round(Number(oldValue) - movement.delta);
+                }
+            }
+        } else {
+            // Vertical movement (up/down arrows)
+            if (entityObj.plan?.top !== undefined) {
+                const oldValue = entityObj.plan.top;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    // Percentage value: increment by 1%
+                    const oldPct = parseFloat(oldValue);
+                    entityObj.plan.top = `${Math.round((oldPct + movement.delta) * 10) / 10}%`;
+                } else {
+                    // Numeric (px) value: increment by 1
+                    entityObj.plan.top = Math.round(Number(oldValue) + movement.delta);
+                }
+            } else if (entityObj.plan?.bottom !== undefined) {
+                // Bottom anchor: moving down decreases bottom value (invert delta)
+                const oldValue = entityObj.plan.bottom;
+                if (typeof oldValue === 'string' && oldValue.endsWith('%')) {
+                    const oldPct = parseFloat(oldValue);
+                    entityObj.plan.bottom = `${Math.round((oldPct - movement.delta) * 10) / 10}%`;
+                } else {
+                    entityObj.plan.bottom = Math.round(Number(oldValue) - movement.delta);
+                }
+            }
+        }
+
+        // Update config
+        if (isGroupChild && parentGroupIndex >= 0) {
+            // Update child in group
+            const parentGroupEntity = room.entities[parentGroupIndex];
+            if (typeof parentGroupEntity !== 'string') {
+                const parentGroup = { ...parentGroupEntity };
+                const groupElement = { ...(parentGroup.plan?.element || {}) };
+                const children = [...((groupElement as any).children || [])];
+                children[entityIndex] = entityObj;
+                parentGroup.plan = {
+                    ...parentGroup.plan,
+                    element: {
+                        ...groupElement,
+                        children
+                    }
+                };
+                room.entities = [...room.entities];
+                room.entities[parentGroupIndex] = parentGroup;
+            }
+        } else {
+            // Update root entity
+            room.entities = [...room.entities];
+            room.entities[entityIndex] = entityObj;
+        }
+
+        // Update rooms array and config
+        rooms[roomIndex] = room;
+        this._config = {
+            ...this._config,
+            rooms
+        };
+
         this._configChanged();
     }
 
