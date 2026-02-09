@@ -188,11 +188,19 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
     }
 
     /**
-     * Render a single child element optimized for normal (non-editor) view
-     * Zero editor overhead: no drag controllers, no selection, no click handlers
+     * Prepare child metadata - shared helper to avoid duplication
+     * Extracts entity/plan, validates, generates keys, builds config
+     * 
+     * @returns Metadata object or null if validation fails
      */
-    private _renderReadOnlyChild(childConfig: EntityConfig, index: number): unknown {
-        if (!this.hass) return nothing;
+    private _prepareChildMetadata(childConfig: EntityConfig, index: number): {
+        entity: string;
+        plan: any;
+        uniqueKey: string;
+        elementType: any;
+        elementConfig: any;
+    } | null {
+        if (!this.hass) return null;
 
         // Extract entity and plan from EntityConfig
         const entity = typeof childConfig === 'string' ? childConfig : childConfig.entity;
@@ -201,13 +209,13 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         // Validate that we have positioning information
         if (!plan) {
             console.warn(`group-shp: Child at index ${index} missing plan configuration`, childConfig);
-            return nothing;
+            return null;
         }
 
         // Validate no-entity elements have a type
         if (!entity && (!plan.element || !plan.element.type)) {
             console.warn(`group-shp: No-entity child at index ${index} missing element.type`, childConfig);
-            return nothing;
+            return null;
         }
 
         // Generate unique key for child (entity ID or generated key)
@@ -216,6 +224,20 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         // Get element type and merged config
         const elementType = this._getElementType(entity, plan);
         const elementConfig = this._buildElementConfig(entity, plan, elementType);
+
+        return { entity, plan, uniqueKey, elementType, elementConfig };
+    }
+
+    /**
+     * Render a single child element optimized for normal (non-editor) view
+     * Zero editor overhead: no drag controllers, no selection, no click handlers
+     */
+    private _renderReadOnlyChild(childConfig: EntityConfig, index: number): unknown {
+        // Prepare and validate child metadata (shared helper)
+        const metadata = this._prepareChildMetadata(childConfig, index);
+        if (!metadata) return nothing;
+        
+        const { entity, plan, uniqueKey, elementConfig } = metadata;
 
         // Get or create the child element card (shared helper)
         const card = this._prepareChildCard(uniqueKey, entity, elementConfig);
@@ -240,32 +262,11 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
      * Includes drag controllers, selection highlighting, click handlers
      */
     private _renderEditableChild(childConfig: EntityConfig, index: number, currentChildKeys: Set<string>): unknown {
-        if (!this.hass) return nothing;
-
-        // Extract entity and plan from EntityConfig
-        const entity = typeof childConfig === 'string' ? childConfig : childConfig.entity;
-        const plan = typeof childConfig === 'string' ? undefined : childConfig.plan;
-
-        // Validate that we have positioning information
-        if (!plan) {
-            console.warn(`group-shp: Child at index ${index} missing plan configuration`, childConfig);
-            return nothing;
-        }
-
-        // Validate no-entity elements have a type
-        if (!entity && (!plan.element || !plan.element.type)) {
-            console.warn(`group-shp: No-entity child at index ${index} missing element.type`, childConfig);
-            return nothing;
-        }
-
-        // Generate unique key for child (entity ID or generated key)
-        // IMPORTANT: Use same key generation as element-renderer-shp for consistency
-        // This ensures the editor can find and update the child during drag-drop
-        const uniqueKey = entity || generateElementKey(plan.element?.type || 'unknown', plan);
-
-        // Get element type and merged config
-        const elementType = this._getElementType(entity, plan);
-        const elementConfig = this._buildElementConfig(entity, plan, elementType);
+        // Prepare and validate child metadata (shared helper)
+        const metadata = this._prepareChildMetadata(childConfig, index);
+        if (!metadata) return nothing;
+        
+        const { entity, plan, uniqueKey, elementConfig } = metadata;
 
         // Get or create the child element card (shared helper)
         const card = this._prepareChildCard(uniqueKey, entity, elementConfig);
