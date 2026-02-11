@@ -58,6 +58,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     _previewRoomIndex?: number;  // Internal: room index to preview in detail view (not persisted, used during editing)
     _editorMode?: boolean;  // Internal: interactive editor mode enabled (not persisted, used during editing)
     _selectedElementKey?: string | null;  // Internal: currently selected element uniqueKey (not persisted, used during editing)
+    _selectedBoundaryPointIndex?: number | null;  // Internal: currently selected boundary point index (not persisted, used during editing)
 }
 
 
@@ -71,6 +72,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     @state() private _currentView: 'overview' | 'detail' | 'entities' = 'overview';
     @state() private _editorMode = false;
     @state() private _selectedElementKey: string | null = null;
+    @state() private _selectedBoundaryPointIndex: number | null = null;
 
     // Performance optimization: Cache entity IDs per room to avoid expensive lookups
     private _roomEntityCache: Map<string, RoomEntityCache> = new Map();
@@ -186,6 +188,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         if (this._isEditMode()) {
             this._editorMode = config._editorMode || false;
             this._selectedElementKey = config._selectedElementKey || null;
+            this._selectedBoundaryPointIndex = config._selectedBoundaryPointIndex ?? null;
         }
     }
 
@@ -301,6 +304,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                         .houseCache=${this._houseCache}
                         .editorMode=${this._editorMode}
                         .selectedElementKey=${this._selectedElementKey}
+                        .selectedBoundaryPointIndex=${this._selectedBoundaryPointIndex}
                         .roomIndex=${this._selectedRoomIndex}
                     ></scalable-house-plan-detail>
                 </div>

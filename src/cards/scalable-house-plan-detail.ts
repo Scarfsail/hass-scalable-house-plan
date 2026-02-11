@@ -27,6 +27,7 @@ export class ScalableHousePlanDetail extends LitElement {
     @property({ attribute: false }) public houseCache!: HouseCache;
     @property({ type: Boolean }) public editorMode = false;
     @property({ attribute: false }) public selectedElementKey?: string | null;
+    @property({ attribute: false }) public selectedBoundaryPointIndex?: number | null;
     @property({ type: Number }) public roomIndex?: number;
 
     @state() private _createCardElement: CreateCardElement = null;
@@ -220,6 +221,7 @@ export class ScalableHousePlanDetail extends LitElement {
                 .houseCache=${this.houseCache}
                 .editorMode=${this.editorMode}
                 .selectedElementKey=${this.selectedElementKey}
+                .selectedBoundaryPointIndex=${this.selectedBoundaryPointIndex}
                 .roomIndex=${this.roomIndex}
                 .viewId=${'detail-dialog'}
             ></scalable-house-plan-room>

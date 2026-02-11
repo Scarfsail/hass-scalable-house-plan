@@ -6,6 +6,7 @@ import type { Room, EntityConfig, RoomEntityCache } from "../cards/types";
 import type { ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getRoomEntities } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
+import "./boundary-handles-shp";
 import { 
     createGradientDefinition, 
     calculatePolygonCenter,
@@ -60,6 +61,7 @@ export class ScalableHousePlanRoom extends LitElement {
     @property({ attribute: false }) public houseCache!: HouseCache;
     @property({ type: Boolean }) public editorMode = false;
     @property({ attribute: false }) public selectedElementKey?: string | null;
+    @property({ attribute: false }) public selectedBoundaryPointIndex?: number | null;
     @property({ type: Number }) public roomIndex?: number;
     @property({ type: String }) public viewId?: string;  // Unique identifier for this render context (e.g., "main-card", "detail-dialog")
 
@@ -672,6 +674,15 @@ export class ScalableHousePlanRoom extends LitElement {
                         `}
                     </svg>
                 `}
+                ${this.editorMode ? html`
+                    <boundary-handles-shp
+                        .boundary=${this.room.boundary}
+                        .roomIndex=${this.roomIndex ?? 0}
+                        .scale=${scale}
+                        .roomBounds=${roomBounds}
+                        .selectedPointIndex=${this.selectedBoundaryPointIndex}
+                    ></boundary-handles-shp>
+                ` : ''}
                 <div class="elements-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
                     ${elements}
                 </div>

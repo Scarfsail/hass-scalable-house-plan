@@ -18,6 +18,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     @state() private _previewRoomIndex: number | null = null;
     @state() private _editorMode = true;
     @state() private _selectedElementKey: string | null = null;
+    @state() private _selectedBoundaryPointIndex: number | null = null;
     @query('editor-rooms-shp') private _roomsEditor?: any;
     private _localize?: LocalizeFunction;
 
@@ -42,6 +43,10 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         window.addEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
         // Listen for room preview events from card preview (room click / back button)
         window.addEventListener('scalable-house-plan-room-preview', this._handleRoomPreviewFromCard as EventListener);
+        // Listen for boundary point events from boundary handles
+        window.addEventListener('scalable-house-plan-boundary-point-changed', this._handleBoundaryPointChanged as EventListener);
+        window.addEventListener('scalable-house-plan-boundary-point-deleted', this._handleBoundaryPointDeleted as EventListener);
+        window.addEventListener('scalable-house-plan-boundary-point-selected', this._handleBoundaryPointSelected as EventListener);
         // Keyboard arrow controls for nudging selected elements
         document.addEventListener('keydown', this._handleKeyboardArrow);
     }
@@ -56,6 +61,10 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         window.removeEventListener('scalable-house-plan-element-focused', this._handleElementFocus as EventListener);
         // Clean up room preview listener
         window.removeEventListener('scalable-house-plan-room-preview', this._handleRoomPreviewFromCard as EventListener);
+        // Clean up boundary point listeners
+        window.removeEventListener('scalable-house-plan-boundary-point-changed', this._handleBoundaryPointChanged as EventListener);
+        window.removeEventListener('scalable-house-plan-boundary-point-deleted', this._handleBoundaryPointDeleted as EventListener);
+        window.removeEventListener('scalable-house-plan-boundary-point-selected', this._handleBoundaryPointSelected as EventListener);
         // Clean up keyboard listener
         document.removeEventListener('keydown', this._handleKeyboardArrow);
     }
@@ -310,6 +319,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         // Clear selection when switching to Preview mode
         if (!this._editorMode) {
             this._selectedElementKey = null;
+            this._selectedBoundaryPointIndex = null;
         }
 
         // Update preview with new mode state
@@ -320,6 +330,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     private _handleElementSelection = (ev: CustomEvent): void => {
         const { uniqueKey, roomIndex, parentGroupKey } = ev.detail;
         this._selectedElementKey = uniqueKey;
+        // Mutual exclusion: clear boundary point selection
+        this._selectedBoundaryPointIndex = null;
 
         // Auto-expand element in editor (Phase 4)
         if (this._editorMode && roomIndex !== undefined && uniqueKey) {
@@ -339,6 +351,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
         const { uniqueKey } = ev.detail;
         this._selectedElementKey = uniqueKey;
+        // Mutual exclusion: clear boundary point selection
+        this._selectedBoundaryPointIndex = null;
         this._configChanged();
     }
 
@@ -349,7 +363,9 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         // - An element is selected
         // - A room is in preview (detail view)
         // - Not typing in an input field
+        // - Not handling boundary point selection (boundary handles component owns that)
         if (!this._editorMode || !this._selectedElementKey || this._previewRoomIndex === null) return;
+        if (this._selectedBoundaryPointIndex !== null) return;
         
         // Don't interfere with typing in input fields
         const target = ev.target as HTMLElement;
@@ -710,6 +726,69 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         this._configChanged();
     }
 
+    /**
+     * Handle boundary point move or copy from boundary handles component
+     */
+    private _handleBoundaryPointChanged = (ev: CustomEvent): void => {
+        const { roomIndex, pointIndex, newPoint, mode } = ev.detail;
+
+        const rooms = [...(this._config.rooms || [])];
+        if (roomIndex < 0 || roomIndex >= rooms.length) return;
+
+        const room = { ...rooms[roomIndex] };
+        const boundary = [...room.boundary];
+
+        if (pointIndex < 0 || pointIndex >= boundary.length) return;
+
+        if (mode === 'move') {
+            boundary[pointIndex] = newPoint;
+        } else if (mode === 'copy') {
+            // Insert new point after the dragged point
+            boundary.splice(pointIndex + 1, 0, newPoint);
+            // Select the newly created point for better UX
+            this._selectedBoundaryPointIndex = pointIndex + 1;
+        }
+
+        room.boundary = boundary;
+        rooms[roomIndex] = room;
+        this._config = { ...this._config, rooms };
+        this._configChanged();
+    };
+
+    /**
+     * Handle boundary point selection from boundary handles component
+     */
+    private _handleBoundaryPointSelected = (ev: CustomEvent): void => {
+        const { pointIndex } = ev.detail;
+        this._selectedBoundaryPointIndex = pointIndex;
+        // Mutual exclusion: clear element selection
+        this._selectedElementKey = null;
+        this._configChanged();
+    };
+
+    /**
+     * Handle boundary point deletion from boundary handles component
+     */
+    private _handleBoundaryPointDeleted = (ev: CustomEvent): void => {
+        const { roomIndex, pointIndex } = ev.detail;
+
+        const rooms = [...(this._config.rooms || [])];
+        if (roomIndex < 0 || roomIndex >= rooms.length) return;
+
+        const room = { ...rooms[roomIndex] };
+        const boundary = [...room.boundary];
+
+        // Minimum 3 points for a valid polygon
+        if (boundary.length <= 3) return;
+        if (pointIndex < 0 || pointIndex >= boundary.length) return;
+
+        boundary.splice(pointIndex, 1);
+        room.boundary = boundary;
+        rooms[roomIndex] = room;
+        this._config = { ...this._config, rooms };
+        this._configChanged();
+    };
+
     // Room handlers
     private _handlePreviewDetail(ev: CustomEvent): void {
         this._applyRoomPreview(ev.detail.roomIndex, ev.detail.showPreview);
@@ -748,6 +827,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         // Clear selection when switching rooms
         if (this._previewRoomIndex !== null && roomIndex !== this._previewRoomIndex) {
             this._selectedElementKey = null;
+            this._selectedBoundaryPointIndex = null;
         }
 
         this._previewRoomIndex = showPreview ? roomIndex : null;
@@ -755,6 +835,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
         // Clear selection when hiding preview
         if (!showPreview) {
             this._selectedElementKey = null;
+            this._selectedBoundaryPointIndex = null;
         }
 
         // Trigger config update to update the preview
@@ -931,7 +1012,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                     ...this._config,
                     _previewRoomIndex: this._previewRoomIndex,
                     _editorMode: this._editorMode,
-                    _selectedElementKey: this._selectedElementKey
+                    _selectedElementKey: this._selectedElementKey,
+                    _selectedBoundaryPointIndex: this._selectedBoundaryPointIndex
                 }
             },
             bubbles: true,
