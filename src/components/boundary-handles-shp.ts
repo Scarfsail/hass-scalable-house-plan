@@ -37,6 +37,9 @@ const HANDLE_SIZE = 10;
 /** Drag threshold in pixels before drag activates */
 const DRAG_THRESHOLD = 3;
 
+/** Label positioning tolerance in config space (room coordinates) */
+const LABEL_TOLERANCE = 50;
+
 /**
  * Drag state tracked during an active boundary point drag.
  * NOT reactive (@state) - we use direct DOM manipulation during drag
@@ -280,6 +283,28 @@ export class BoundaryHandles extends LitElement {
             previewHandle.setAttribute('visibility', 'visible');
         }
 
+        // 1b) Update preview label with coordinates
+        const previewLabel = this.renderRoot.querySelector('.drag-preview-label') as SVGTextElement | null;
+        if (previewLabel) {
+            // Calculate new config coordinates for the dragged point
+            const dxConfig = dx / this.scale;
+            const dyConfig = dy / this.scale;
+            const newConfigPoint: [number, number] = [
+                Math.round(this._dragState.originalPoint[0] + dxConfig),
+                Math.round(this._dragState.originalPoint[1] + dyConfig)
+            ];
+
+            // Get smart label position for the new coordinates
+            const labelPos = this._getLabelPosition(newConfigPoint);
+
+            previewLabel.setAttribute('x', String(labelPos.x));
+            previewLabel.setAttribute('y', String(labelPos.y));
+            previewLabel.setAttribute('text-anchor', labelPos.textAnchor);
+            previewLabel.setAttribute('dominant-baseline', labelPos.dominantBaseline);
+            previewLabel.textContent = labelPos.content;
+            previewLabel.setAttribute('visibility', 'visible');
+        }
+
         // 2) Update ghost polygon
         const ghostPolygon = this.renderRoot.querySelector('.ghost-polygon') as SVGPolygonElement | null;
         if (ghostPolygon) {
@@ -383,7 +408,7 @@ export class BoundaryHandles extends LitElement {
     }
 
     /**
-     * Ensure the overlay elements (ghost polygon, preview handle) exist and are hidden.
+     * Ensure the overlay elements (ghost polygon, preview handle, preview label) exist and are hidden.
      * These are always rendered in the template but start with visibility:hidden.
      * This method is called once when drag actually starts.
      */
@@ -391,6 +416,10 @@ export class BoundaryHandles extends LitElement {
         const previewHandle = this.renderRoot.querySelector('.drag-preview-handle') as SVGRectElement | null;
         if (previewHandle) {
             previewHandle.setAttribute('visibility', 'hidden');
+        }
+        const previewLabel = this.renderRoot.querySelector('.drag-preview-label') as SVGTextElement | null;
+        if (previewLabel) {
+            previewLabel.setAttribute('visibility', 'hidden');
         }
         const ghostPolygon = this.renderRoot.querySelector('.ghost-polygon') as SVGPolygonElement | null;
         if (ghostPolygon) {
@@ -487,6 +516,91 @@ export class BoundaryHandles extends LitElement {
         return '#2196F3';
     }
 
+    /**
+     * Calculate smart label position for a boundary point.
+     * Labels are positioned to avoid overlapping with the room boundary:
+     * - Points near edges show labels on the opposite side
+     * - Corner points use diagonal positioning
+     * - Center points show labels above (default)
+     */
+    private _getLabelPosition(point: [number, number]): {
+        x: number;
+        y: number;
+        textAnchor: 'start' | 'middle' | 'end';
+        dominantBaseline: string;
+        content: string;
+    } {
+        const sx = this._toScreenX(point[0]);
+        const sy = this._toScreenY(point[1]);
+        const offset = HANDLE_SIZE / 2 + 4; // 14px offset from handle center
+
+        // Edge detection in config space (room coordinates)
+        const isNearLeft = point[0] - this.roomBounds.minX < LABEL_TOLERANCE;
+        const isNearRight = this.roomBounds.maxX - point[0] < LABEL_TOLERANCE;
+        const isNearTop = point[1] - this.roomBounds.minY < LABEL_TOLERANCE;
+        const isNearBottom = this.roomBounds.maxY - point[1] < LABEL_TOLERANCE;
+
+        let labelX = sx;
+        let labelY = sy;
+        let textAnchor: 'start' | 'middle' | 'end' = 'middle';
+
+        // Priority: corners first (diagonal positioning), then edges
+        if (isNearTop && isNearLeft) {
+            // Top-left corner: show label bottom-right
+            labelX = sx + offset;
+            labelY = sy + offset;
+            textAnchor = 'start';
+        } else if (isNearTop && isNearRight) {
+            // Top-right corner: show label bottom-left
+            labelX = sx - offset;
+            labelY = sy + offset;
+            textAnchor = 'end';
+        } else if (isNearBottom && isNearLeft) {
+            // Bottom-left corner: show label top-right
+            labelX = sx + offset;
+            labelY = sy - offset;
+            textAnchor = 'start';
+        } else if (isNearBottom && isNearRight) {
+            // Bottom-right corner: show label top-left
+            labelX = sx - offset;
+            labelY = sy - offset;
+            textAnchor = 'end';
+        } else if (isNearLeft) {
+            // Left edge: show label on right
+            labelX = sx + offset;
+            labelY = sy;
+            textAnchor = 'start';
+        } else if (isNearRight) {
+            // Right edge: show label on left
+            labelX = sx - offset;
+            labelY = sy;
+            textAnchor = 'end';
+        } else if (isNearTop) {
+            // Top edge: show label below
+            labelX = sx;
+            labelY = sy + offset;
+            textAnchor = 'middle';
+        } else if (isNearBottom) {
+            // Bottom edge: show label above
+            labelX = sx;
+            labelY = sy - offset;
+            textAnchor = 'middle';
+        } else {
+            // Center/default: show label above (preserves current behavior)
+            labelX = sx;
+            labelY = sy - offset;
+            textAnchor = 'middle';
+        }
+
+        return {
+            x: labelX,
+            y: labelY,
+            textAnchor,
+            dominantBaseline: 'middle',
+            content: `[${point[0]}, ${point[1]}]`
+        };
+    }
+
     render() {
         if (!this.boundary || this.boundary.length === 0) return html``;
 
@@ -540,7 +654,27 @@ export class BoundaryHandles extends LitElement {
                         `;
                     })}
 
+                    <!-- Point coordinate labels with smart positioning -->
+                    ${this.boundary.map((point, index) => {
+                        const labelPos = this._getLabelPosition(point);
+                        return svg`
+                            <text
+                                x="${labelPos.x}"
+                                y="${labelPos.y}"
+                                text-anchor="${labelPos.textAnchor}"
+                                dominant-baseline="${labelPos.dominantBaseline}"
+                                font-size="10"
+                                fill="#FFFFFF"
+                                stroke="rgba(0, 0, 0, 0.7)"
+                                stroke-width="3"
+                                paint-order="stroke"
+                                class="point-label"
+                            >${labelPos.content}</text>
+                        `;
+                    })}
+
                     <!-- Drag preview handle (hidden until drag starts, updated imperatively) -->
+                    <!-- Rendered last so it appears on top of other elements -->
                     <rect
                         class="drag-preview-handle"
                         x="0" y="0"
@@ -553,21 +687,20 @@ export class BoundaryHandles extends LitElement {
                         visibility="hidden"
                     />
 
-                    <!-- Point index labels -->
-                    ${this.boundary.map((point, index) => {
-                        const sx = this._toScreenX(point[0]);
-                        const sy = this._toScreenY(point[1]);
-                        return svg`
-                            <text
-                                x="${sx}"
-                                y="${sy - halfHandle - 4}"
-                                text-anchor="middle"
-                                font-size="10"
-                                fill="#2196F3"
-                                class="point-label"
-                            >${index}</text>
-                        `;
-                    })}
+                    <!-- Drag preview label (shows coordinates during drag) -->
+                    <text
+                        class="drag-preview-label point-label"
+                        x="0"
+                        y="0"
+                        text-anchor="middle"
+                        dominant-baseline="middle"
+                        font-size="10"
+                        fill="#FFFFFF"
+                        stroke="rgba(0, 0, 0, 0.7)"
+                        stroke-width="3"
+                        paint-order="stroke"
+                        visibility="hidden"
+                    ></text>
                 </svg>
             `}
         `;
