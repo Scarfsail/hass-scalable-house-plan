@@ -26,15 +26,18 @@ interface ActionHandlerElement extends HTMLElement {
 }
 
 const HOLD_TIME = 500; // ms
+const MOVE_THRESHOLD = 10; // px of movement that cancels hold
 
 class ActionHandlerController {
   private timer?: number;
   private held = false;
   private cancelled = false;
+  private startX = 0;
+  private startY = 0;
 
   constructor() {
-    // Cancel on scroll/touch events
-    ['touchcancel', 'mouseout', 'mouseup', 'touchmove', 'mousewheel', 'wheel', 'scroll'].forEach((ev) => {
+    // Cancel on scroll and discrete pointer-up events
+    ['touchcancel', 'mouseout', 'mouseup', 'mousewheel', 'wheel', 'scroll'].forEach((ev) => {
       document.addEventListener(
         ev,
         () => {
@@ -47,6 +50,33 @@ class ActionHandlerController {
         { passive: true }
       );
     });
+
+    // Cancel on significant touch movement (allows minor tremor while holding)
+    document.addEventListener('touchmove', (ev: Event) => {
+      const touch = (ev as TouchEvent).changedTouches[0];
+      if (!touch) return;
+      const dx = touch.clientX - this.startX;
+      const dy = touch.clientY - this.startY;
+      if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD) {
+        this.cancelled = true;
+        if (this.timer) {
+          clearTimeout(this.timer);
+          this.timer = undefined;
+        }
+      }
+    }, { passive: true });
+
+    // Cancel on significant mouse movement (allows cursor drift while holding)
+    document.addEventListener('mousemove', (ev: Event) => {
+      if (!this.timer) return;
+      const dx = (ev as MouseEvent).clientX - this.startX;
+      const dy = (ev as MouseEvent).clientY - this.startY;
+      if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD) {
+        this.cancelled = true;
+        clearTimeout(this.timer);
+        this.timer = undefined;
+      }
+    }, { passive: true });
   }
 
   public bind(element: ActionHandlerElement, options: ActionHandlerOptions = {}) {
@@ -80,7 +110,16 @@ class ActionHandlerController {
 
     element.actionHandler.start = (ev: Event) => {
       this.cancelled = false;
-      
+
+      // Record start position for movement threshold checks
+      if (ev instanceof TouchEvent && ev.touches[0]) {
+        this.startX = ev.touches[0].clientX;
+        this.startY = ev.touches[0].clientY;
+      } else if (ev instanceof MouseEvent) {
+        this.startX = ev.clientX;
+        this.startY = ev.clientY;
+      }
+
       // Cancel hold action if multi-touch gesture detected (e.g., pinch-to-zoom)
       if (ev instanceof TouchEvent && ev.touches.length > 1) {
         this.cancelled = true;
