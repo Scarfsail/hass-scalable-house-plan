@@ -1,5 +1,5 @@
 import { LitElement, html, svg, css } from "lit-element";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property } from "lit/decorators.js";
 
 /**
  * Room bounds shape used by the handles component
@@ -58,6 +58,23 @@ interface DragState {
 }
 
 /**
+ * Keyboard coordinate editing state.
+ * NOT reactive (@state) - we use direct DOM manipulation during editing
+ * to match drag behavior and avoid re-renders.
+ */
+interface EditState {
+    pointIndex: number;
+    originalPoint: [number, number];
+    /** Which coordinate axis is currently being edited */
+    axis: 'x' | 'y';
+    /** Current input buffer for the active axis */
+    buffer: string;
+    /** Independently committed values per axis (null = not yet edited) */
+    committedX: number | null;
+    committedY: number | null;
+}
+
+/**
  * BoundaryHandles - Renders draggable handles at each vertex of a room boundary polygon.
  *
  * IMPORTANT: During drag, all visual updates happen via direct DOM manipulation (setAttribute)
@@ -82,6 +99,9 @@ export class BoundaryHandles extends LitElement {
     /** Non-reactive drag state - updated imperatively, never triggers render */
     private _dragState: DragState | null = null;
 
+    /** Non-reactive keyboard edit state - updated imperatively like drag */
+    private _editState: EditState | null = null;
+
     /** Selected point index - owned by editor, passed down as property */
     @property({ attribute: false }) selectedPointIndex: number | null = null;
 
@@ -96,8 +116,22 @@ export class BoundaryHandles extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         document.removeEventListener('keydown', this._handleKeyDown);
-        // Clean up document listeners if drag was in progress
         this._removeDocumentListeners();
+        this._editState = null;
+    }
+
+    updated(changedProps: Map<string, unknown>): void {
+        super.updated(changedProps);
+        if (this._editState) {
+            // Cancel edit if selection moves to a different point
+            if (changedProps.has('selectedPointIndex') &&
+                this.selectedPointIndex !== this._editState.pointIndex) {
+                this._cancelEdit();
+                return;
+            }
+            // Re-apply edit visuals after render (render overwrites imperative DOM changes)
+            this._updateEditVisuals();
+        }
     }
 
     static styles = css`
@@ -214,6 +248,9 @@ export class BoundaryHandles extends LitElement {
         e.stopPropagation();
         e.preventDefault();
 
+        // Cancel any active keyboard edit before starting drag
+        if (this._editState) this._cancelEdit();
+
         // Notify editor of selection change (editor owns the selection state)
         this._dispatchSelection(pointIndex);
 
@@ -308,7 +345,9 @@ export class BoundaryHandles extends LitElement {
         // 2) Update ghost polygon
         const ghostPolygon = this.renderRoot.querySelector('.ghost-polygon') as SVGPolygonElement | null;
         if (ghostPolygon) {
-            ghostPolygon.setAttribute('points', this._buildPreviewPoints(newScreenX, newScreenY));
+            ghostPolygon.setAttribute('points', this._buildPreviewPoints(
+                this._dragState.pointIndex, newScreenX, newScreenY, this._dragState.isCtrlHeld
+            ));
             ghostPolygon.setAttribute('stroke', this._dragState.isCtrlHeld ? '#4CAF50' : '#2196F3');
             ghostPolygon.setAttribute('visibility', 'visible');
         }
@@ -380,17 +419,17 @@ export class BoundaryHandles extends LitElement {
     };
 
     /**
-     * Build ghost polygon points string for the current drag position.
+     * Build ghost polygon points string replacing one point with preview position.
+     * Used by both drag and keyboard edit modes.
      */
-    private _buildPreviewPoints(newScreenX: number, newScreenY: number): string {
-        if (!this._dragState) return '';
-
-        const { pointIndex, isCtrlHeld } = this._dragState;
+    private _buildPreviewPoints(
+        pointIndex: number, newScreenX: number, newScreenY: number, insertAfter = false
+    ): string {
         const points: string[] = [];
 
         for (let i = 0; i < this.boundary.length; i++) {
-            if (i === pointIndex && !isCtrlHeld) {
-                // Move mode: replace this point with preview position
+            if (i === pointIndex && !insertAfter) {
+                // Move/edit mode: replace this point with preview position
                 points.push(`${newScreenX},${newScreenY}`);
             } else {
                 points.push(
@@ -399,7 +438,7 @@ export class BoundaryHandles extends LitElement {
             }
 
             // Copy mode: insert the new point after the source
-            if (i === pointIndex && isCtrlHeld) {
+            if (i === pointIndex && insertAfter) {
                 points.push(`${newScreenX},${newScreenY}`);
             }
         }
@@ -428,15 +467,27 @@ export class BoundaryHandles extends LitElement {
     }
 
     private _handleKeyDown = (e: KeyboardEvent): void => {
-        // Escape: cancel drag
-        if (e.key === 'Escape' && this._dragState?.isDragging) {
-            try {
-                this._dragState.handleElement.releasePointerCapture(this._dragState.pointerId);
-            } catch { /* ok */ }
-            this._removeDocumentListeners();
-            this._dragState = null;
-            // Force re-render to restore handle visuals
-            this.requestUpdate();
+        // Escape: cancel drag or edit
+        if (e.key === 'Escape') {
+            if (this._dragState?.isDragging) {
+                try {
+                    this._dragState.handleElement.releasePointerCapture(this._dragState.pointerId);
+                } catch { /* ok */ }
+                this._removeDocumentListeners();
+                this._dragState = null;
+                this.requestUpdate();
+                return;
+            }
+            if (this._editState) {
+                e.preventDefault();
+                this._cancelEdit();
+                return;
+            }
+        }
+
+        // Route to edit mode handler if active (consumes all keys)
+        if (this._editState) {
+            this._handleEditKey(e);
             return;
         }
 
@@ -446,6 +497,20 @@ export class BoundaryHandles extends LitElement {
         // Don't interfere with typing in input fields
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+        // Tab: enter Y edit mode
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            this._startEdit('y');
+            return;
+        }
+
+        // Digit or minus: enter X edit mode
+        if (/^[0-9\-]$/.test(e.key)) {
+            e.preventDefault();
+            this._startEdit('x', e.key);
+            return;
+        }
 
         // Arrow keys: nudge selected point by 1px
         const arrowKeys: Record<string, [number, number]> = {
@@ -495,6 +560,224 @@ export class BoundaryHandles extends LitElement {
             this._dispatchSelection(null);
         }
     };
+
+    // ─── Keyboard coordinate editing ──────────────────────────────
+
+    /** Start keyboard coordinate editing for the selected point */
+    private _startEdit(axis: 'x' | 'y', initialKey?: string): void {
+        if (this.selectedPointIndex === null || this._dragState) return;
+
+        const point = this.boundary[this.selectedPointIndex];
+        if (!point) return;
+
+        this._editState = {
+            pointIndex: this.selectedPointIndex,
+            originalPoint: [...point] as [number, number],
+            axis,
+            buffer: initialKey ?? '',
+            committedX: null,
+            committedY: null,
+        };
+
+        this._ensureOverlayElements();
+        this._updateEditVisuals();
+    }
+
+    /** Handle keyboard input during coordinate editing */
+    private _handleEditKey(e: KeyboardEvent): void {
+        if (!this._editState) return;
+
+        // If user focused an input field, abandon edit mode
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+            this._cancelEdit();
+            return;
+        }
+
+        // Enter: save and exit
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            this._saveEdit();
+            return;
+        }
+
+        // Tab or semicolon: commit current axis value & switch to other axis
+        if (e.key === 'Tab' || e.key === ';') {
+            e.preventDefault();
+            // Commit current buffer value to the appropriate axis
+            const parsed = this._editState.buffer !== '' && this._editState.buffer !== '-'
+                ? parseInt(this._editState.buffer, 10) : null;
+            if (parsed !== null && !isNaN(parsed)) {
+                if (this._editState.axis === 'x') {
+                    this._editState.committedX = parsed;
+                } else {
+                    this._editState.committedY = parsed;
+                }
+            }
+            // Switch axis
+            this._editState.axis = this._editState.axis === 'x' ? 'y' : 'x';
+            this._editState.buffer = '';
+            this._updateEditVisuals();
+            return;
+        }
+
+        // Backspace: delete last character from buffer
+        if (e.key === 'Backspace') {
+            e.preventDefault();
+            this._editState.buffer = this._editState.buffer.slice(0, -1);
+            this._updateEditVisuals();
+            return;
+        }
+
+        // Digit: append to buffer
+        if (/^[0-9]$/.test(e.key)) {
+            e.preventDefault();
+            this._editState.buffer += e.key;
+            this._updateEditVisuals();
+            return;
+        }
+
+        // Minus: only at start of buffer
+        if (e.key === '-' && this._editState.buffer === '') {
+            e.preventDefault();
+            this._editState.buffer = '-';
+            this._updateEditVisuals();
+            return;
+        }
+
+        // Block arrow/delete keys during edit to prevent accidental nudge/delete
+        if (/^Arrow|^Delete$|^Backspace$/.test(e.key)) {
+            e.preventDefault();
+        }
+        // All other keys (browser shortcuts, F-keys, etc.) pass through naturally
+    }
+
+    /**
+     * Calculate the preview config point based on current edit state.
+     * Considers both the active buffer and any previously committed axis value.
+     */
+    private _getEditPreviewPoint(): [number, number] {
+        if (!this._editState) return [0, 0];
+
+        const { originalPoint, axis, buffer, committedX, committedY } = this._editState;
+        const newPoint: [number, number] = [
+            committedX ?? originalPoint[0],
+            committedY ?? originalPoint[1],
+        ];
+
+        // Apply current buffer to active axis (overrides committed value for that axis)
+        const parsed = buffer !== '' && buffer !== '-' ? parseInt(buffer, 10) : null;
+        if (parsed !== null && !isNaN(parsed)) {
+            newPoint[axis === 'x' ? 0 : 1] = parsed;
+        }
+
+        return newPoint;
+    }
+
+    /** Update visual preview during coordinate editing (direct DOM manipulation) */
+    private _updateEditVisuals(): void {
+        if (!this._editState) return;
+
+        const { pointIndex, axis, buffer } = this._editState;
+        const newPoint = this._getEditPreviewPoint();
+        const newScreenX = this._toScreenX(newPoint[0]);
+        const newScreenY = this._toScreenY(newPoint[1]);
+        const halfHandle = HANDLE_SIZE / 2;
+
+        // 1) Preview handle
+        const previewHandle = this.renderRoot.querySelector('.drag-preview-handle') as SVGRectElement | null;
+        if (previewHandle) {
+            previewHandle.setAttribute('x', String(newScreenX - halfHandle));
+            previewHandle.setAttribute('y', String(newScreenY - halfHandle));
+            previewHandle.setAttribute('fill', '#9C27B0');
+            previewHandle.setAttribute('visibility', 'visible');
+        }
+
+        // 2) Preview label with editing indicator
+        const previewLabel = this.renderRoot.querySelector('.drag-preview-label') as SVGTextElement | null;
+        if (previewLabel) {
+            const labelPos = this._getLabelPosition(newPoint);
+
+            // Format: show buffer or underscore for active axis, resolved value for other
+            const xDisplay = axis === 'x' ? (buffer || '_') : String(newPoint[0]);
+            const yDisplay = axis === 'y' ? (buffer || '_') : String(newPoint[1]);
+
+            previewLabel.setAttribute('x', String(labelPos.x));
+            previewLabel.setAttribute('y', String(labelPos.y));
+            previewLabel.setAttribute('text-anchor', labelPos.textAnchor);
+            previewLabel.setAttribute('dominant-baseline', labelPos.dominantBaseline);
+            previewLabel.textContent = `[${xDisplay}, ${yDisplay}]`;
+            previewLabel.setAttribute('visibility', 'visible');
+        }
+
+        // 3) Ghost polygon
+        const ghostPolygon = this.renderRoot.querySelector('.ghost-polygon') as SVGPolygonElement | null;
+        if (ghostPolygon) {
+            ghostPolygon.setAttribute('points', this._buildPreviewPoints(
+                pointIndex, newScreenX, newScreenY
+            ));
+            ghostPolygon.setAttribute('stroke', '#9C27B0');
+            ghostPolygon.setAttribute('visibility', 'visible');
+        }
+
+        // 4) Hide original handle
+        const handles = this.renderRoot.querySelectorAll('.boundary-handle');
+        const editedHandle = handles[pointIndex] as SVGRectElement | undefined;
+        if (editedHandle) {
+            editedHandle.setAttribute('opacity', '0');
+        }
+    }
+
+    /** Save coordinate edit and dispatch change event */
+    private _saveEdit(): void {
+        if (!this._editState) return;
+
+        const { pointIndex } = this._editState;
+        const newPoint = this._getEditPreviewPoint();
+
+        // Clear state BEFORE dispatching (which triggers re-render)
+        const originalPoint = this._editState.originalPoint;
+        this._editState = null;
+
+        // Only dispatch if actually changed
+        if (newPoint[0] !== originalPoint[0] || newPoint[1] !== originalPoint[1]) {
+            window.dispatchEvent(new CustomEvent<BoundaryPointChangedDetail>(
+                'scalable-house-plan-boundary-point-changed', {
+                    detail: {
+                        roomIndex: this.roomIndex,
+                        pointIndex,
+                        newPoint,
+                        mode: 'move',
+                    }
+                }
+            ));
+        }
+
+        this.requestUpdate();
+    }
+
+    /** Cancel coordinate edit and restore original visual state */
+    private _cancelEdit(): void {
+        if (!this._editState) return;
+
+        const pointIndex = this._editState.pointIndex;
+        this._editState = null;
+
+        // Restore the handle that was hidden during editing
+        const handles = this.renderRoot.querySelectorAll('.boundary-handle');
+        const editedHandle = handles[pointIndex] as SVGRectElement | undefined;
+        if (editedHandle) {
+            editedHandle.removeAttribute('opacity');
+        }
+
+        // Hide overlay elements (visibility is a static attr in template, must reset manually)
+        const previewHandle = this.renderRoot.querySelector('.drag-preview-handle') as SVGRectElement | null;
+        previewHandle?.setAttribute('visibility', 'hidden');
+        const previewLabel = this.renderRoot.querySelector('.drag-preview-label') as SVGTextElement | null;
+        previewLabel?.setAttribute('visibility', 'hidden');
+        const ghostPolygon = this.renderRoot.querySelector('.ghost-polygon') as SVGPolygonElement | null;
+        ghostPolygon?.setAttribute('visibility', 'hidden');
+    }
 
     /**
      * Get fill color for a handle based on its state (selection only - drag visuals are imperative)
