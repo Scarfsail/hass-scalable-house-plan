@@ -374,6 +374,44 @@ export const sharedStyles = css`
         transform: rotate(2deg);
     }
 
+    /* Color Field with Swatch */
+    .color-field-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .color-field-wrapper ha-textfield {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .color-swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        flex-shrink: 0;
+        border: 1px solid var(--divider-color);
+        /* Checkerboard to visualize alpha */
+        background-image:
+            linear-gradient(45deg, #ccc 25%, transparent 25%),
+            linear-gradient(-45deg, #ccc 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #ccc 75%),
+            linear-gradient(-45deg, transparent 75%, #ccc 75%);
+        background-size: 8px 8px;
+        background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+        background-color: white;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .color-swatch::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-color: inherit;
+    }
+
     /* Interactive Editor Mode - Selected Element Styles */
     .selected-element {
         outline: 3px solid var(--primary-color) !important;

@@ -211,6 +211,22 @@ export class EditorRoomShp extends LitElement {
                                         ></ha-switch>
                                     </ha-formfield>
                                 </div>
+                                <div class="room-field">
+                                    <div class="color-field-wrapper">
+                                        <ha-textfield
+                                            label="${this.localize('editor.room_color')}"
+                                            .value=${this.room.color || ''}
+                                            @input=${this._colorChanged}
+                                            placeholder="rgba(100, 150, 200, 0.3)"
+                                            helper-persistent
+                                            helper-text="${this.localize('editor.room_color_helper')}"
+                                        ></ha-textfield>
+                                        <div class="color-swatch"
+                                             style="background-color: ${this.room.color || 'transparent'}"
+                                             title="${this.room.color || ''}">
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -370,6 +386,11 @@ export class EditorRoomShp extends LitElement {
     private _disableDynamicColorChanged(e: Event) {
         const target = e.target as HTMLInputElement;
         this._dispatchUpdate({ ...this.room, disable_dynamic_color: target.checked });
+    }
+
+    private _colorChanged(e: Event) {
+        const value = (e.target as HTMLInputElement).value.trim();
+        this._dispatchUpdate({ ...this.room, color: value || undefined });
     }
 
     private _infoBoxConfigChanged(e: CustomEvent) {

@@ -47,7 +47,15 @@ Implemented as halo drop-shadows instead of the planned element backdrop (backdr
 
 Config schema (`background_mode` preset, `resolveEffectiveConfig`), color swatches in editor, new editor sections, `room.color` field in per-room editor.
 
-- [ ] Implement
+Changes:
+- `src/cards/scalable-house-plan.ts` — `BackgroundMode` type, `ElementAppearanceConfig` interface, extended `ScalableHousePlanConfig`
+- `src/cards/config-resolver.ts` — **created** — `MODE_DEFAULTS` + `resolveEffectiveConfig()`
+- `src/cards/editor-components/shared-styles.ts` — color swatch CSS (`.color-field-wrapper`, `.color-swatch`)
+- `src/cards/scalable-house-plan-editor.ts` — `background_mode` select, color swatches on all 4 color fields, `show_idle_overlay` / `show_border` toggles, new "Element Appearance" section, `_renderColorField()` helper, all change handlers
+- `src/cards/editor-components/editor-room-shp.ts` — `room.color` field with swatch, `_colorChanged` handler
+- `src/localize/translations/cs.json` — 13 new localization keys
+
+- [x] Implement
 - [ ] Code review
 - [ ] User verification
 - [ ] Committed
@@ -56,4 +64,4 @@ Config schema (`background_mode` preset, `resolveEffectiveConfig`), color swatch
 
 ## Current State
 
-**Next step:** Start Group C — see `configurability/solution_design.md`.
+**Next step:** Code review of Group C.

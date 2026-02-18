@@ -208,30 +208,30 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                     </div>
                     <div class="section-content ${this._expandedSections.has('dynamicColors') ? 'expanded' : ''}">
                         <div class="basic-config">
-                            <ha-textfield
-                                label="${this.localize('editor.ambient_lights_color')}"
-                                .value=${this._config.dynamic_colors?.ambient_lights || 'rgba(220, 180, 255, 0.20)'}
-                                @input=${this._ambientLightsColorChanged}
-                                placeholder="rgba(220, 180, 255, 0.20)"
-                            ></ha-textfield>
-                            <ha-textfield
-                                label="${this.localize('editor.lights_color')}"
-                                .value=${this._config.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.20)'}
-                                @input=${this._lightsColorChanged}
-                                placeholder="rgba(255, 245, 170, 0.20)"
-                            ></ha-textfield>
-                            <ha-textfield
-                                label="${this.localize('editor.motion_occupancy_color')}"
-                                .value=${this._config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.20)'}
-                                @input=${this._motionOccupancyColorChanged}
-                                placeholder="rgba(135, 206, 250, 0.20)"
-                            ></ha-textfield>
-                            <ha-textfield
-                                label="${this.localize('editor.default_color')}"
-                                .value=${this._config.dynamic_colors?.default || 'rgba(100, 100, 100, 0.20)'}
-                                @input=${this._defaultColorChanged}
-                                placeholder="rgba(100, 100, 100, 0.20)"
-                            ></ha-textfield>
+                            ${this._renderColorField(
+                                this.localize('editor.ambient_lights_color'),
+                                this._config.dynamic_colors?.ambient_lights || 'rgba(220, 180, 255, 0.20)',
+                                'rgba(220, 180, 255, 0.20)',
+                                this._ambientLightsColorChanged
+                            )}
+                            ${this._renderColorField(
+                                this.localize('editor.lights_color'),
+                                this._config.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.20)',
+                                'rgba(255, 245, 170, 0.20)',
+                                this._lightsColorChanged
+                            )}
+                            ${this._renderColorField(
+                                this.localize('editor.motion_occupancy_color'),
+                                this._config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.20)',
+                                'rgba(135, 206, 250, 0.20)',
+                                this._motionOccupancyColorChanged
+                            )}
+                            ${this._renderColorField(
+                                this.localize('editor.default_color'),
+                                this._config.dynamic_colors?.default || 'rgba(100, 100, 100, 0.20)',
+                                'rgba(100, 100, 100, 0.20)',
+                                this._defaultColorChanged
+                            )}
                             <ha-textfield
                                 label="${this.localize('editor.motion_delay_seconds')}"
                                 type="number"
@@ -240,6 +240,18 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                                 .value=${this._config.dynamic_colors?.motion_delay_seconds ?? 60}
                                 @input=${this._motionDelaySecondsChanged}
                             ></ha-textfield>
+                            <ha-formfield label="${this.localize('editor.show_idle_overlay')}">
+                                <ha-switch
+                                    .checked=${this._config.dynamic_colors?.show_idle_overlay ?? false}
+                                    @change=${this._showIdleOverlayChanged}
+                                ></ha-switch>
+                            </ha-formfield>
+                            <ha-formfield label="${this.localize('editor.show_border')}">
+                                <ha-switch
+                                    .checked=${this._config.dynamic_colors?.show_border ?? false}
+                                    @change=${this._showBorderChanged}
+                                ></ha-switch>
+                            </ha-formfield>
                         </div>
                     </div>
                 </div>
@@ -986,8 +998,8 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     private _motionDelaySecondsChanged(ev: any): void {
         const value = parseInt(ev.target.value);
         if (!isNaN(value) && value >= 0) {
-            this._config = { 
-                ...this._config, 
+            this._config = {
+                ...this._config,
                 dynamic_colors: {
                     ...this._config.dynamic_colors,
                     motion_delay_seconds: value
@@ -995,6 +1007,41 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             };
             this._configChanged();
         }
+    }
+
+    private _showIdleOverlayChanged(ev: Event): void {
+        this._config = {
+            ...this._config,
+            dynamic_colors: { ...this._config.dynamic_colors, show_idle_overlay: (ev.target as any).checked }
+        };
+        this._configChanged();
+    }
+
+    private _showBorderChanged(ev: Event): void {
+        this._config = {
+            ...this._config,
+            dynamic_colors: { ...this._config.dynamic_colors, show_border: (ev.target as any).checked }
+        };
+        this._configChanged();
+    }
+
+    private _renderColorField(
+        label: string,
+        value: string,
+        placeholder: string,
+        handler: (ev: Event) => void
+    ) {
+        return html`
+            <div class="color-field-wrapper">
+                <ha-textfield
+                    label="${label}"
+                    .value=${value}
+                    @input=${handler}
+                    placeholder="${placeholder}"
+                ></ha-textfield>
+                <div class="color-swatch" style="background-color: ${value}" title="${value}"></div>
+            </div>
+        `;
     }
 
     private _infoBoxDefaultsChanged(ev: any): void {
