@@ -105,6 +105,10 @@ export interface DynamicColorsConfig {
     lights?: string;                // Default: (warm white light)
     default?: string;               // Default: (very light gray)
     motion_delay_seconds?: number;  // Default: 60
+    // cat1: when true, idle rooms render a default overlay; false (default) = transparent
+    show_idle_overlay?: boolean;
+    // cat3: when true, polygon borders are visible in dynamic color mode; false (default) = hidden
+    show_border?: boolean;
 }
 
 /**

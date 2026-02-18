@@ -53,8 +53,19 @@ export function adjustOpacity(rgbaColor: string, opacity: number): string {
     // Match rgba pattern: rgba(r, g, b, a)
     const match = rgbaColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
     if (!match) return rgbaColor;
-    
+
     return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${opacity})`;
+}
+
+/**
+ * Extract alpha channel from rgba/rgb color string.
+ * Returns the alpha value (0.0–1.0), defaulting to 1.0 if absent or unparseable.
+ */
+export function extractAlpha(rgbaColor: string): number {
+    const match = rgbaColor.match(/rgba?\(\d+,\s*\d+,\s*\d+(?:,\s*([\d.]+))?\)/);
+    if (!match || match[1] === undefined) return 1.0;
+    const alpha = parseFloat(match[1]);
+    return isNaN(alpha) ? 1.0 : Math.max(0, Math.min(1, alpha));
 }
 
 /**
@@ -71,15 +82,14 @@ export function createGradientDefinition(
     const cx = ((centerX - bounds.minX) / bounds.width * 100).toFixed(1);
     const cy = ((centerY - bounds.minY) / bounds.height * 100).toFixed(1);
     
-    // Center: 0.2 opacity (more visible = brighter), Outer: 0.05 opacity (more transparent = darker)
-    const innerColor = adjustOpacity(baseColor, 0.2);
-    const outerColor = adjustOpacity(baseColor, 0.05);
+    // cat4: honor user-configured alpha; inner = baseColor as-is, outer = 25% of inner alpha
+    const outerColor = adjustOpacity(baseColor, extractAlpha(baseColor) * 0.25);
     
     return {
         id: gradientId,
         cx: `${cx}%`,
         cy: `${cy}%`,
-        innerColor,
+        innerColor: baseColor,
         outerColor
     };
 }
@@ -195,10 +205,11 @@ export function calculateDynamicRoomColor(
     }
     
     // Get configured colors with defaults
-    const motionColor = config?.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)';
-    const lightsColor = config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.17)';
-    const ambientLightsColor = config?.dynamic_colors?.ambient_lights || 'rgba(220, 180, 255, 0.12)';  // Subtle purple/pink
-    const defaultColor = config?.dynamic_colors?.default || 'rgba(100, 100, 100, 0.05)';
+    // cat4: defaults updated to 0.20 so unmodified configs produce the same visual after the alpha fix
+    const motionColor = config?.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.20)';
+    const lightsColor = config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.20)';
+    const ambientLightsColor = config?.dynamic_colors?.ambient_lights || 'rgba(220, 180, 255, 0.20)';
+    const defaultColor = config?.dynamic_colors?.default || 'rgba(100, 100, 100, 0.20)';
     const delaySeconds = config?.dynamic_colors?.motion_delay_seconds ?? 60;
     
     // Check all states (do all checks once to build complete picture)
@@ -223,7 +234,10 @@ export function calculateDynamicRoomColor(
         return { color: ambientLightsColor, type: 'ambient_lights', activeTypes };
     }
     
-    // Default color
+    // Default (idle) — cat1: transparent by default, opt in via show_idle_overlay
+    if (!(config?.dynamic_colors?.show_idle_overlay ?? false)) {
+        return { color: 'transparent', type: 'transparent', activeTypes };
+    }
     activeTypes.push('default');
     return { color: defaultColor, type: 'default', activeTypes };
 }

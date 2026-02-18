@@ -7,10 +7,11 @@ import type { ScalableHousePlanConfig, HouseCache } from "../cards/scalable-hous
 import { CreateCardElement, getRoomEntities } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
 import "./boundary-handles-shp";
-import { 
-    createGradientDefinition, 
+import {
+    createGradientDefinition,
     calculatePolygonCenter,
     adjustOpacity,
+    extractAlpha,
     type DynamicColorResult,
     type GradientDefinition,
     type CachedEntityIds,
@@ -320,7 +321,7 @@ export class ScalableHousePlanRoom extends LitElement {
         this._activeLightColor = undefined;
         if (this._hasMotion && this._currentColor.activeTypes.includes('lights')) {
             // Use the configured light color (the same color shown when only light is active)
-            this._activeLightColor = this.config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.17)';
+            this._activeLightColor = this.config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.20)';
         }
         
         // Create gradient if not transparent
@@ -337,25 +338,30 @@ export class ScalableHousePlanRoom extends LitElement {
                 this._cachedRoomBounds
             );
             
-            // Create inverted gradient (dark center, bright edges) for motion animation
+            // Create inverted gradient for the motion wave animation.
+            // Motion + lights: crossfade between motion color (center-bright) and light color (center-bright).
+            // Motion only: ripple wave — normal has bright center/transparent edges, inverted has
+            //   transparent center/bright edges. Combined they shift the bright spot center↔edges.
             if (this._hasMotion) {
-                const cx = ((center.x - this._cachedRoomBounds.minX) / this._cachedRoomBounds.width * 100).toFixed(1);
-                const cy = ((center.y - this._cachedRoomBounds.minY) / this._cachedRoomBounds.height * 100).toFixed(1);
-                
-                // Use light color if both motion and light are active, otherwise use motion color
-                const colorForInverted = this._activeLightColor || this._currentColor.color;
-                
-                // Inverted: Center is dark (0.05), outer is bright (0.2)
-                const innerColor = adjustOpacity(colorForInverted, 0.05);
-                const outerColor = adjustOpacity(colorForInverted, 0.2);
-                
-                this._currentGradientInverted = {
-                    id: gradientIdInverted,
-                    cx: `${cx}%`,
-                    cy: `${cy}%`,
-                    innerColor,
-                    outerColor
-                };
+                if (this._activeLightColor) {
+                    this._currentGradientInverted = createGradientDefinition(
+                        this._activeLightColor,
+                        gradientIdInverted,
+                        center.x,
+                        center.y,
+                        this._cachedRoomBounds
+                    );
+                } else {
+                    const motionColor = this._currentColor.color;
+                    const userAlpha = extractAlpha(motionColor);
+                    this._currentGradientInverted = {
+                        id: gradientIdInverted,
+                        cx: this._currentGradient.cx,
+                        cy: this._currentGradient.cy,
+                        innerColor: adjustOpacity(motionColor, 0),
+                        outerColor: adjustOpacity(motionColor, userAlpha)
+                    };
+                }
             } else {
                 this._currentGradientInverted = undefined;
             }
@@ -382,9 +388,11 @@ export class ScalableHousePlanRoom extends LitElement {
         // Dynamic colors: use gradient if motion/lights/default (not transparent type)
         // This handles cases where motion sensors are active or lights are on
         if (this._currentColor && this._currentColor.type !== 'transparent' && this._currentGradient) {
+            // cat3: show border only when explicitly opted in, or in debug mode (showRoomBackgrounds)
+            const showBorder = this.showRoomBackgrounds || (this.config?.dynamic_colors?.show_border ?? false);
             return {
                 fillColor: `url(#${this._currentGradient.id})`,
-                strokeColor: 'rgba(0, 0, 0, 0.1)',
+                strokeColor: showBorder ? 'rgba(0, 0, 0, 0.1)' : 'none',
                 useGradient: true,
                 gradientId: this._currentGradient.id
             };
@@ -392,11 +400,14 @@ export class ScalableHousePlanRoom extends LitElement {
         
         // Fallback: static room color or transparent based on mode and settings
         if (this.mode === 'detail') {
-            // Detail mode: always show static room background with more opacity
-            const detailColor = this.room.color || 'rgba(128, 128, 128, 0.8)';  // More opaque default for detail
+            // Only show a color overlay when the room has an explicit static color configured.
+            // Without room.color, keep transparent so the background image shows through.
+            if (!this.room.color) {
+                return { fillColor: 'transparent', strokeColor: 'none', useGradient: false };
+            }
             return {
-                fillColor: detailColor,
-                strokeColor: detailColor.replace(/[\d.]+\)$/, '0.4)'),
+                fillColor: this.room.color,
+                strokeColor: adjustOpacity(this.room.color, 0.4),
                 useGradient: false
             };
         } else {
@@ -489,10 +500,10 @@ export class ScalableHousePlanRoom extends LitElement {
                     </defs>
                 ` : ''}
                 ${this._hasMotion && this._currentGradientInverted ? svg`
-                    <!-- Normal gradient polygon - fades out when inverted fades in -->
-                    <polygon 
-                        points="${this._cachedRelativePoints}" 
-                        fill="url(#${this._currentGradient!.id})" 
+                    <!-- Motion: two polygons in opposite phase create a ripple wave effect -->
+                    <polygon
+                        points="${this._cachedRelativePoints}"
+                        fill="url(#${this._currentGradient!.id})"
                         stroke="${strokeColor}"
                         stroke-width="2"
                         class="room-polygon overview motion-normal ${elementsClickable ? 'no-pointer-events' : ''}"
@@ -501,10 +512,9 @@ export class ScalableHousePlanRoom extends LitElement {
                         @click=${this.editorMode ? this._handleRoomBackgroundClick : null}
                         .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
-                    <!-- Inverted gradient polygon - fades in when normal fades out -->
-                    <polygon 
-                        points="${this._cachedRelativePoints}" 
-                        fill="url(#${this._currentGradientInverted.id})" 
+                    <polygon
+                        points="${this._cachedRelativePoints}"
+                        fill="url(#${this._currentGradientInverted.id})"
                         stroke="${strokeColor}"
                         stroke-width="2"
                         class="room-polygon overview motion-inverted ${elementsClickable ? 'no-pointer-events' : ''}"
@@ -514,10 +524,10 @@ export class ScalableHousePlanRoom extends LitElement {
                         .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
                 ` : svg`
-                    <!-- Single polygon for non-motion states -->
-                    <polygon 
-                        points="${this._cachedRelativePoints}" 
-                        fill="${fillColor}" 
+                    <!-- Static polygon for non-motion states -->
+                    <polygon
+                        points="${this._cachedRelativePoints}"
+                        fill="${fillColor}"
                         stroke="${strokeColor}"
                         stroke-width="2"
                         class="room-polygon overview ${elementsClickable ? 'no-pointer-events' : ''}"
@@ -642,19 +652,18 @@ export class ScalableHousePlanRoom extends LitElement {
                         />
                         <!-- Room colored polygon on top -->
                         ${this._hasMotion && this._currentGradientInverted ? svg`
-                            <!-- Normal gradient polygon - fades out when inverted fades in -->
-                            <polygon 
-                                points="${points}" 
-                                fill="url(#${this._currentGradient!.id})" 
+                            <!-- Motion: two polygons in opposite phase create a ripple wave effect -->
+                            <polygon
+                                points="${points}"
+                                fill="url(#${this._currentGradient!.id})"
                                 stroke="${strokeColor}"
                                 stroke-width="2"
                                 class="room-polygon motion-normal"
                                 @click=${this.editorMode ? this._handleRoomBackgroundClick : (e: Event) => e.stopPropagation()}
                             />
-                            <!-- Inverted gradient polygon - fades in when normal fades out -->
-                            <polygon 
-                                points="${points}" 
-                                fill="url(#${this._currentGradientInverted.id})" 
+                            <polygon
+                                points="${points}"
+                                fill="url(#${this._currentGradientInverted.id})"
                                 stroke="${strokeColor}"
                                 stroke-width="2"
                                 class="room-polygon motion-inverted"
@@ -662,10 +671,10 @@ export class ScalableHousePlanRoom extends LitElement {
                                 @click=${this.editorMode ? this._handleRoomBackgroundClick : (e: Event) => e.stopPropagation()}
                             />
                         ` : svg`
-                            <!-- Single polygon for non-motion states -->
-                            <polygon 
-                                points="${points}" 
-                                fill="${fillColor}" 
+                            <!-- Static polygon for non-motion states -->
+                            <polygon
+                                points="${points}"
+                                fill="${fillColor}"
                                 stroke="${strokeColor}"
                                 stroke-width="2"
                                 class="room-polygon"

@@ -210,27 +210,27 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                         <div class="basic-config">
                             <ha-textfield
                                 label="${this.localize('editor.ambient_lights_color')}"
-                                .value=${this._config.dynamic_colors?.ambient_lights || 'rgba(220, 180, 255, 0.12)'}
+                                .value=${this._config.dynamic_colors?.ambient_lights || 'rgba(220, 180, 255, 0.20)'}
                                 @input=${this._ambientLightsColorChanged}
-                                placeholder="rgba(220, 180, 255, 0.12)"
+                                placeholder="rgba(220, 180, 255, 0.20)"
                             ></ha-textfield>
                             <ha-textfield
                                 label="${this.localize('editor.lights_color')}"
-                                .value=${this._config.dynamic_colors?.lights || 'rgba(255, 250, 250, 0.18)'}
+                                .value=${this._config.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.20)'}
                                 @input=${this._lightsColorChanged}
-                                placeholder="rgba(255, 250, 220, 0.18)"
+                                placeholder="rgba(255, 245, 170, 0.20)"
                             ></ha-textfield>
                             <ha-textfield
                                 label="${this.localize('editor.motion_occupancy_color')}"
-                                .value=${this._config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.15)'}
+                                .value=${this._config.dynamic_colors?.motion_occupancy || 'rgba(135, 206, 250, 0.20)'}
                                 @input=${this._motionOccupancyColorChanged}
-                                placeholder="rgba(135, 206, 250, 0.15)"
+                                placeholder="rgba(135, 206, 250, 0.20)"
                             ></ha-textfield>
                             <ha-textfield
                                 label="${this.localize('editor.default_color')}"
-                                .value=${this._config.dynamic_colors?.default || 'rgba(128, 128, 128, 0.05)'}
+                                .value=${this._config.dynamic_colors?.default || 'rgba(100, 100, 100, 0.20)'}
                                 @input=${this._defaultColorChanged}
-                                placeholder="rgba(128, 128, 128, 0.05)"
+                                placeholder="rgba(100, 100, 100, 0.20)"
                             ></ha-textfield>
                             <ha-textfield
                                 label="${this.localize('editor.motion_delay_seconds')}"
