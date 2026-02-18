@@ -479,7 +479,7 @@ export class ScalableHousePlanRoom extends LitElement {
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
 
-        
+
         // Build SVG polygon with conditional interactivity and gradient
         const polygonSvg = svg`
             <svg class="room-svg" style="position: absolute; top: 0; left: 0; width: ${roomBounds.width}px; height: ${roomBounds.height}px;" 
@@ -604,7 +604,7 @@ export class ScalableHousePlanRoom extends LitElement {
         });
 
         const { fillColor, strokeColor, useGradient } = this._getRoomColors();
-        
+
         // Transform and scale points relative to room bounds
         const points = this.room.boundary
             .map(p => `${(p[0] - roomBounds.minX) * scale},${(p[1] - roomBounds.minY) * scale}`)

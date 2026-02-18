@@ -31,7 +31,7 @@ Fixes: idle rooms transparent by default (cat1), borders hidden by default (cat3
 
 Adds configurable element backdrop + strengthens text shadow in analog-text-shp.
 
-- [ ] Implement
+- [x] Implement
 - [ ] Code review
 - [ ] User verification
 - [ ] Committed
@@ -52,4 +52,4 @@ Config schema (`background_mode` preset, `resolveEffectiveConfig`), color swatch
 
 ## Current State
 
-**Next step:** Start Group B — see `element_visibility/solution_design.md`.
+**Next step:** Code review Group B — see `element_visibility/solution_design.md`.

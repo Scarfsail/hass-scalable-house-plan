@@ -1,4 +1,5 @@
 import { LitElement, html, css, TemplateResult } from 'lit-element';
+import { planTextShadow, planDropShadow } from '../utils/plan-styles';
 import { customElement, property } from "lit/decorators.js";
 import { styleMap } from 'lit/directives/style-map.js';
 import type { HassEntity } from 'home-assistant-js-websocket';
@@ -31,6 +32,7 @@ class AnalogText extends LitElement {
         }
         span {
             line-height: 1;
+            ${planTextShadow};
         }
         
         .gauge-container-bottom {
@@ -111,7 +113,7 @@ class AnalogText extends LitElement {
         .text-overlay {
             position: relative;
             z-index: 1;
-            text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+            ${planTextShadow};
             line-height: 1;
         }
         
@@ -132,6 +134,7 @@ class AnalogText extends LitElement {
             width: 100%;
             overflow: hidden;
             border-radius: 2px;
+            ${planDropShadow};
         }
         
         .gauge-bar-background {

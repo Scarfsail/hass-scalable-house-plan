@@ -325,19 +325,19 @@ function calculatePositionStyles(
     // Calculate transform
     const transform = elementScale !== 1 ? `scale(${elementScale})` : '';
     
-    // Build base style string
+    // Build style string
     let styleString = Object.entries(style)
         .map(([k, v]) => `${k}: ${v}`)
         .join('; ');
-    
+
     // Apply custom styles
     if (plan.style) {
-        const customStyles = typeof plan.style === 'string' 
-            ? plan.style 
+        const customStyles = typeof plan.style === 'string'
+            ? plan.style
             : Object.entries(plan.style)
                 .map(([k, v]) => `${k}: ${v}`)
                 .join('; ');
-        
+
         if (customStyles) {
             styleString += `; ${customStyles}`;
         }
@@ -427,7 +427,7 @@ function renderReadOnlyElements(
     mode: 'overview' | 'detail'
 ): unknown[] {
     const { hass, roomBounds, createCardElement, elementCards, scale = 1, scaleRatio = 0, elementsClickable } = options;
-    
+
     return elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
         // Get or create cached position styles (shared helper)
         const positionData = preparePositionData(uniqueKey, plan, scale, scaleRatio, boundsKey, roomBounds, elementScale, posCache);
@@ -657,7 +657,7 @@ function renderEditableElements(
 
         // Get or create the element card (shared helper)
         const card = prepareElementCard(uniqueKey, entity, elementConfig, hass, createCardElement, elementCards, mode);
-        
+
         // Setup editor-specific card properties (group elements only)
         setupEditorCardProperties(card, elementConfig, {
             selectedElementKey: selectedElementKey ?? undefined,
