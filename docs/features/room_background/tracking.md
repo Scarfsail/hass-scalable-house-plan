@@ -29,12 +29,16 @@ Fixes: idle rooms transparent by default (cat1), borders hidden by default (cat3
 ### Group B — Element Visibility
 `element_visibility/solution_design.md`
 
-Adds configurable element backdrop + strengthens text shadow in analog-text-shp.
+Implemented as halo drop-shadows instead of the planned element backdrop (backdrop was rejected after user testing). Changes:
+- `src/utils/plan-styles.ts` — new shared `planTextShadow` and `planDropShadow` constants
+- `analog-text-shp` — `planTextShadow` on span + .text-overlay; `planDropShadow` on gauge bar
+- `state-icon-shp` — `planDropShadow` on icon container; title label uses `planTextShadow` (black rectangle removed)
+- `motion-sensor-shp` — `planDropShadow` on ha-icon
 
 - [x] Implement
-- [ ] Code review
-- [ ] User verification
-- [ ] Committed
+- [x] Code review
+- [x] User verification
+- [x] Committed
 
 ---
 
@@ -52,4 +56,4 @@ Config schema (`background_mode` preset, `resolveEffectiveConfig`), color swatch
 
 ## Current State
 
-**Next step:** Code review Group B — see `element_visibility/solution_design.md`.
+**Next step:** Start Group C — see `configurability/solution_design.md`.
