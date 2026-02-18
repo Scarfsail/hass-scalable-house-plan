@@ -1,6 +1,7 @@
 import { html, css } from "lit"
 import { customElement } from "lit/decorators.js";
 import { ElementEntityBase, ElementEntityBaseConfig } from "./base";
+import { planTextShadow, planDropShadow } from '../utils/plan-styles';
 import { HassEntity } from "home-assistant-js-websocket";
 
 interface StateIconElementConfig extends ElementEntityBaseConfig {
@@ -24,6 +25,7 @@ export class StateIconElement extends ElementEntityBase<StateIconElementConfig> 
         .icon-container {
             position: relative;
             display: inline-block;
+            ${planDropShadow};
         }
         
         .info-label {
@@ -63,8 +65,11 @@ export class StateIconElement extends ElementEntityBase<StateIconElementConfig> 
         }
         
         .title {
-            background: rgba(0, 0, 0, 0.8);
+            background: none;
+            padding: 0;
+            opacity: 1;
             color: white;
+            ${planTextShadow};
             max-width: 80px;
             overflow: hidden;
             text-overflow: ellipsis;

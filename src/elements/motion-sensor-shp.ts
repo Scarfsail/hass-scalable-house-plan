@@ -1,8 +1,9 @@
-import { html, nothing } from "lit"
+import { html, css, nothing } from "lit"
 import { customElement } from "lit/decorators.js";
 import "../components/last-change-text-shp";
 import { ElementEntityArmableBase, ElementEntityBaseConfig } from "./base";
 import { HassEntity } from "home-assistant-js-websocket";
+import { planDropShadow } from '../utils/plan-styles';
 
 interface MotionSensorElementConfig extends ElementEntityBaseConfig {
     hide_icon?: boolean;  // Default: false - whether to hide the icon
@@ -10,6 +11,12 @@ interface MotionSensorElementConfig extends ElementEntityBaseConfig {
 
 @customElement("motion-sensor-shp")
 export class MotionSensorElement extends ElementEntityArmableBase<MotionSensorElementConfig> {
+    static styles = css`
+        ha-icon {
+            ${planDropShadow};
+        }
+    `;
+
     protected override renderEntityContent(entity: HassEntity) {
 
         //const opened = entity.state == "on";
