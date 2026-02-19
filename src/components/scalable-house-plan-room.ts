@@ -74,7 +74,6 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedRelativePoints?: string;
     private _cachedOverviewRoom?: Room;
     private _cachedClipId?: string;  // Clip path ID for detail mode
-    private _infoBoxCache: Map<string, any> = new Map();  // Cache for info box entity config
     
     // Cached entity IDs (computed once when room changes, used with fresh hass.states lookups)
     private _cachedEntityIds?: {
@@ -462,10 +461,8 @@ export class ScalableHousePlanRoom extends LitElement {
             elementCards: this.elementCards,
             scale: scale.scaleX,
             scaleRatio: 0,  // Overview: no element scaling
-            config: this.config,
             originalRoom: this.room,  // Pass original room for info box entity detection
-            infoBoxCache: this._infoBoxCache,
-            cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds,  // Use cached IDs from parent
+            elementDefaults: this.config?.element_defaults,
             elementsClickable,  // Control element clickability
             houseCache: this.houseCache,
             editorMode: this.editorMode,
@@ -589,9 +586,7 @@ export class ScalableHousePlanRoom extends LitElement {
             elementCards: this.elementCards,
             scale,
             scaleRatio,
-            config: this.config,
-            infoBoxCache: this._infoBoxCache,
-            cachedInfoBoxEntityIds: this.cachedEntityIds?.infoBoxEntityIds,  // Use cached IDs from parent
+            elementDefaults: this.config?.element_defaults,
             elementsClickable: true,  // Elements always clickable in detail view
             houseCache: this.houseCache,
             editorMode: this.editorMode,

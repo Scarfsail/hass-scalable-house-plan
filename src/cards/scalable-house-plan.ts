@@ -9,7 +9,7 @@ import "./scalable-house-plan-detail";
 import "./scalable-house-plan-entities";
 import type {
     PositionScalingMode,
-    InfoBoxConfig,
+    ElementDefaultConfig,
     Room,
     PlanConfig,
     EntityConfig,
@@ -54,7 +54,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     card_size?: number;
     show_room_backgrounds?: boolean;  // Show room background colors (helpful for editing boundaries)
     dynamic_colors?: DynamicColorsConfig;  // Dynamic room color configuration
-    info_box_defaults?: InfoBoxConfig;  // Default info box configuration for all rooms
+    element_defaults?: ElementDefaultConfig[];  // House-level element defaults (keyed by element type)
     _previewRoomIndex?: number;  // Internal: room index to preview in detail view (not persisted, used during editing)
     _editorMode?: boolean;  // Internal: interactive editor mode enabled (not persisted, used during editing)
     _selectedElementKey?: string | null;  // Internal: currently selected element uniqueKey (not persisted, used during editing)
@@ -233,7 +233,6 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             this._roomEntityCache.set(room.name, {
                 allEntityIds,
                 areaEntityIds,
-                infoBoxEntityIds: allEntityIds,  // Info box uses all entities
                 motionSensorIds,
                 ambientLightIds,
                 lightIds,

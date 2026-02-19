@@ -1,6 +1,6 @@
 /**
  * Shared type definitions for scalable-house-plan card
- * 
+ *
  * These types are used across multiple components including the main card,
  * editor components, utility functions, and room/element renderers.
  */
@@ -8,13 +8,6 @@
 import type { ElementBaseConfig } from "../elements/base";
 
 export type PositionScalingMode = "plan" | "element" | "fixed";
-
-export interface InfoBoxPosition {
-    top?: number;    // Pixels from top edge of room
-    bottom?: number; // Pixels from bottom edge (mutually exclusive with top)
-    left?: number;   // Pixels from left edge of room
-    right?: number;  // Pixels from right edge (mutually exclusive with left)
-}
 
 export interface InfoBoxTypeConfig {
     show?: boolean;  // Default: true (deprecated - use visible_detail/visible_overview)
@@ -25,17 +18,16 @@ export interface InfoBoxTypeConfig {
     element?: Record<string, any>;  // Parameters to spread to the child component (e.g., analog-text-shp)
 }
 
-export interface InfoBoxConfig {
-    show?: boolean;             // Default: true
-    position?: InfoBoxPosition; // Default: { top: 5, left: 5 }
-    show_background_detail?: boolean;  // Default: true - show background in detail view
-    show_background_overview?: boolean;  // Default: true - show background in overview
-    types?: {
-        motion?: InfoBoxTypeConfig;
-        occupancy?: InfoBoxTypeConfig;
-        temperature?: InfoBoxTypeConfig;
-        humidity?: InfoBoxTypeConfig;
-    }
+/**
+ * House-level default config for an element type.
+ * Matched by element.type; all other fields are baseline plan/element properties.
+ */
+export interface ElementDefaultConfig {
+    left?: string | number;
+    right?: string | number;
+    top?: string | number;
+    bottom?: string | number;
+    element: ElementConfig & { type: string };  // type is required for matching
 }
 
 export interface Room {
@@ -46,7 +38,6 @@ export interface Room {
     color?: string;  // Optional color for room background (supports rgba)
     elements_clickable_on_overview?: boolean;  // Default false - when true, elements are clickable and room is not
     disable_dynamic_color?: boolean;  // Default false - when true, room is transparent (no dynamic colors)
-    info_box?: InfoBoxConfig;  // Info box configuration for this room
 }
 
 export interface PlanConfig {
@@ -118,7 +109,6 @@ export interface RoomEntityCache {
     allEntityIds: string[];           // All entities (explicit + area)
     ambientLightIds: string[];        // Ambient light entity IDs
     areaEntityIds: string[];          // Cached area entities
-    infoBoxEntityIds: string[];       // For info box scanning (allEntityIds)
     // Used for dynamic color calculation
     motionSensorIds: string[];
     lightIds: string[];

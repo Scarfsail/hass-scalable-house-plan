@@ -256,28 +256,6 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                     </div>
                 </div>
 
-                <!-- Info Box Defaults Section -->
-                <div class="config-section collapsible-section">
-                    <div class="section-header ${this._expandedSections.has('infoBoxDefaults') ? 'expanded' : ''}" @click=${() => this._toggleSection('infoBoxDefaults')}>
-                        <div class="section-title">
-                            <ha-icon 
-                                icon="mdi:chevron-right" 
-                                class="expand-icon ${this._expandedSections.has('infoBoxDefaults') ? 'expanded' : ''}"
-                            ></ha-icon>
-                            <ha-icon icon="mdi:information-box"></ha-icon>
-                            ${this.localize('editor.info_box_defaults')}
-                        </div>
-                    </div>
-                    <div class="section-content ${this._expandedSections.has('infoBoxDefaults') ? 'expanded' : ''}">
-                        <ha-yaml-editor
-                            .hass=${this.hass}
-                            .value=${this._config.info_box_defaults || {}}
-                            auto-update
-                            @value-changed=${this._infoBoxDefaultsChanged}
-                        ></ha-yaml-editor>
-                    </div>
-                </div>
-
                 <!-- Rooms Section -->
                 <div class="config-section collapsible-section">
                     <div class="section-header ${this._expandedSections.has('rooms') ? 'expanded' : ''}" @click=${() => this._toggleSection('rooms')}>
@@ -1042,14 +1020,6 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                 <div class="color-swatch" style="background-color: ${value}" title="${value}"></div>
             </div>
         `;
-    }
-
-    private _infoBoxDefaultsChanged(ev: any): void {
-        this._config = {
-            ...this._config,
-            info_box_defaults: ev.detail.value
-        };
-        this._configChanged();
     }
 
     private _configChanged(): void {

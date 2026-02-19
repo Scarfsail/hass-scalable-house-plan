@@ -2,8 +2,8 @@ import { html, TemplateResult } from "lit-element";
 import { keyed } from "lit/directives/keyed.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import { DragController } from "../utils/drag-controller";
-import type { Room, EntityConfig, PositionScalingMode, InfoBoxConfig } from "../cards/types";
-import type { ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
+import type { Room, EntityConfig, PositionScalingMode, ElementDefaultConfig } from "../cards/types";
+import type { HouseCache } from "../cards/scalable-house-plan";
 import { CreateCardElement, getElementTypeForEntity, mergeElementProperties, getRoomEntities, getDefaultTapAction, getDefaultHoldAction, isEntityActionable, getAllRoomEntityIds, isGroupElementType } from "../utils";
 import { getOrCreateElementCard } from "../utils/card-element-cache";
 
@@ -67,10 +67,8 @@ export interface ElementRendererOptions {
     elementCards: Map<string, any>;
     scale: number;
     scaleRatio?: number;  // Element scaling ratio (0=no scale, 1=full scale with plan)
-    config?: ScalableHousePlanConfig;  // Optional: needed for info box defaults
     originalRoom?: Room;  // Optional: original room with all entities (for info box in overview mode)
-    infoBoxCache?: Map<string, EntityConfig | null>;  // Cache for info box entity configs
-    cachedInfoBoxEntityIds?: string[];  // Pre-computed entity IDs for info box (avoids expensive getAllRoomEntityIds call)
+    elementDefaults?: ElementDefaultConfig[];  // House-level element defaults (for three-tier merge)
     elementsClickable?: boolean;  // Whether elements should be clickable (controls pointer-events)
     houseCache: HouseCache;  // Element renderer caches (required)
     editorMode?: boolean;  // Interactive editor mode: enable click-to-select behavior
@@ -113,9 +111,12 @@ interface CachedElementStructure {
 
 /**
  * Generate unique key for no-entity elements based on type and position
- * Key format: 
+ * Key format:
  * - Groups: custom:group-shp-room{roomIndex}-element{elementIndex}
- * - Others: elementType-left-top-right-bottom-room_id-mode (mode only for info boxes)
+ * - Others: elementType-room{roomIndex}-left-top-right-bottom
+ *
+ * roomIndex is included so elements of the same type at the same position
+ * in different rooms don't share a key (e.g., two info-boxes at left:0,top:0).
  */
 export function generateElementKey(elementType: string, plan: any, roomIndex?: number, elementIndex?: number): string {
     // Use index-based keys for groups to prevent oscillation after drag
@@ -125,21 +126,15 @@ export function generateElementKey(elementType: string, plan: any, roomIndex?: n
     if (isGroup && roomIndex !== undefined && elementIndex !== undefined) {
         return `${elementType}-room${roomIndex}-element${elementIndex}`;
     }
-    
+
     // Use position-based keys for non-group elements
     const left = plan.left !== undefined ? String(plan.left) : 'undefined';
     const top = plan.top !== undefined ? String(plan.top) : 'undefined';
     const right = plan.right !== undefined ? String(plan.right) : 'undefined';
     const bottom = plan.bottom !== undefined ? String(plan.bottom) : 'undefined';
-    
-    // Include room_id if present (for info boxes to be unique per room)
-    const roomId = plan.element?.room_id ? `-${plan.element.room_id}` : '';
-    
-    // Include mode only for info boxes (they have mode-specific visibility settings)
-    const isInfoBox = elementType === 'custom:info-box-shp';
-    const mode = isInfoBox && plan.element?.mode ? `-${plan.element.mode}` : '';
-    
-    return `${elementType}-${left}-${top}-${right}-${bottom}${roomId}${mode}`;
+    const room = roomIndex !== undefined ? `-room${roomIndex}` : '';
+
+    return `${elementType}${room}-${left}-${top}-${right}-${bottom}`;
 }
 
 /**
@@ -153,7 +148,8 @@ export function generateElementKey(elementType: string, plan: any, roomIndex?: n
 function buildElementStructure(
     allEntities: EntityConfig[],
     hass: HomeAssistant,
-    roomIndex?: number
+    roomIndex?: number,
+    elementDefaults?: ElementDefaultConfig[]
 ): Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }> {
     return allEntities
         .filter((entityConfig: EntityConfig) => {
@@ -163,7 +159,7 @@ function buildElementStructure(
         .map((entityConfig: EntityConfig, elementIndex: number) => {
             const entity = typeof entityConfig === 'string' ? entityConfig : entityConfig.entity;
             const plan = typeof entityConfig === 'string' ? undefined : entityConfig.plan;
-            
+
             if (!plan) return null;
 
             // Validate no-entity elements
@@ -176,7 +172,7 @@ function buildElementStructure(
             const uniqueKey = entity || generateElementKey(plan.element?.type || 'unknown', plan, roomIndex, elementIndex);
 
             // Build element metadata (always fresh to avoid stale elementConfig)
-            const metadata = buildElementMetadata(entity, plan, hass);
+            const metadata = buildElementMetadata(entity, plan, hass, elementDefaults);
 
             return { entity, plan, elementConfig: metadata.elementConfig, uniqueKey };
         })
@@ -193,15 +189,40 @@ function buildElementStructure(
 function buildElementMetadata(
     entity: string,
     plan: any,
-    hass: HomeAssistant
+    hass: HomeAssistant,
+    elementDefaults?: ElementDefaultConfig[]
 ): ElementMetadata {
     const deviceClass = entity && hass?.states[entity]?.attributes?.device_class;
-    const defaultElement = entity 
+    const defaultElement = entity
         ? getElementTypeForEntity(entity, deviceClass, 'plan')
         : { type: plan.element!.type as string };
-    
-    // Merge default properties with user overrides
-    const elementConfig = mergeElementProperties(defaultElement, plan.element || {});
+
+    // Resolve the element type (user-specified or auto-detected)
+    const resolvedType = plan.element?.type || defaultElement.type;
+
+    // Three-tier merge: tier1 (element_defaults) < tier2 (auto-mapped) < tier3 (user plan)
+    let elementConfig: any;
+    if (elementDefaults?.length) {
+        const matching = elementDefaults.find(d => d.element?.type === resolvedType);
+        if (matching) {
+            // Extract element properties from defaults, excluding 'type' (used only for matching)
+            const { type: _t, ...defaultsElementProps } = matching.element;
+
+            if (plan.element?.type) {
+                // User specified explicit type → skip tier 2 (auto-mapping)
+                // Merge: tier1 (defaults) + tier3 (user)  — tier3 wins per-key
+                elementConfig = { ...defaultsElementProps, ...plan.element };
+            } else {
+                // Auto-detected type → all three tiers
+                // Merge: tier1 < tier2 < tier3
+                elementConfig = { ...defaultsElementProps, ...defaultElement, ...(plan.element || {}) };
+            }
+        } else {
+            elementConfig = mergeElementProperties(defaultElement, plan.element || {});
+        }
+    } else {
+        elementConfig = mergeElementProperties(defaultElement, plan.element || {});
+    }
 
     // Add default tap_action and hold_action for entities (if not already set by user)
     if (entity && isEntityActionable(entity, hass)) {
@@ -212,7 +233,7 @@ function buildElementMetadata(
             elementConfig.hold_action = getDefaultHoldAction();
         }
     }
-    
+
     return {
         defaultElement,
         elementConfig,
@@ -719,11 +740,11 @@ function renderEditableElements(
  * - scaleRatio = 0.25 (default): elements scale 25% of plan scaling
  */
 export function renderElements(options: ElementRendererOptions): unknown[] {
-    const { hass, room, roomBounds, scale, scaleRatio = 0, config, originalRoom, infoBoxCache, cachedInfoBoxEntityIds, houseCache, editorMode = false, roomIndex = 0 } = options;
-    
+    const { hass, room, roomBounds, scale, scaleRatio = 0, originalRoom, elementDefaults, houseCache, editorMode = false, roomIndex = 0 } = options;
+
     // Extract position cache from HouseCache (only cache kept - self-invalidating via key)
     const posCache = houseCache.position;
-    
+
     // Calculate element scale: 1 + (planScale - 1) * scaleRatio
     // When scale=5, ratio=0.5: elementScale = 1 + 4*0.5 = 3
     // When scale=5, ratio=0: elementScale = 1 (no scaling)
@@ -733,17 +754,26 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
     // Generate bounds key for position cache
     const boundsKey = getBoundsKey(roomBounds);
 
-    // Add info box element if enabled
     const isOverview = !!originalRoom;
     const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
     const roomForInfoBox = originalRoom || room;
-    const infoBoxEntity = getOrCreateInfoBoxEntity(roomForInfoBox, config, hass, mode, infoBoxCache, cachedInfoBoxEntityIds);
-    
-    const allEntities = infoBoxEntity ? [...(room.entities || []), infoBoxEntity] : (room.entities || []);
 
     // Build element structure fresh each render
     // NOT cached: plan references go stale after drag-drop position changes
-    const elements = buildElementStructure(allEntities, hass, roomIndex);
+    const elements = buildElementStructure(room.entities || [], hass, roomIndex, elementDefaults);
+
+    // Auto-inject runtime properties for info-box elements.
+    // These cannot be user-configured because they are computed at render time.
+    for (const el of elements) {
+        if (el.elementConfig?.type === 'custom:info-box-shp') {
+            el.elementConfig.room_entities = getAllRoomEntityIds(hass, roomForInfoBox, null);
+            el.elementConfig.mode = mode;
+            // Compute mode-specific show_background from user config properties
+            const showBgOverview = el.elementConfig.show_background_overview ?? true;
+            const showBgDetail = el.elementConfig.show_background_detail ?? true;
+            el.elementConfig.show_background = mode === 'overview' ? showBgOverview : showBgDetail;
+        }
+    }
 
     // Route to appropriate render path based on editor mode
     // Normal view: Zero editor overhead (no drag, no selection, no click handlers)
@@ -840,113 +870,10 @@ export function getRoomBounds(room: Room): { minX: number; minY: number; maxX: n
 }
 
 /**
- * Get or create cached info box entity config
- * @param room - The room to create info box for
- * @param config - House plan config (for defaults)
- * @param hass - Home Assistant instance
- * @param mode - Current view mode
- * @param cache - Optional cache map for info box configs
- * @param cachedEntityIds - Pre-computed entity IDs (avoids expensive getAllRoomEntityIds call)
- * @returns EntityConfig for info box or null if disabled
- */
-function getOrCreateInfoBoxEntity(
-    room: Room, 
-    config: ScalableHousePlanConfig | undefined, 
-    hass: HomeAssistant, 
-    mode: 'overview' | 'detail',
-    cache?: Map<string, EntityConfig | null>,
-    cachedEntityIds?: string[]
-): EntityConfig | null {
-    // Generate cache key: room name + mode
-    const cacheKey = `${room.name}-${mode}`;
-    
-    // Check cache first
-    if (cache?.has(cacheKey)) {
-        return cache.get(cacheKey) || null;
-    }
-    
-    // Create info box entity (expensive operation)
-    const infoBoxEntity = createInfoBoxEntity(room, config, hass, mode, cachedEntityIds);
-    
-    // Store in cache if available
-    if (cache) {
-        cache.set(cacheKey, infoBoxEntity);
-    }
-    
-    return infoBoxEntity;
-}
-
-/**
- * Create info box entity config if info box is enabled for the room
- * @param room - The room to create info box for
- * @param config - House plan config (for defaults)
- * @param hass - Home Assistant instance
- * @param mode - Current view mode
- * @param cachedEntityIds - Pre-computed entity IDs (avoids expensive getAllRoomEntityIds call)
- * @returns EntityConfig for info box or null if disabled
- */
-/**
  * Cleanup all drag controllers. Call when editor mode is disabled or component unmounts.
  */
 export function cleanupDragControllers(): void {
     dragControllers.forEach(controller => controller.detach());
     dragControllers.clear();
-}
-
-function createInfoBoxEntity(room: Room, config: ScalableHousePlanConfig | undefined, hass: HomeAssistant, mode: 'overview' | 'detail', cachedEntityIds?: string[]): EntityConfig | null {
-    // Merge defaults: code default -> house config -> room config
-    const codeDefault: InfoBoxConfig = {
-        show: true,
-        position: { top: 5, left: 5 },
-        show_background_detail: true,
-        show_background_overview: true,
-        types: {}
-    };
-    
-    const houseDefaults = config?.info_box_defaults || {};
-    const roomConfig = room.info_box || {};
-    
-    // Merge configs (room overrides house, house overrides code defaults)
-    const merged: InfoBoxConfig = {
-        show: roomConfig.show !== undefined ? roomConfig.show : (houseDefaults.show !== undefined ? houseDefaults.show : codeDefault.show),
-        position: roomConfig.position || houseDefaults.position || codeDefault.position,
-        show_background_detail: roomConfig.show_background_detail ?? houseDefaults.show_background_detail ?? codeDefault.show_background_detail,
-        show_background_overview: roomConfig.show_background_overview ?? houseDefaults.show_background_overview ?? codeDefault.show_background_overview,
-        types: {
-            ...codeDefault.types,
-            ...houseDefaults.types,
-            ...roomConfig.types
-        }
-    };
-    
-    // Don't create if disabled
-    if (merged.show === false) {
-        return null;
-    }
-    
-    // Determine if background should be shown for current mode
-    const showBackground = mode === 'overview' ? merged.show_background_overview : merged.show_background_detail;
-    
-    // Use cached entity IDs if provided, otherwise fall back to expensive getAllRoomEntityIds call
-    const roomEntityIds = cachedEntityIds || getAllRoomEntityIds(hass, room, null);
-    
-    // Create element config for info box
-    // Add room name to make unique key for each room's info box
-    const pos = merged.position!;
-    return {
-        entity: '', // No entity (info box looks up entities itself)
-        plan: {
-            overview: true,  // Show on overview
-            ...pos,  // Spread position properties (top, left, right, bottom)
-            element: {
-                type: 'custom:info-box-shp',
-                room_entities: roomEntityIds,
-                mode: mode,  // Pass current mode
-                show_background: showBackground,  // Pass mode-specific background visibility
-                types: merged.types,
-                room_id: room.name  // Unique identifier per room
-            }
-        }
-    };
 }
 

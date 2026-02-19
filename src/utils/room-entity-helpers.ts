@@ -150,7 +150,7 @@ export function collectAllEntityConfigs(
  * @param hass - HomeAssistant instance
  * @param room - Room configuration
  * @param areaEntityIds - Cached area entity IDs (optional, will fetch if not provided)
- * @returns Set of entity IDs that should be shown in info box (empty if info box is disabled)
+ * @returns Set of entity IDs that match info box sensor types (motion/occupancy/temperature/humidity)
  */
 export function getInfoBoxEntityIds(
     hass: HomeAssistant,
@@ -158,13 +158,7 @@ export function getInfoBoxEntityIds(
     areaEntityIds: string[] | null = null
 ): Set<string> {
     const infoBoxEntityIds = new Set<string>();
-    
-    // Check if info box is enabled (show by default if not explicitly disabled)
-    const infoBoxEnabled = room.info_box?.show !== false;
-    if (!infoBoxEnabled) {
-        return infoBoxEntityIds;
-    }
-    
+
     // Get area entities if not provided
     const areaIds = areaEntityIds !== null 
         ? areaEntityIds 
