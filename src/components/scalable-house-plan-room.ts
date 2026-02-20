@@ -697,7 +697,7 @@ export class ScalableHousePlanRoom extends LitElement {
                         .roomIndex=${this.roomIndex ?? 0}
                         .scale=${scale}
                         .roomBounds=${roomBounds}
-                        .selectedPointIndex=${this.selectedBoundaryPointIndex}
+                        .selectedPointIndex=${this.selectedBoundaryPointIndex ?? null}
                     ></boundary-handles-shp>
                 ` : ''}
                 <div class="elements-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
