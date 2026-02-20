@@ -45,30 +45,33 @@ This document tracks the incremental fix progress for the performance issues fou
 
 ---
 
-### Fix 3 — Debounce `onResize` (Issue 7) — NEXT
+### Fix 3 — Debounce `onResize` (Issue 7) ✅ DONE
 - **File:** `src/cards/scalable-house-plan.ts`
 - **Problem:** `ResizeObserver` fires continuously during window resize (~60/s). Each callback calls `requestUpdate()` with no debounce, causing full re-renders of the card and all children.
 - **Fix:** Add a 100ms debounce timer. Clear old timer on each call. Also clear timer in `disconnectedCallback()`.
 - **Regression risk:** 100ms delay before card layout updates during resize. Acceptable. No functional regression.
 - **Notes:** The root card's ResizeObserver is what observes the HA app div, not the card itself. The debounce must ensure the timer is cleared properly on disconnect.
+- **Status:** COMMITTED (part of `perf: fix performance degradation over time (5 issues)`)
 
 ---
 
-### Fix 4 — Fix `requestUpdate` in `render()` in detail view (Issue 6)
+### Fix 4 — Fix `requestUpdate` in `render()` in detail view (Issue 6) ✅ DONE
 - **File:** `src/cards/scalable-house-plan-detail.ts`
 - **Problem:** `hasViewportChanged()` and `this.requestUpdate()` called inside `_renderRoomDetail()` (which is called from `render()`). Scheduling a new render from within render() creates unnecessary extra cycles on viewport change.
 - **Fix:** Move the viewport change check from `render()` to a `willUpdate()` override.
 - **Notes:** The overview has a similar issue in `willUpdate()` but calling `requestUpdate()` inside `willUpdate()` is less harmful than from `render()`. The overview fix can come later or be skipped since ResizeObserver on root card already handles resize. The detail's `render()` call is clearly wrong and should be fixed.
 - **Regression risk:** Low. The root card's ResizeObserver already handles resize events. The extra `requestUpdate()` in render was a safety net.
+- **Status:** COMMITTED (part of `perf: fix performance degradation over time (5 issues)`)
 
 ---
 
-### Fix 5 — Store unsubscribe from `subscribeRenderTemplate` (Issue 5)
+### Fix 5 — Store unsubscribe from `subscribeRenderTemplate` (Issue 5) ✅ DONE
 - **File:** `src/elements/base/element-base.ts`
 - **Problem:** `subscribeRenderTemplate` discards the returned unsubscribe function, causing WebSocket subscriptions to leak if any element uses this method.
 - **Fix:** Store returned unsubscribe functions in a `_templateUnsubscribers` array. Call all in `disconnectedCallback()`.
 - **Notes:** Currently no element uses this method, so this is a latent fix. Safe to implement now.
 - **Regression risk:** None. Adds cleanup that was missing.
+- **Status:** COMMITTED (part of `perf: fix performance degradation over time (5 issues)`)
 
 ---
 
@@ -88,7 +91,11 @@ This document tracks the incremental fix progress for the performance issues fou
 
 ## Current Status
 
-**Next fix:** Fix 3 — Debounce `onResize`
+**All priority fixes complete.** Fixes 1–5 committed in `45afbf8`.
+
+**Remaining (low-priority, editor-only):**
+- Fix 6 (action-handler mousemove early exit) — already implemented in existing code, no action needed.
+- Fix 7 (cleanupDragControllers never called) — editor-only memory issue, deferred.
 
 ---
 
