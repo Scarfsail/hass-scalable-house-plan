@@ -7,6 +7,7 @@ import { getAreaEntities, getAllRoomEntityIds, analyzeRoomEntities, isGroupShp }
 import "./scalable-house-plan-overview";
 import "./scalable-house-plan-detail";
 import "./scalable-house-plan-entities";
+import { cleanupDragControllers } from "../components/element-renderer-shp";
 import type {
     PositionScalingMode,
     ElementDefaultConfig,
@@ -208,6 +209,15 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         }
     }
 
+    updated(changedProperties: Map<string | number | symbol, unknown>) {
+        super.updated(changedProperties);
+
+        // Clean up drag controllers when editor mode is turned off
+        if (changedProperties.has('_editorMode') && changedProperties.get('_editorMode') === true && !this._editorMode) {
+            cleanupDragControllers();
+        }
+    }
+
     /**
      * Compute and cache entity IDs for all rooms
      * This expensive operation runs once when config changes, not on every render
@@ -406,6 +416,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             clearTimeout(this._resizeTimer);
             this._resizeTimer = undefined;
         }
+        cleanupDragControllers();
         super.disconnectedCallback();
 
         // Remove popstate listener
