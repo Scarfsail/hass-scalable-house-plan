@@ -143,6 +143,8 @@ export class ScalableHousePlanDetail extends LitElement {
         // Clear element cache when room changes
         if (changedProperties.has('room')) {
             this._elementCards.clear();
+        }
+        if (changedProperties.has('room') || changedProperties.has('roomEntityCache')) {
             this._calculateEntitiesNotOnDetail();
         }
     }
@@ -153,8 +155,9 @@ export class ScalableHousePlanDetail extends LitElement {
             return;
         }
 
-        // Get area entities (empty array if no area)
-        const areaEntityIds = this.room.area ? getAreaEntities(this.hass, this.room.area) : [];
+        // Use cached area entity IDs from parent (avoid live scan)
+        const areaEntityIds = this.roomEntityCache?.get(this.room.name)?.areaEntityIds
+            ?? (this.room.area ? getAreaEntities(this.hass, this.room.area) : []);
         
         // Use shared utility function to get count
         this._entitiesNotOnDetailCount = getEntitiesNotOnDetailCount(this.hass, this.room, areaEntityIds);

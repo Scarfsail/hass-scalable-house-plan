@@ -194,18 +194,29 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             this._selectedElementKey = config._selectedElementKey || null;
             this._selectedBoundaryPointIndex = config._selectedBoundaryPointIndex ?? null;
         }
+
+        // Recompute entity cache immediately when config changes and hass is already available
+        // (covers config re-saves; initial load is handled by willUpdate on first hass assignment)
+        if (this.hass) {
+            this._computeRoomEntityCaches();
+        }
     }
 
     /**
-     * Lifecycle hook - compute entity caches when config or hass changes
+     * Lifecycle hook - compute entity caches when hass is first set or entity registry changes
      */
     willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
         super.willUpdate(changedProperties);
 
-        // Recompute entity cache when config changes (rooms, areas, entities)
-        // Don't need to invalidate on hass changes - cache contains IDs only, not state
-        if (changedProperties.has('config') && this.config && this.hass) {
-            this._computeRoomEntityCaches();
+        // Recompute entity cache on:
+        //   - First hass assignment (initial card load; config already set via setConfig)
+        //   - Entity/device registry change (entity reassigned to different area in HA UI)
+        // Does NOT run on normal state updates (hass.states changes) — entities/devices refs are stable
+        if (changedProperties.has('hass') && this.config && this.hass) {
+            const prevHass = changedProperties.get('hass') as HomeAssistant | undefined;
+            if (!prevHass || prevHass.entities !== this.hass.entities || prevHass.devices !== this.hass.devices) {
+                this._computeRoomEntityCaches();
+            }
         }
     }
 

@@ -475,6 +475,7 @@ export class ScalableHousePlanRoom extends LitElement {
             scale: scale.scaleX,
             scaleRatio: 0,  // Overview: no element scaling
             originalRoom: this.room,  // Pass original room for info box entity detection
+            roomEntityIds: this.cachedEntityIds?.allEntityIds,  // Pre-computed entity IDs (avoids live getAreaEntities scan)
             elementDefaults: this.config?.element_defaults,
             elementsClickable,  // Control element clickability
             houseCache: this.houseCache,
@@ -599,6 +600,7 @@ export class ScalableHousePlanRoom extends LitElement {
             elementCards: this.elementCards,
             scale,
             scaleRatio,
+            roomEntityIds: this.cachedEntityIds?.allEntityIds,  // Pre-computed entity IDs (avoids live getAreaEntities scan)
             elementDefaults: this.config?.element_defaults,
             elementsClickable: true,  // Elements always clickable in detail view
             houseCache: this.houseCache,

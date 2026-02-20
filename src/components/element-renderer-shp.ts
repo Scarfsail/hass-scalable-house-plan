@@ -76,6 +76,7 @@ export interface ElementRendererOptions {
     selectedElementKey?: string | null;  // Currently selected element uniqueKey
     onElementClick?: (uniqueKey: string, elementIndex: number, entity: string, parentGroupKey?: string) => void;  // Click callback for element selection
     roomIndex?: number;  // Room index for drag event
+    roomEntityIds?: string[];  // Pre-computed entity IDs for the room (avoids getAllRoomEntityIds call)
 }
 
 /**
@@ -778,7 +779,7 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
     // These cannot be user-configured because they are computed at render time.
     for (const el of elements) {
         if (el.elementConfig?.type === 'custom:info-box-shp') {
-            el.elementConfig.room_entities = getAllRoomEntityIds(hass, roomForInfoBox, null);
+            el.elementConfig.room_entities = options.roomEntityIds ?? getAllRoomEntityIds(hass, roomForInfoBox, null);
             el.elementConfig.mode = mode;
             // Compute mode-specific show_background from user config properties
             const showBgOverview = el.elementConfig.show_background_overview ?? true;
