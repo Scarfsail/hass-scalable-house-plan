@@ -82,23 +82,29 @@ This document tracks the incremental fix progress for the performance issues fou
 
 ---
 
-### Fix 7 — `cleanupDragControllers()` never called (Issue 8, editor-only)
-- **File:** `src/components/element-renderer-shp.ts`
+### Fix 7 — `cleanupDragControllers()` never called (Issue 8, editor-only) ✅ DONE
+- **File:** `src/cards/scalable-house-plan.ts`
 - **Problem:** Module-level Maps accumulate state for rooms that no longer exist. The `cleanupDragControllers` function is exported but never called.
-- **Notes:** Editor-only issue, low runtime impact. Deferred until after higher-priority fixes.
+- **Fix:** Import `cleanupDragControllers` in the root card. Call it in `disconnectedCallback()` and in a new `updated()` hook when `_editorMode` transitions from `true` to `false`.
+- **Regression risk:** None. Pure cleanup path.
+- **Status:** COMMITTED (`perf(editor): call cleanupDragControllers on disconnect and editor mode exit`)
 
 ---
 
 ## Current Status
 
-**All priority fixes complete.** Fixes 1–5 committed in `45afbf8`.
+**All fixes complete.** Every issue from the analysis has been addressed or confirmed already handled.
 
-**Remaining (low-priority, editor-only):**
-- Fix 6 (action-handler mousemove early exit) — already implemented in existing code, no action needed.
-- Fix 7 (cleanupDragControllers never called) — editor-only memory issue, deferred.
+- Fix 1–5: COMMITTED in `45afbf8`
+- Fix 6: Already implemented in existing code, no action needed.
+- Fix 7: COMMITTED in `26e7bc8`
 
 ---
 
 ## Session Prompt Template
 
 > Read `docs/bugs/performance/performance_issue_fixing.md` for the current fix plan and progress. Continue with the next fix listed as "NEXT". Follow the workflow: check the code, analyze regressions, implement, tell me what to test, then after confirmation commit and update the doc.
+
+---
+
+*All performance fixes complete as of 2026-02-20.*
