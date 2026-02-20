@@ -373,6 +373,14 @@ function calculatePositionStyles(
 }
 
 /**
+ * Maximum number of entries in the position cache.
+ * Each distinct zoom level creates new entries (key includes scale.toFixed(2)).
+ * When exceeded, the entire cache is cleared to reclaim memory.
+ * At ~10 elements per room and 10 rooms, this allows ~10 distinct zoom levels before eviction.
+ */
+const MAX_POSITION_CACHE_SIZE = 1000;
+
+/**
  * Get or create cached position data for an element
  * Shared helper to avoid duplication between render paths
  */
@@ -388,13 +396,17 @@ function preparePositionData(
 ): PositionCache {
     const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, boundsKey, plan);
     let positionData = posCache.get(positionCacheKey);
-    
+
     if (!positionData) {
+        // Evict entire cache when it exceeds the size limit to prevent unbounded zoom growth
+        if (posCache.size >= MAX_POSITION_CACHE_SIZE) {
+            posCache.clear();
+        }
         // Cache miss - calculate and store
         positionData = calculatePositionStyles(plan, scale, scaleRatio, roomBounds, elementScale);
         posCache.set(positionCacheKey, positionData);
     }
-    
+
     return positionData;
 }
 

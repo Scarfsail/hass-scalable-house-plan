@@ -74,6 +74,7 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedRelativePoints?: string;
     private _cachedOverviewRoom?: Room;
     private _cachedClipId?: string;  // Clip path ID for detail mode
+    private _prevColorKey?: string;  // Memoization key for _updateDynamicColor
     
     // Cached entity IDs (computed once when room changes, used with fresh hass.states lookups)
     private _cachedEntityIds?: {
@@ -122,8 +123,10 @@ export class ScalableHousePlanRoom extends LitElement {
             if (!this.cachedEntityIds) {
                 this._computeEntityIdCache();
             }
+            // Room changed: force full color recalculation (gradient ID and center depend on room)
+            this._prevColorKey = undefined;
         }
-        
+
         // Update cached entity IDs when parent provides new cache
         if (changedProperties.has('cachedEntityIds') && this.cachedEntityIds) {
             this._cachedEntityIds = {
@@ -133,10 +136,12 @@ export class ScalableHousePlanRoom extends LitElement {
                 lights: this.cachedEntityIds.lightIds,
                 occupancySensors: this.cachedEntityIds.occupancySensorIds
             };
+            // Entity IDs changed: force full color recalculation
+            this._prevColorKey = undefined;
         }
-        
-        // Update dynamic colors when hass changes
-        if (changedProperties.has('hass')) {
+
+        // Update dynamic colors when hass or room changes
+        if (changedProperties.has('hass') || changedProperties.has('room')) {
             this._updateDynamicColor();
         }
     }
@@ -301,28 +306,36 @@ export class ScalableHousePlanRoom extends LitElement {
 
     /**
      * Update dynamic room color based on current entity states
+     * Memoized: skips all @state assignments when color/type/activeLightColor are unchanged,
+     * preventing LitElement re-renders on every unrelated HA entity update.
      */
     private _updateDynamicColor(): void {
         if (!this.hass || !this.room || !this._cachedRoomBounds || !this._cachedEntityIds) return;
-        
+
         // Calculate color using cached entity IDs and timestamp-based delay checking
-        this._currentColor = calculateDynamicRoomColor(
+        const newColor = calculateDynamicRoomColor(
             this.hass,
             this.room,
             this.config,
             this._cachedEntityIds
         );
-        
-        // Track motion detection state for animation
-        this._hasMotion = this._currentColor.type === 'motion';
-        
-        // Check if both motion and lights are active to use configured light color for motion layer
-        this._activeLightColor = undefined;
-        if (this._hasMotion && this._currentColor.activeTypes.includes('lights')) {
-            // Use the configured light color (the same color shown when only light is active)
-            this._activeLightColor = this.config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.20)';
-        }
-        
+
+        // Compute derived values before comparing
+        const newHasMotion = newColor.type === 'motion';
+        const newActiveLightColor = (newHasMotion && newColor.activeTypes.includes('lights'))
+            ? (this.config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.20)')
+            : undefined;
+
+        // Memoization: skip re-render if nothing visually changed
+        const newColorKey = `${newColor.type}|${newColor.color}|${newActiveLightColor ?? ''}`;
+        if (newColorKey === this._prevColorKey) return;
+        this._prevColorKey = newColorKey;
+
+        // Assign @state() properties (triggers LitElement re-render)
+        this._currentColor = newColor;
+        this._hasMotion = newHasMotion;
+        this._activeLightColor = newActiveLightColor;
+
         // Create gradient if not transparent
         if (this._currentColor.type !== 'transparent') {
             const center = calculatePolygonCenter(this.room.boundary);

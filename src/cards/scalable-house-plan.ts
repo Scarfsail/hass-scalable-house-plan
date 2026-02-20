@@ -76,9 +76,12 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     // Performance optimization: Cache entity IDs per room to avoid expensive lookups
     private _roomEntityCache: Map<string, RoomEntityCache> = new Map();
-    
+
     // Element renderer caches (shared across all views and rooms)
     private _houseCache: HouseCache = new HouseCache();
+
+    // Debounce timer for resize events
+    private _resizeTimer?: number;
 
     @property({ attribute: false }) hass?: HomeAssistant;
 
@@ -398,6 +401,11 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     disconnectedCallback() {
         this.resizeObserver.disconnect();
+        // Clear any pending resize debounce timer
+        if (this._resizeTimer !== undefined) {
+            clearTimeout(this._resizeTimer);
+            this._resizeTimer = undefined;
+        }
         super.disconnectedCallback();
 
         // Remove popstate listener
@@ -405,7 +413,15 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     onResize() {
-        this.requestUpdate();
+        // Debounce resize events: ResizeObserver fires ~60/s during window drag.
+        // Only trigger a re-render 100ms after the last resize event.
+        if (this._resizeTimer !== undefined) {
+            clearTimeout(this._resizeTimer);
+        }
+        this._resizeTimer = window.setTimeout(() => {
+            this._resizeTimer = undefined;
+            this.requestUpdate();
+        }, 100);
     }
 
     public static async getConfigElement(): Promise<LovelaceCardEditor> {

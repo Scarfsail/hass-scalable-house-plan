@@ -128,9 +128,18 @@ export class ScalableHousePlanDetail extends LitElement {
         this._createCardElement = await getCreateCardElement();
     }
 
+    willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
+        super.willUpdate(changedProperties);
+        // Detect viewport changes and schedule a follow-up render if dimensions changed.
+        // Must be in willUpdate (not render) to avoid scheduling new renders mid-render.
+        if (hasViewportChanged(this.previousViewport)) {
+            this.requestUpdate();
+        }
+    }
+
     updated(changedProperties: Map<string, any>) {
         super.updated(changedProperties);
-        
+
         // Clear element cache when room changes
         if (changedProperties.has('room')) {
             this._elementCards.clear();
@@ -194,10 +203,6 @@ export class ScalableHousePlanDetail extends LitElement {
 
         const fitIntoHeight = clientRect.height - 60; // Subtract header height
         const fitIntoWidth = clientRect.width;
-
-        if (hasViewportChanged(this.previousViewport)) {
-            this.requestUpdate();
-        }
 
         // Calculate uniform scale (maintain aspect ratio)
         const scaleX = fitIntoWidth / contentWidth;

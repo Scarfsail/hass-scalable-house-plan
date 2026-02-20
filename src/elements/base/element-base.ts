@@ -30,6 +30,16 @@ export abstract class ElementBase<TConfig extends ElementBaseConfig = ElementBas
 
     @state() protected _config?: TConfig;
 
+    private _templateUnsubscribers: Array<() => unknown> = [];
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        for (const unsub of this._templateUnsubscribers) {
+            unsub();
+        }
+        this._templateUnsubscribers = [];
+    }
+
     async setConfig(config: TConfig) {
         this._config = config;
 
@@ -51,7 +61,10 @@ export abstract class ElementBase<TConfig extends ElementBaseConfig = ElementBas
             return;
         }
 
-        await subscribeRenderTemplate(this.hass.connection, template, onChange);
+        const unsub = await subscribeRenderTemplate(this.hass.connection, template, onChange);
+        if (unsub) {
+            this._templateUnsubscribers.push(unsub);
+        }
     }
     protected evalJsTemplate(jsTemplate: string, entity?: HassEntity): string {
         if (!jsTemplate)
