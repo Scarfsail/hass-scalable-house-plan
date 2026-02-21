@@ -1,5 +1,5 @@
-import { LitElement, html, css } from "lit-element";
-import { customElement, property, state } from "lit/decorators.js";
+import { LitElement, html, css, PropertyValues } from "lit-element";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { Room } from "../types";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
@@ -18,6 +18,12 @@ export class EditorRoomShp extends LitElement {
     @state() private _yamlMode = false;
     @state() private _previewDetailView = false;
     private _localize?: LocalizeFunction;
+
+    // @ts-ignore — ha-yaml-editor is defined at runtime by HA frontend
+    @query('ha-yaml-editor') private _yamlEditor?: any;
+
+    /** True while we are dispatching a room-update event from the YAML editor */
+    private _yamlSelfUpdate = false;
 
     private get localize(): LocalizeFunction {
         if (!this._localize) {
@@ -109,6 +115,17 @@ export class EditorRoomShp extends LitElement {
         `
     ];
 
+    protected updated(changedProperties: PropertyValues): void {
+        super.updated(changedProperties);
+        // When switching to YAML mode, or when room prop changes externally while in YAML mode,
+        // initialize/sync the editor — but not when we triggered the change ourselves
+        const yamlModeJustEnabled = changedProperties.has('_yamlMode') && this._yamlMode;
+        const roomChangedExternally = changedProperties.has('room') && !this._yamlSelfUpdate;
+        if (this._yamlMode && (yamlModeJustEnabled || roomChangedExternally)) {
+            this._yamlEditor?.setValue(this.room || {});
+        }
+    }
+
     protected render() {
         return html`
             <div class="room-container">
@@ -147,8 +164,6 @@ export class EditorRoomShp extends LitElement {
                         ${this._yamlMode ? html`
                             <ha-yaml-editor
                                 .hass=${this.hass}
-                                .value=${this.room}
-                                auto-update
                                 @value-changed=${this._roomYamlChanged}
                             ></ha-yaml-editor>
                         ` : html`
@@ -393,8 +408,13 @@ export class EditorRoomShp extends LitElement {
     }
 
     private _roomYamlChanged(e: CustomEvent) {
-        const updatedRoom = e.detail.value as Room;
-        this._dispatchUpdate(updatedRoom);
+        if (!e.detail.isValid) return;
+        const value = e.detail.value;
+        // Don't propagate non-plain-object values (bare strings, arrays, null)
+        if (value !== undefined && (typeof value !== 'object' || value === null || Array.isArray(value))) return;
+        this._yamlSelfUpdate = true;
+        this._dispatchUpdate(value as Room);
+        Promise.resolve().then(() => { this._yamlSelfUpdate = false; });
     }
 
     private _toggleSection(section: string): void {
