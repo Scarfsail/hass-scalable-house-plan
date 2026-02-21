@@ -203,9 +203,13 @@ export class EditorElementShp extends LitElement {
         planSection: Omit<PlanConfig, 'element'>, 
         elementSection: ElementConfig
     ): PlanConfig {
-        const result: PlanConfig = { ...planSection };
-        if (elementSection && Object.keys(elementSection).length > 0) {
-            result.element = elementSection;
+        // Guard: spreading a non-plain-object (e.g. YAML scalar string, null, array) corrupts config
+        const isPlainObj = (v: unknown) => typeof v === 'object' && v !== null && !Array.isArray(v);
+        const safePlan = isPlainObj(planSection) ? planSection : {};
+        const result: PlanConfig = { ...safePlan };
+        const safeElement = isPlainObj(elementSection) ? elementSection : {};
+        if (Object.keys(safeElement).length > 0) {
+            result.element = safeElement;
         }
         return result;
     }
@@ -457,12 +461,18 @@ export class EditorElementShp extends LitElement {
     }
 
     private _onPlanSectionChanged(ev: CustomEvent) {
-        this._planSectionConfig = ev.detail.value;
+        const value = ev.detail.value;
+        // Guard against non-plain-object values (null, arrays, primitives)
+        if (value !== undefined && (typeof value !== 'object' || value === null || Array.isArray(value))) return;
+        this._planSectionConfig = value;
         this._updateFullConfig();
     }
 
     private _onElementSectionChanged(ev: CustomEvent) {
-        this._elementSectionConfig = ev.detail.value;
+        const value = ev.detail.value;
+        // Guard against non-plain-object values (null, arrays, primitives)
+        if (value !== undefined && (typeof value !== 'object' || value === null || Array.isArray(value))) return;
+        this._elementSectionConfig = value;
         this._updateFullConfig();
     }
 
@@ -480,7 +490,6 @@ export class EditorElementShp extends LitElement {
         const updatedEntity = isEmpty 
             ? { entity: entityId }
             : { entity: entityId, plan: fullPlan };
-        
         this._dispatchUpdate(updatedEntity);
     }
 
