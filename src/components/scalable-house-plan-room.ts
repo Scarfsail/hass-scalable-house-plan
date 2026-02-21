@@ -312,6 +312,20 @@ export class ScalableHousePlanRoom extends LitElement {
     private _updateDynamicColor(): void {
         if (!this.hass || !this.room || !this._cachedRoomBounds || !this._cachedEntityIds) return;
 
+        // Dashboard rooms never use dynamic color overlays — always transparent
+        if (this.room.show_as_dashboard) {
+            const newColorKey = 'dashboard';
+            if (newColorKey !== this._prevColorKey) {
+                this._prevColorKey = newColorKey;
+                this._currentColor = { type: 'transparent', color: 'transparent', activeTypes: [] };
+                this._currentGradient = undefined;
+                this._currentGradientInverted = undefined;
+                this._hasMotion = false;
+                this._activeLightColor = undefined;
+            }
+            return;
+        }
+
         // Calculate color using cached entity IDs and timestamp-based delay checking
         const newColor = calculateDynamicRoomColor(
             this.hass,
@@ -442,6 +456,68 @@ export class ScalableHousePlanRoom extends LitElement {
     }
 
     /**
+     * Render the dashboard background SVG fragment (black fill + bezel + edge glow).
+     * Uses ONLY direct SVG attribute values (no <defs>, no url() references) because
+     * SVG url(#id) references don't resolve reliably in LitElement Shadow DOM.
+     * The glare effect is rendered separately via CSS (see _renderDashboardGlare).
+     *
+     * @param points - Room boundary polygon points string (already scaled/offset)
+     * @param opacity - Overall opacity 0–1 (1.0 in detail, variable in overview)
+     */
+    private _renderDashboardBackground(points: string, opacity: number): TemplateResult {
+        return svg`
+            <g opacity="${opacity}">
+                <!-- Deep black screen fill — no strokes; all edge depth comes from CSS shadows -->
+                <polygon points="${points}" fill="#060610" stroke="none" pointer-events="none" />
+            </g>
+        `;
+    }
+
+    /**
+     * Render the dashboard CSS overlay (glare + drop shadow) as an HTML div.
+     * Uses CSS radial-gradient and clip-path (works reliably in Shadow DOM, unlike SVG defs).
+     *
+     * @param opacity - Overall opacity 0–1 (1.0 in detail, variable in overview)
+     */
+    private _renderDashboardGlare(opacity: number): TemplateResult {
+        if (!this._cachedRoomBounds) return html``;
+
+        const bounds = this._cachedRoomBounds;
+        const glareType = this.room.dashboard_glare ?? 'top-center';
+
+        // CSS polygon clip-path with percentage values (works for any room shape)
+        const clipPath = `polygon(${this.room.boundary
+            .map(p => `${((p[0] - bounds.minX) / bounds.width * 100).toFixed(2)}% ${((p[1] - bounds.minY) / bounds.height * 100).toFixed(2)}%`)
+            .join(', ')})`;
+
+        // Glare gradient position depends on type
+        let gradient: string;
+        if (glareType === 'full') {
+            const center = calculatePolygonCenter(this.room.boundary);
+            const cx = ((center.x - bounds.minX) / bounds.width * 100).toFixed(1);
+            const cy = ((center.y - bounds.minY) / bounds.height * 100).toFixed(1);
+            gradient = `radial-gradient(ellipse at ${cx}% ${cy}%, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.08) 45%, transparent 70%)`;
+        } else if (glareType === 'left-center') {
+            // left-center: side-lit monitor, hotspot at the left edge mid-height
+            gradient = `radial-gradient(ellipse at 0% 50%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.10) 40%, transparent 65%)`;
+        } else if (glareType === 'lcd') {
+            // lcd: two-lobe directional glare strip across the upper-left, imitating a sun reflection on glass
+            gradient = `linear-gradient(135deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.20) 18%, transparent 35%),
+                         linear-gradient(135deg, transparent 25%, rgba(255,255,255,0.08) 40%, transparent 60%)`;
+        } else {
+            // top-center: overhead screen reflection (default)
+            gradient = `radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.10) 40%, transparent 65%)`;
+        }
+
+        return html`
+            <!-- Glare highlight -->
+            <div style="position:absolute; inset:0; clip-path:${clipPath}; background:${gradient}; opacity:${opacity}; pointer-events:none;"></div>
+            <!-- Inset edge vignette: soft dark fade from the boundary inward — screen recessed into its frame -->
+            <div style="position:absolute; inset:0; clip-path:${clipPath}; box-shadow:inset 0 0 60px 20px rgba(0,0,0,0.92); opacity:${opacity}; pointer-events:none;"></div>
+        `;
+    }
+
+    /**
      * Render room in overview mode
      * - Positioned absolutely at room offset
      * - Non-uniform scale
@@ -492,8 +568,9 @@ export class ScalableHousePlanRoom extends LitElement {
 
 
         // Build SVG polygon with conditional interactivity and gradient
+        const isDashboard = this.room.show_as_dashboard;
         const polygonSvg = svg`
-            <svg class="room-svg" style="position: absolute; top: 0; left: 0; width: ${roomBounds.width}px; height: ${roomBounds.height}px;" 
+            <svg class="room-svg" style="position: absolute; top: 0; left: 0; width: ${roomBounds.width}px; height: ${roomBounds.height}px;${isDashboard ? ' overflow: visible; filter: drop-shadow(0 2px 4px rgba(0,0,0,1)) drop-shadow(0 10px 25px rgba(0,0,0,0.90)) drop-shadow(0 28px 55px rgba(0,0,0,0.65)) drop-shadow(0 50px 90px rgba(0,0,0,0.35));' : ''}" 
                  viewBox="0 0 ${roomBounds.width} ${roomBounds.height}" 
                  preserveAspectRatio="none">
                 ${useGradient && this._currentGradient ? svg`
@@ -548,14 +625,23 @@ export class ScalableHousePlanRoom extends LitElement {
                         .actionHandler=${elementsClickable ? null : actionHandler({ hasHold: true })}
                     />
                 `}
+                ${this.room.show_as_dashboard
+                    ? this._renderDashboardBackground(
+                        this._cachedRelativePoints!,
+                        (this.room.dashboard_overview_opacity ?? 100) / 100
+                    )
+                    : ''}
             </svg>
         `;
+
+        const dashboardOpacity = (this.room.dashboard_overview_opacity ?? 100) / 100;
 
         // Render with conditional order: SVG always below elements for proper visual stacking
         // Pointer events controlled via elementsClickable at the element-wrapper level
         return html`
             <div class="room-container" style="position: absolute; left: ${roomBounds.minX}px; top: ${roomBounds.minY}px; width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
                 ${polygonSvg}
+                ${this.room.show_as_dashboard ? this._renderDashboardGlare(dashboardOpacity) : ''}
                 <div class="elements-container" style="width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
                     ${elements}
                 </div>
@@ -626,10 +712,12 @@ export class ScalableHousePlanRoom extends LitElement {
         const imageWidth = this.config.image_width * scale;
         const imageHeight = this.config.image_height * scale;
 
+        const isDashboard = this.room.show_as_dashboard;
+
         return html`
             <div class="room-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
                 ${svg`
-                    <svg class="room-svg" style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px;" 
+                    <svg class="room-svg" style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px;${isDashboard ? ' overflow: visible; filter: drop-shadow(0 2px 4px rgba(0,0,0,1)) drop-shadow(0 10px 25px rgba(0,0,0,0.90)) drop-shadow(0 28px 55px rgba(0,0,0,0.65)) drop-shadow(0 50px 90px rgba(0,0,0,0.35));' : ''}" 
                          viewBox="0 0 ${scaledWidth} ${scaledHeight}" 
                          preserveAspectRatio="none">
                         <defs>
@@ -650,16 +738,22 @@ export class ScalableHousePlanRoom extends LitElement {
                                 ` : ''}
                             ` : ''}
                         </defs>
-                        <!-- Background image clipped to room shape -->
-                        <image 
-                            href="${this.config.image}" 
-                            x="${imageOffsetX}"
-                            y="${imageOffsetY}"
-                            width="${imageWidth}"
-                            height="${imageHeight}"
-                            clip-path="url(#${this._cachedClipId})"
-                            preserveAspectRatio="none"
-                        />
+                        <!-- Background image clipped to room shape (hidden in dashboard mode) -->
+                        ${!this.room.show_as_dashboard ? svg`
+                            <image
+                                href="${this.config.image}"
+                                x="${imageOffsetX}"
+                                y="${imageOffsetY}"
+                                width="${imageWidth}"
+                                height="${imageHeight}"
+                                clip-path="url(#${this._cachedClipId})"
+                                preserveAspectRatio="none"
+                            />
+                        ` : ''}
+                        <!-- Dashboard background (black fill + bezel + edge glow) -->
+                        ${this.room.show_as_dashboard
+                            ? this._renderDashboardBackground(points, 1.0)
+                            : ''}
                         <!-- Room colored polygon on top -->
                         ${this._hasMotion && this._currentGradientInverted ? svg`
                             <!-- Motion: two polygons in opposite phase create a ripple wave effect -->
@@ -702,6 +796,7 @@ export class ScalableHousePlanRoom extends LitElement {
                         .selectedPointIndex=${this.selectedBoundaryPointIndex ?? null}
                     ></boundary-handles-shp>
                 ` : ''}
+                ${this.room.show_as_dashboard ? this._renderDashboardGlare(1.0) : ''}
                 <div class="elements-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
                     ${elements}
                 </div>

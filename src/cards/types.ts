@@ -38,6 +38,9 @@ export interface Room {
     color?: string;  // Optional color for room background (supports rgba)
     elements_clickable_on_overview?: boolean;  // Default false - when true, elements are clickable and room is not
     disable_dynamic_color?: boolean;  // Default false - when true, room is transparent (no dynamic colors)
+    show_as_dashboard?: boolean;             // Default false — renders room as a black screen/display panel
+    dashboard_glare?: 'top-center' | 'left-center' | 'full' | 'lcd'; // Default 'top-center' — glare/highlight effect style
+    dashboard_overview_opacity?: number;     // Default 100 — background opacity in overview (0=transparent, 100=opaque)
 }
 
 export interface PlanConfig {

@@ -212,6 +212,51 @@ export class EditorRoomShp extends LitElement {
                                     </ha-formfield>
                                 </div>
                                 <div class="room-field">
+                                    <ha-formfield
+                                        .label=${this.localize('editor.show_as_dashboard')}
+                                    >
+                                        <ha-switch
+                                            .checked=${this.room.show_as_dashboard ?? false}
+                                            @change=${this._showAsDashboardChanged}
+                                        ></ha-switch>
+                                    </ha-formfield>
+                                </div>
+                                ${this.room.show_as_dashboard ? html`
+                                    <div class="room-field">
+                                        <ha-select
+                                            .label=${this.localize('editor.dashboard_glare')}
+                                            .value=${this.room.dashboard_glare ?? 'top-center'}
+                                            @selected=${this._dashboardGlareChanged}
+                                            @closed=${(e: Event) => e.stopPropagation()}
+                                        >
+                                            <mwc-list-item value="top-center">
+                                                ${this.localize('editor.dashboard_glare_top_center')}
+                                            </mwc-list-item>
+                                            <mwc-list-item value="left-center">
+                                                ${this.localize('editor.dashboard_glare_left_center')}
+                                            </mwc-list-item>
+                                            <mwc-list-item value="full">
+                                                ${this.localize('editor.dashboard_glare_full')}
+                                            </mwc-list-item>
+                                            <mwc-list-item value="lcd">
+                                                ${this.localize('editor.dashboard_glare_lcd')}
+                                            </mwc-list-item>
+                                        </ha-select>
+                                    </div>
+                                    <div class="room-field">
+                                        <ha-textfield
+                                            label="${this.localize('editor.dashboard_overview_opacity')}"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            .value=${String(this.room.dashboard_overview_opacity ?? 100)}
+                                            @input=${this._dashboardOpacityChanged}
+                                            helper-persistent
+                                            helper-text="${this.localize('editor.dashboard_overview_opacity_helper')}"
+                                        ></ha-textfield>
+                                    </div>
+                                ` : ''}
+                                <div class="room-field">
                                     <div class="color-field-wrapper">
                                         <ha-textfield
                                             label="${this.localize('editor.room_color')}"
@@ -365,6 +410,23 @@ export class EditorRoomShp extends LitElement {
         this._dispatchUpdate({ ...this.room, disable_dynamic_color: target.checked });
     }
 
+    private _showAsDashboardChanged(e: Event) {
+        const target = e.target as HTMLInputElement;
+        this._dispatchUpdate({ ...this.room, show_as_dashboard: target.checked });
+    }
+
+    private _dashboardGlareChanged(e: CustomEvent) {
+        // ha-select fires @selected with {index} in e.detail, not {value}.
+        // The actual string value is on the element's .value property.
+        const value = (e.target as HTMLSelectElement).value as 'top-center' | 'left-center' | 'full' | 'lcd';
+        if (value) this._dispatchUpdate({ ...this.room, dashboard_glare: value });
+    }
+
+    private _dashboardOpacityChanged(e: Event) {
+        const target = e.target as HTMLInputElement;
+        this._dispatchUpdate({ ...this.room, dashboard_overview_opacity: Number(target.value) });
+    }
+
     private _colorChanged(e: Event) {
         const value = (e.target as HTMLInputElement).value.trim();
         this._dispatchUpdate({ ...this.room, color: value || undefined });
@@ -395,7 +457,7 @@ export class EditorRoomShp extends LitElement {
         this._dispatchUpdate({ ...this.room, boundary });
     }
 
-    private _handleElementAdd(e?: CustomEvent) {
+    private _handleElementAdd(_e?: CustomEvent) {
         // Add a new entity to the room
         const newEntity: string = "";  // Start with empty string (entity_id)
         const entities = [...(this.room.entities || []), newEntity];
