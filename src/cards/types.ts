@@ -41,6 +41,7 @@ export interface Room {
     show_as_dashboard?: boolean;             // Default false — renders room as a black screen/display panel
     dashboard_glare?: 'top-center' | 'left-center' | 'full' | 'lcd'; // Default 'top-center' — glare/highlight effect style
     dashboard_overview_opacity?: number;     // Default 100 — background opacity in overview (0=transparent, 100=opaque)
+    detail_view?: string;                    // Optional — "dashboard/view" or "/view" — navigate to HA view instead of SVG detail
 }
 
 export interface PlanConfig {

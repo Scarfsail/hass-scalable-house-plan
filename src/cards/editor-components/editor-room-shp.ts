@@ -257,6 +257,17 @@ export class EditorRoomShp extends LitElement {
                                     </div>
                                 ` : ''}
                                 <div class="room-field">
+                                    <ha-textfield
+                                        label="${this.localize('editor.detail_view')}"
+                                        .value=${this.room.detail_view || ''}
+                                        @input=${this._detailViewChanged}
+                                        placeholder="my-dashboard/my-view"
+                                        helper-persistent
+                                        helper-text="${this.localize('editor.detail_view_helper')}"
+                                        style="width: 100%"
+                                    ></ha-textfield>
+                                </div>
+                                <div class="room-field">
                                     <div class="color-field-wrapper">
                                         <ha-textfield
                                             label="${this.localize('editor.room_color')}"
@@ -425,6 +436,11 @@ export class EditorRoomShp extends LitElement {
     private _dashboardOpacityChanged(e: Event) {
         const target = e.target as HTMLInputElement;
         this._dispatchUpdate({ ...this.room, dashboard_overview_opacity: Number(target.value) });
+    }
+
+    private _detailViewChanged(e: Event) {
+        const value = (e.target as HTMLInputElement).value.trim();
+        this._dispatchUpdate({ ...this.room, detail_view: value || undefined });
     }
 
     private _colorChanged(e: Event) {

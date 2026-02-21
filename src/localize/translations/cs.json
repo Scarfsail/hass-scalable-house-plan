@@ -50,6 +50,8 @@
     "dashboard_glare_lcd": "LCD (sluneční odlesk)",
     "dashboard_overview_opacity": "Průhlednost v přehledu (%)",
     "dashboard_overview_opacity_helper": "0 = průhledný, 100 = plně černý",
+    "detail_view": "Detailní pohled (cesta k HA pohledu)",
+    "detail_view_helper": "Formát: dashboard/pohled nebo /pohled. Klepnutím přejde na daný HA pohled místo SVG detailu.",
     "disable_dynamic_color_entity": "Vyloučit z dynamické barvy",
     "info_box": "Informační box",
     "info_box_defaults": "Výchozí nastavení informačního boxu (celý dům)",

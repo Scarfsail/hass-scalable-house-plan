@@ -343,6 +343,13 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     private _openRoomDetail(roomIndex: number) {
+        const room = this.config!.rooms[roomIndex];
+
+        if (room.detail_view && !this._isEditMode()) {
+            this._navigateToView(room.detail_view);
+            return;
+        }
+
         this._selectedRoomIndex = roomIndex;
         this._currentView = 'detail';
         // Only use history API when not in edit mode to avoid conflicts
@@ -350,6 +357,16 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             history.pushState({ view: 'room-detail', roomIndex }, '', '');
         }
         this.requestUpdate();
+    }
+
+    private _navigateToView(detailView: string) {
+        const path = detailView.startsWith('/') ? detailView : `/${detailView}`;
+        window.history.pushState(null, '', path);
+        window.dispatchEvent(new CustomEvent('location-changed', {
+            detail: { replace: false },
+            bubbles: true,
+            composed: true,
+        }));
     }
 
     private _closeRoomDetail() {
