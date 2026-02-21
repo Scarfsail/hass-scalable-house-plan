@@ -1,5 +1,5 @@
 import { LitElement, html, css, PropertyValues } from "lit-element";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { sharedStyles } from "./shared-styles";
 import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { EntityConfig, PlanConfig, ElementConfig } from "../types";
@@ -21,7 +21,14 @@ export class EditorElementShp extends LitElement {
     @state() private _elementSectionConfig?: ElementConfig;
     @state() private _planSectionExpanded: boolean = true;
     @state() private _elementSectionExpanded: boolean = true;
-    
+    @state() private _yamlMode = false;
+
+    // @ts-ignore — ha-yaml-editor is defined at runtime by HA frontend
+    @query('ha-yaml-editor') private _yamlEditor?: any;
+
+    /** True while we are dispatching an element-update event from the YAML editor */
+    private _yamlSelfUpdate = false;
+
     private _localize?: LocalizeFunction;
 
     // Track if this is a no-entity element
@@ -122,6 +129,16 @@ export class EditorElementShp extends LitElement {
                 color: var(--secondary-text-color);
             }
 
+            .icon-button.toggled {
+                background: var(--primary-color);
+                color: var(--text-primary-color);
+            }
+
+            .icon-button.toggled:hover {
+                background: var(--primary-color);
+                opacity: 0.9;
+            }
+
             /* Collapsible section styles */
             .config-sections {
                 display: flex;
@@ -214,6 +231,11 @@ export class EditorElementShp extends LitElement {
         return result;
     }
 
+    /** Normalize EntityConfig to a plain object for the YAML editor */
+    private _getEntityForYaml(): object {
+        return typeof this.entity === 'string' ? { entity: this.entity } : this.entity;
+    }
+
     protected willUpdate(changedProperties: PropertyValues) {
         super.willUpdate(changedProperties);
         
@@ -242,6 +264,17 @@ export class EditorElementShp extends LitElement {
                 // No entity yet, default to filtering by area
                 this.filterByArea = true;
             }
+        }
+    }
+
+    protected updated(changedProperties: PropertyValues): void {
+        super.updated(changedProperties);
+        // When switching to YAML mode, or when entity prop changes externally while in YAML mode,
+        // initialize/sync the editor — but not when we triggered the change ourselves
+        const yamlModeJustEnabled = changedProperties.has('_yamlMode') && this._yamlMode;
+        const entityChangedExternally = changedProperties.has('entity') && !this._yamlSelfUpdate;
+        if (this._yamlMode && (yamlModeJustEnabled || entityChangedExternally)) {
+            this._yamlEditor?.setValue(this._getEntityForYaml());
         }
     }
 
@@ -281,6 +314,13 @@ export class EditorElementShp extends LitElement {
                         ` : ''}
                     </div>
                     <div class="item-actions" @click=${(e: Event) => e.stopPropagation()}>
+                        <button
+                            class="icon-button ${this._yamlMode ? 'toggled' : ''}"
+                            @click=${this._toggleYamlMode}
+                            title="${this.localize(`editor.edit_${this._yamlMode ? 'ui' : 'yaml'}`)}"
+                        >
+                            <ha-icon icon="mdi:playlist-edit"></ha-icon>
+                        </button>
                         <button class="icon-button" @click=${this._duplicateElement} title="${this.localize('editor.duplicate_entity')}">
                             <ha-icon icon="mdi:content-duplicate"></ha-icon>
                         </button>
@@ -292,6 +332,12 @@ export class EditorElementShp extends LitElement {
                 </div>
                 
                 <div class="item-content ${this.isExpanded ? 'expanded' : ''}" @focusin=${this._handleContentFocus}>
+                ${this._yamlMode ? html`
+                    <ha-yaml-editor
+                        .hass=${this.hass}
+                        @value-changed=${this._entityYamlChanged}
+                    ></ha-yaml-editor>
+                ` : html`
                     <!-- Entity Picker (hidden if no-entity mode) -->
                     ${!this._isNoEntity ? html`
                         <div class="entity-picker">
@@ -377,9 +423,25 @@ export class EditorElementShp extends LitElement {
                             ` : ''}
                         </div>
                     </div>
+                `}
                 </div>
             </div>
         `;
+    }
+
+    private _toggleYamlMode(e: Event) {
+        e.stopPropagation();
+        this._yamlMode = !this._yamlMode;
+    }
+
+    private _entityYamlChanged(e: CustomEvent) {
+        if (!e.detail.isValid) return;
+        const value = e.detail.value;
+        // Don't propagate non-plain-object values (bare strings, arrays, null)
+        if (value !== undefined && (typeof value !== 'object' || value === null || Array.isArray(value))) return;
+        this._yamlSelfUpdate = true;
+        this._dispatchUpdate(value as EntityConfig);
+        Promise.resolve().then(() => { this._yamlSelfUpdate = false; });
     }
 
     private _getEntityDisplayName(entityId: string): string {
