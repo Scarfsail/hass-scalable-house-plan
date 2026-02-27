@@ -8,7 +8,7 @@ interface BadgeElementsConfig extends ElementBaseConfig {
     entities: string[];
     show_name: boolean;
     show_entity_picture: boolean;
-
+    show_state?: boolean;
 }
 interface Badge {
     entity: string;
@@ -24,9 +24,10 @@ export class BadgeElements extends ElementBase<BadgeElementsConfig> {
             this.badges = this._config!.entities.map(entity => {
                 const element = document.createElement('hui-entity-badge') as any
                 element.setConfig({
-                    entity: entity, 
+                    entity: entity,
                     show_name: this._config!.show_name,
-                    show_entity_picture: this._config!.show_entity_picture});
+                    show_entity_picture: this._config!.show_entity_picture,
+                    show_state: this._config!.show_state ?? true});
                 return {
                     "entity": entity,
                     "element": element

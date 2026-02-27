@@ -142,6 +142,14 @@ export class EditorBadgesShp extends LitElement {
                 ></ha-switch>
                 <label>Show Entity Picture</label>
             </div>
+
+            <div class="checkbox-field">
+                <ha-switch
+                    .checked=${this.elementSection?.show_state !== false}
+                    @change=${this._showStateChanged}
+                ></ha-switch>
+                <label>Show State</label>
+            </div>
         `;
     }
 
@@ -169,6 +177,11 @@ export class EditorBadgesShp extends LitElement {
     private _showEntityPictureChanged(ev: Event) {
         const checked = (ev.target as HTMLInputElement).checked;
         this._updateConfig({ show_entity_picture: checked });
+    }
+
+    private _showStateChanged(ev: Event) {
+        const checked = (ev.target as HTMLInputElement).checked;
+        this._updateConfig({ show_state: checked });
     }
 
     private _updateConfig(changes: Partial<ElementConfig>) {

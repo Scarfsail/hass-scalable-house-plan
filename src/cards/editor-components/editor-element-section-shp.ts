@@ -164,8 +164,8 @@ export class EditorElementSectionShp extends LitElement {
 
     private _elementChanged(ev: CustomEvent) {
         ev.stopPropagation();
-        // Don't propagate invalid YAML
-        if (!ev.detail.isValid) return;
+        // Don't propagate invalid YAML (only applies to YAML editor events that explicitly set isValid)
+        if (ev.detail.isValid === false) return;
         // Don't propagate non-plain-object values (bare strings, numbers, arrays, null)
         if (ev.detail.value !== undefined && !_isPlainObject(ev.detail.value)) return;
         this._selfUpdate = true;
