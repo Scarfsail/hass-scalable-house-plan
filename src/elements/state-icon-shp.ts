@@ -68,7 +68,7 @@ export class StateIconElement extends ElementEntityBase<StateIconElementConfig> 
             background: none;
             padding: 0;
             opacity: 1;
-            color: white;
+            color: var(--shp-plan-text-color, white);
             ${planTextShadow};
             max-width: 80px;
             overflow: hidden;

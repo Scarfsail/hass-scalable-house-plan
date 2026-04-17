@@ -17,6 +17,7 @@ import {
     type CachedEntityIds,
     calculateDynamicRoomColor
 } from "../utils/room-color-helpers";
+import { getReadabilityModeCssVars } from "../utils/plan-styles";
 
 /**
  * Type definitions for scale values
@@ -517,6 +518,14 @@ export class ScalableHousePlanRoom extends LitElement {
         `;
     }
 
+    private _getDashboardReadabilityOverride(): string {
+        if (!this.room.show_as_dashboard) return '';
+
+        return Object.entries(getReadabilityModeCssVars('dark-image'))
+            .map(([key, value]) => `${key}: ${value}`)
+            .join('; ');
+    }
+
     /**
      * Render room in overview mode
      * - Positioned absolutely at room offset
@@ -635,11 +644,12 @@ export class ScalableHousePlanRoom extends LitElement {
         `;
 
         const dashboardOpacity = (this.room.dashboard_overview_opacity ?? 100) / 100;
+        const dashboardReadabilityOverride = this._getDashboardReadabilityOverride();
 
         // Render with conditional order: SVG always below elements for proper visual stacking
         // Pointer events controlled via elementsClickable at the element-wrapper level
         return html`
-            <div class="room-container" style="position: absolute; left: ${roomBounds.minX}px; top: ${roomBounds.minY}px; width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
+            <div class="room-container" style="position: absolute; left: ${roomBounds.minX}px; top: ${roomBounds.minY}px; width: ${roomBounds.width}px; height: ${roomBounds.height}px; ${dashboardReadabilityOverride}">
                 ${polygonSvg}
                 ${this.room.show_as_dashboard ? this._renderDashboardGlare(dashboardOpacity) : ''}
                 <div class="elements-container" style="width: ${roomBounds.width}px; height: ${roomBounds.height}px;">
@@ -713,9 +723,10 @@ export class ScalableHousePlanRoom extends LitElement {
         const imageHeight = this.config.image_height * scale;
 
         const isDashboard = this.room.show_as_dashboard;
+        const dashboardReadabilityOverride = this._getDashboardReadabilityOverride();
 
         return html`
-            <div class="room-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px;">
+            <div class="room-container" style="width: ${scaledWidth}px; height: ${scaledHeight}px; ${dashboardReadabilityOverride}">
                 ${svg`
                     <svg class="room-svg" style="position: absolute; top: 0; left: 0; width: ${scaledWidth}px; height: ${scaledHeight}px;${isDashboard ? ' overflow: visible; filter: drop-shadow(0 2px 4px rgba(0,0,0,1)) drop-shadow(0 10px 25px rgba(0,0,0,0.90)) drop-shadow(0 28px 55px rgba(0,0,0,0.65)) drop-shadow(0 50px 90px rgba(0,0,0,0.35));' : ''}" 
                          viewBox="0 0 ${scaledWidth} ${scaledHeight}" 

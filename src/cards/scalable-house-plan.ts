@@ -8,8 +8,10 @@ import "./scalable-house-plan-overview";
 import "./scalable-house-plan-detail";
 import "./scalable-house-plan-entities";
 import { cleanupDragControllers } from "../components/element-renderer-shp";
+import { getReadabilityModeCssVars } from "../utils/plan-styles";
 import type {
     PositionScalingMode,
+    ReadabilityMode,
     ElementDefaultConfig,
     Room,
     PlanConfig,
@@ -47,6 +49,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     rooms: Room[];
     image: string;
     style?: any
+    readability_mode?: ReadabilityMode;
     image_width: number;
     image_height: number;
     max_scale?: number;
@@ -155,6 +158,13 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     getCardSize() {
         return this.config?.card_size ?? 1;
+    }
+
+    private _getReadabilityStyleString(): string {
+        const mode = this.config?.readability_mode ?? 'bright-image';
+        return Object.entries(getReadabilityModeCssVars(mode))
+            .map(([key, value]) => `${key}: ${value}`)
+            .join('; ');
     }
 
     /**
@@ -299,8 +309,10 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         ` : '';
         
         // Always show overview as base layer
+        const readabilityStyle = this._getReadabilityStyleString();
         const overviewHtml = html`
             <scalable-house-plan-overview
+                style="${readabilityStyle}"
                 .hass=${this.hass}
                 .config=${this.config}
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
@@ -318,6 +330,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 <div class="detail-backdrop" @click=${() => this._closeRoomDetail()}></div>
                 <div class="detail-content">
                     <scalable-house-plan-detail
+                        style="${readabilityStyle}"
                         .hass=${this.hass}
                         .room=${this.config.rooms[this._selectedRoomIndex]}
                         .config=${this.config}

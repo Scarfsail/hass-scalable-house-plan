@@ -8,6 +8,7 @@
 import type { ElementBaseConfig } from "../elements/base";
 
 export type PositionScalingMode = "plan" | "element" | "fixed";
+export type ReadabilityMode = "bright-image" | "dark-image";
 
 export interface InfoBoxTypeConfig {
     show?: boolean;  // Default: true (deprecated - use visible_detail/visible_overview)

@@ -23,7 +23,9 @@ export class MotionSensorElement extends ElementEntityArmableBase<MotionSensorEl
 
 
         const alarmState = this.getAlarmoSensorState();
-        const color = (entity?.attributes["device_class"] == "occupancy" && entity?.state == "on") ? "#ffc107" : (alarmState ? (alarmState.armed ? 'red' : 'green') : 'white')
+        const color = (entity?.attributes["device_class"] == "occupancy" && entity?.state == "on")
+            ? "#ffc107"
+            : (alarmState ? (alarmState.armed ? 'red' : 'green') : 'var(--shp-plan-text-color, white)')
 
 
         return html`

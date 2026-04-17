@@ -1,8 +1,9 @@
-import { html } from "lit"
+import { html, css } from "lit"
 import { customElement } from "lit/decorators.js";
 import { ElementBase, ElementBaseConfig } from "./base";
 import { HassEntity } from "home-assistant-js-websocket";
 import { keyed } from 'lit/directives/keyed.js';
+import { planDropShadow } from "../utils/plan-styles";
 
 interface BadgeElementsConfig extends ElementBaseConfig {
     entities: string[];
@@ -16,6 +17,18 @@ interface Badge {
 }
 @customElement("badges-shp")
 export class BadgeElements extends ElementBase<BadgeElementsConfig> {
+    static styles = css`
+        .badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .badge {
+            display: inline-block;
+            ${planDropShadow};
+        }
+    `;
 
     private badges?: Badge[];
 
@@ -41,8 +54,8 @@ export class BadgeElements extends ElementBase<BadgeElementsConfig> {
         }
 
         return html`
-            <div style="display: flex; flex-wrap: wrap;gap: 5px">
-                ${this.badges.map(badge => keyed(badge.entity, html`${badge.element}`))}
+            <div class="badges">
+                ${this.badges.map(badge => keyed(badge.entity, html`<div class="badge">${badge.element}</div>`))}
             </div>
         `;
     }

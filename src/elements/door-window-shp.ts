@@ -4,6 +4,7 @@ import "../components/last-change-text-shp";
 
 import { ElementEntityBaseConfig, ElementEntityArmableBase } from "./base/";
 import type { HassEntity } from "home-assistant-js-websocket";
+import { planDropShadow } from "../utils/plan-styles";
 
 interface DoorWindowElementConfig extends ElementEntityBaseConfig {
     width: number;
@@ -37,8 +38,34 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             line-height: 0;
             cursor: pointer;
             gap: 1px;
+            --shp-last-change-bg-muted: rgba(255, 255, 255, 0.18);
+            --shp-last-change-bg-mid: rgba(255, 255, 255, 0.24);
+            --shp-last-change-bg-recent: rgba(255, 255, 255, 0.3);
+            --shp-last-change-bg-alert: rgba(180, 48, 48, 0.48);
+            --shp-last-change-shadow-blur: 4px;
+            --shp-last-change-shadow-spread: 0px;
+            --shp-last-change-shadow-muted: rgba(255, 255, 255, 0.03);
+            --shp-last-change-shadow-mid: rgba(255, 255, 255, 0.05);
+            --shp-last-change-shadow-recent: rgba(255, 255, 255, 0.07);
+            --shp-last-change-shadow-alert: rgba(200, 60, 60, 0.16);
         }
-        
+
+        .label {
+            position: relative;
+            z-index: 1;
+        }
+
+        .shape {
+            display: block;
+            position: relative;
+            z-index: 0;
+            ${planDropShadow};
+        }
+
+        :host(.text-start) .label {
+            order: -1;
+        }
+         
         /* Horizontal: text-start = text above, SVG bottom aligned */
         :host(.horizontal.text-start) .content {
             bottom: 0;
@@ -135,21 +162,22 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
         const opened = entity.state == "on";
         const alarmState = this.getAlarmoSensorState();
         const color = opened ? 
-            (this._config?.unobtrusive ? 'white' : '#6464FF') 
+            (this._config?.unobtrusive ? 'var(--shp-plan-text-color, white)' : '#6464FF') 
             : 
             alarmState ? 
                 (alarmState.armed ? 'red' : 'green') 
                 : 
-                'gray';
+                'var(--shp-plan-neutral-color, gray)';
 
         const svgElement = svg`
             <svg width="${this._svgWidth}" height="${this._svgHeight}">
                 <path d=${this._svgPath} fill=${color} stroke=${color} strokeDasharray=0 strokeWidth=1 />
             </svg>
         `;
-        
+         
         const textElement = html`
             <last-change-text-shp 
+                class="label"
                 .entity=${entity} 
                 .secondsForSuperHighlight=${5}
             ></last-change-text-shp>
@@ -157,7 +185,8 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
 
         return html`
             <div class="content">
-                ${this._config.text_position === "start" ? html`${textElement}${svgElement}` : html`${svgElement}${textElement}`}
+                <div class="shape">${svgElement}</div>
+                ${textElement}
             </div>
             `
     }

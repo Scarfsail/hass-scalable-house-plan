@@ -1,7 +1,8 @@
-import { html } from "lit"
+import { html, css } from "lit"
 import { customElement } from "lit/decorators.js";
 import { ElementEntityBase, ElementEntityBaseConfig } from "./base";
 import { HassEntity } from "home-assistant-js-websocket";
+import { planDropShadow } from "../utils/plan-styles";
 
 interface ImageLastChangeElementConfig extends ElementEntityBaseConfig {
     size?: number;
@@ -9,6 +10,14 @@ interface ImageLastChangeElementConfig extends ElementEntityBaseConfig {
 
 @customElement("image-last-change-shp")
 export class ImageLastChangeElement extends ElementEntityBase<ImageLastChangeElementConfig> {
+    static styles = css`
+        .image-wrapper {
+            border-radius: 50%;
+            overflow: hidden;
+            ${planDropShadow};
+        }
+    `;
+
     private element: any;
     private _sizeStyle: string = '';
     
@@ -29,7 +38,7 @@ export class ImageLastChangeElement extends ElementEntityBase<ImageLastChangeEle
         this.element.hass = this.hass;
 
         return html`
-            <div style=${this._sizeStyle}>   
+            <div class="image-wrapper" style=${this._sizeStyle}>   
                 ${this.element}
             </div>
             <last-change-text-shp .entity=${entity}></last-change-text-shp>            

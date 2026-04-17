@@ -241,22 +241,27 @@ export class EditorRoomShp extends LitElement {
                                         <ha-select
                                             .label=${this.localize('editor.dashboard_glare')}
                                             .value=${this.room.dashboard_glare ?? 'top-center'}
+                                            .options=${[
+                                                {
+                                                    value: 'top-center',
+                                                    label: this.localize('editor.dashboard_glare_top_center')
+                                                },
+                                                {
+                                                    value: 'left-center',
+                                                    label: this.localize('editor.dashboard_glare_left_center')
+                                                },
+                                                {
+                                                    value: 'full',
+                                                    label: this.localize('editor.dashboard_glare_full')
+                                                },
+                                                {
+                                                    value: 'lcd',
+                                                    label: this.localize('editor.dashboard_glare_lcd')
+                                                }
+                                            ]}
                                             @selected=${this._dashboardGlareChanged}
                                             @closed=${(e: Event) => e.stopPropagation()}
-                                        >
-                                            <mwc-list-item value="top-center">
-                                                ${this.localize('editor.dashboard_glare_top_center')}
-                                            </mwc-list-item>
-                                            <mwc-list-item value="left-center">
-                                                ${this.localize('editor.dashboard_glare_left_center')}
-                                            </mwc-list-item>
-                                            <mwc-list-item value="full">
-                                                ${this.localize('editor.dashboard_glare_full')}
-                                            </mwc-list-item>
-                                            <mwc-list-item value="lcd">
-                                                ${this.localize('editor.dashboard_glare_lcd')}
-                                            </mwc-list-item>
-                                        </ha-select>
+                                        ></ha-select>
                                     </div>
                                     <div class="room-field">
                                         <ha-textfield
@@ -447,9 +452,7 @@ export class EditorRoomShp extends LitElement {
     }
 
     private _dashboardGlareChanged(e: CustomEvent) {
-        // ha-select fires @selected with {index} in e.detail, not {value}.
-        // The actual string value is on the element's .value property.
-        const value = (e.target as HTMLSelectElement).value as 'top-center' | 'left-center' | 'full' | 'lcd';
+        const value = e.detail.value as 'top-center' | 'left-center' | 'full' | 'lcd' | undefined;
         if (value) this._dispatchUpdate({ ...this.room, dashboard_glare: value });
     }
 

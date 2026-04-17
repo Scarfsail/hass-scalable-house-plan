@@ -1,8 +1,9 @@
-import { html } from "lit"
+import { html, css } from "lit"
 import { customElement } from "lit/decorators.js";
 import { ElementEntityBase, ElementEntityBaseConfig } from "./base";
 import { HassEntity } from "home-assistant-js-websocket";
 import { ShortenNumberPrefixType } from "../utils";
+import { planDropShadow } from "../utils/plan-styles";
 
 interface BadgeElementConfig extends ElementEntityBaseConfig {
 
@@ -12,6 +13,13 @@ interface BadgeElementConfig extends ElementEntityBaseConfig {
 @customElement("badge-shp")
 export class BadgeElement extends ElementEntityBase<BadgeElementConfig> {
     protected handleActionsInBase = false; // Actions handled by inner hui-entity-badge
+
+    static styles = css`
+        .badge {
+            display: inline-block;
+            ${planDropShadow};
+        }
+    `;
 
     private element: any;
     protected override renderEntityContent(entity: HassEntity) {
@@ -28,7 +36,7 @@ export class BadgeElement extends ElementEntityBase<BadgeElementConfig> {
         this.element.hass = this.hass;
 
         return html`
-            ${this.element}
+            <div class="badge">${this.element}</div>
         `
     }
 }

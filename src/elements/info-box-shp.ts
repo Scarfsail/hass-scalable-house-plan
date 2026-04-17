@@ -59,12 +59,29 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             flex-direction: column;
             gap: 4px;
             padding: 6px 10px;
-            background: rgba(0, 0, 0, 0.6);
+            background: var(--shp-overlay-surface, rgba(0, 0, 0, 0.6));
             border-radius: 8px;
             align-items: flex-start;
             font-size: 12px;
-            color: white;
+            color: var(--shp-overlay-surface-text-color, white);
             white-space: nowrap;
+        }
+
+        .info-box-container:not(.no-background) {
+            --shp-plan-text-color: var(--shp-overlay-surface-text-color, rgba(255, 255, 255, 0.97));
+            --shp-plan-text-shadow: var(--shp-overlay-surface-text-shadow, 0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6));
+            --shp-plan-drop-shadow: var(--shp-overlay-surface-drop-shadow, drop-shadow(0 0 4px rgba(0,0,0,0.9)) drop-shadow(0 0 8px rgba(0,0,0,0.6)));
+            --shp-last-change-text-muted: var(--shp-overlay-surface-last-change-text-muted, rgba(255, 255, 255, 0.86));
+            --shp-last-change-text-mid: var(--shp-overlay-surface-last-change-text-mid, rgba(255, 255, 255, 0.92));
+            --shp-last-change-text-recent: var(--shp-overlay-surface-last-change-text-recent, rgba(255, 255, 255, 0.96));
+            --shp-last-change-text-alert: var(--shp-overlay-surface-last-change-text-alert, rgba(255, 255, 255, 0.99));
+            --shp-last-change-text-strong: var(--shp-overlay-surface-last-change-text-strong, rgba(255, 255, 255, 0.98));
+            --shp-last-change-bg-muted: var(--shp-overlay-surface-last-change-bg-muted, rgba(255, 255, 255, 0.14));
+            --shp-last-change-bg-mid: var(--shp-overlay-surface-last-change-bg-mid, rgba(255, 255, 255, 0.18));
+            --shp-last-change-bg-recent: var(--shp-overlay-surface-last-change-bg-recent, rgba(255, 255, 255, 0.22));
+            --shp-last-change-bg-alert: var(--shp-overlay-surface-last-change-bg-alert, rgba(200, 60, 60, 0.55));
+            --shp-gauge-track: var(--shp-overlay-surface-gauge-track, rgba(255, 255, 255, 0.16));
+            --shp-gauge-track-inset: var(--shp-overlay-surface-gauge-track-inset, rgba(255, 255, 255, 0.1));
         }
 
         .info-box-container.overview {
@@ -74,6 +91,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
 
         .info-box-container.no-background {
             background: transparent;
+            color: var(--shp-plan-text-color, inherit);
         }
 
         .info-item {

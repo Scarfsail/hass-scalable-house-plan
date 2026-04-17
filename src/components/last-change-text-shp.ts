@@ -72,29 +72,36 @@ class LastChangeText extends LitElement {
     const lastChangeBefore = lastChanged && dayjs.duration(dayjs().diff(lastChanged));
     const secondsSinceChange = lastChangeBefore ? lastChangeBefore.asSeconds() : Infinity;
 
-    let textColor = 'rgba(192, 192, 192, 0.6)';
-    let backgroundColor = 'rgba(0, 0, 0, 0.3)';
+    let textColor = 'var(--shp-last-change-text-muted, rgba(192, 192, 192, 0.6))';
+    let backgroundColor = 'var(--shp-last-change-bg-muted, rgba(0, 0, 0, 0.3))';
+    let shadowColor = `var(--shp-last-change-shadow-muted, ${backgroundColor})`;
 
     // Superhighlight overrides all other highlighting
     if (this.secondsForSuperHighlight && secondsSinceChange <= this.secondsForSuperHighlight) {
-      textColor = 'rgba(255, 255, 255, 1)';
-      backgroundColor = 'rgba(200, 60, 60, 0.4)';
+      textColor = 'var(--shp-last-change-text-alert, var(--shp-last-change-text-strong, rgba(255, 255, 255, 1)))';
+      backgroundColor = 'var(--shp-last-change-bg-alert, rgba(200, 60, 60, 0.4))';
+      shadowColor = `var(--shp-last-change-shadow-alert, ${backgroundColor})`;
     }
     // White/gray for first 30 seconds
     else if (secondsSinceChange <= 30) {
-      textColor = 'rgba(255, 255, 255, 1)';
-      backgroundColor = 'rgba(220, 220, 220, 0.3)';
+      textColor = 'var(--shp-last-change-text-recent, var(--shp-last-change-text-strong, rgba(255, 255, 255, 1)))';
+      backgroundColor = 'var(--shp-last-change-bg-recent, rgba(220, 220, 220, 0.3))';
+      shadowColor = `var(--shp-last-change-shadow-recent, ${backgroundColor})`;
     }
     // Even less bright for next 90 seconds (31-120 seconds)
     else if (secondsSinceChange <= 120) {
-      textColor = 'rgba(192, 192, 192, 1)';
-      backgroundColor = 'rgba(180, 180, 180, 0.25)';
+      textColor = 'var(--shp-last-change-text-mid, rgba(192, 192, 192, 1))';
+      backgroundColor = 'var(--shp-last-change-bg-mid, rgba(180, 180, 180, 0.25))';
+      shadowColor = `var(--shp-last-change-shadow-mid, ${backgroundColor})`;
     }
+
+    const shadowBlur = 'var(--shp-last-change-shadow-blur, 12px)';
+    const shadowSpread = 'var(--shp-last-change-shadow-spread, 7px)';
 
     return html`
       <div style="color: ${textColor}; 
                   background-color: ${backgroundColor}; 
-                  box-shadow: 0px 0px 12px 7px ${backgroundColor}
+                  box-shadow: 0px 0px ${shadowBlur} ${shadowSpread} ${shadowColor}
                   ">
         ${this._lastRenderedText}
       </div>

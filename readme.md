@@ -127,6 +127,7 @@ title: My House                    # Optional: Card title
 background_image: /local/path/to/image.png
 background_width: 1360            # Original image width in pixels
 background_height: 849            # Original image height in pixels
+readability_mode: bright-image    # Optional: overlay contrast preset for bright or dark images
 max_scale: 2.0                    # Optional: Maximum scale factor
 min_scale: 0.5                    # Optional: Minimum scale factor
 card_size: 1                      # Optional: Card size for layout calculation

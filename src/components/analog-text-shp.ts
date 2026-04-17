@@ -29,6 +29,7 @@ class AnalogText extends LitElement {
             white-space: nowrap;
             display: block;
             line-height: 1;
+            color: var(--shp-plan-text-color, inherit);
         }
         span {
             line-height: 1;
@@ -143,8 +144,8 @@ class AnalogText extends LitElement {
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.2);
-            box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.25);
+            background-color: var(--shp-gauge-track, rgba(0, 0, 0, 0.2));
+            box-shadow: inset 0 0 16px var(--shp-gauge-track-inset, rgba(255, 255, 255, 0.25));
         }
         
         .gauge-bar-fill {

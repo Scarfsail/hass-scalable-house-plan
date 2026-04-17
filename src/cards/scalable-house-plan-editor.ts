@@ -81,6 +81,10 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
             .basic-config ha-textfield {
                 width: 100%;
             }
+
+            .basic-config ha-select {
+                width: 100%;
+            }
         `
     ];
 
@@ -142,6 +146,22 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                     </div>
                     <div class="section-content ${this._expandedSections.has('basic') ? 'expanded' : ''}">
                         <div class="basic-config">
+                        <ha-select
+                            label="${this.localize('editor.readability_mode')}"
+                            .value=${this._config.readability_mode ?? 'bright-image'}
+                            .options=${[
+                                {
+                                    value: 'bright-image',
+                                    label: this.localize('editor.readability_mode_bright_image')
+                                },
+                                {
+                                    value: 'dark-image',
+                                    label: this.localize('editor.readability_mode_dark_image')
+                                }
+                            ]}
+                            @selected=${this._readabilityModeChanged}
+                            @closed=${(e: Event) => e.stopPropagation()}
+                        ></ha-select>
                         <ha-textfield
                             label="${this.localize('editor.image_url')}"
                             .value=${this._config.image || ""}
@@ -925,6 +945,13 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     private _showRoomBackgroundsChanged(ev: any): void {
         this._config = { ...this._config, show_room_backgrounds: ev.target.checked };
+        this._configChanged();
+    }
+
+    private _readabilityModeChanged(ev: CustomEvent): void {
+        const value = ev.detail.value as 'bright-image' | 'dark-image' | undefined;
+        if (!value) return;
+        this._config = { ...this._config, readability_mode: value };
         this._configChanged();
     }
 
