@@ -110,6 +110,32 @@ interface CachedElementStructure {
     }>;
 }
 
+function isPlainObject(value: unknown): value is Record<string, any> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function mergeElementConfigLayers<T extends Record<string, any>>(
+    base: T,
+    override?: Record<string, any>
+): T {
+    if (!override) {
+        return { ...base };
+    }
+
+    const merged: Record<string, any> = { ...base };
+
+    for (const [key, value] of Object.entries(override)) {
+        const existing = merged[key];
+        if (isPlainObject(existing) && isPlainObject(value)) {
+            merged[key] = mergeElementConfigLayers(existing, value);
+        } else {
+            merged[key] = value;
+        }
+    }
+
+    return merged as T;
+}
+
 /**
  * Generate unique key for no-entity elements based on type and position
  * Key format:
@@ -211,12 +237,16 @@ function buildElementMetadata(
 
             if (plan.element?.type) {
                 // User specified explicit type → skip tier 2 (auto-mapping)
-                // Merge: tier1 (defaults) + tier3 (user)  — tier3 wins per-key
-                elementConfig = { ...defaultsElementProps, ...plan.element };
+                // Merge: tier1 (defaults) + tier3 (user) — tier3 wins per-key,
+                // while preserving nested defaults like info-box types.* settings.
+                elementConfig = mergeElementConfigLayers(defaultsElementProps, plan.element);
             } else {
                 // Auto-detected type → all three tiers
                 // Merge: tier1 < tier2 < tier3
-                elementConfig = { ...defaultsElementProps, ...defaultElement, ...(plan.element || {}) };
+                elementConfig = mergeElementConfigLayers(
+                    mergeElementConfigLayers(defaultsElementProps, defaultElement),
+                    plan.element || {}
+                );
             }
         } else {
             elementConfig = mergeElementProperties(defaultElement, plan.element || {});
@@ -889,4 +919,3 @@ export function cleanupDragControllers(): void {
     dragControllers.forEach(controller => controller.detach());
     dragControllers.clear();
 }
-
