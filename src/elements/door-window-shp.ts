@@ -38,16 +38,16 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             line-height: 0;
             cursor: pointer;
             gap: 1px;
-            --shp-last-change-bg-muted: rgba(255, 255, 255, 0.18);
-            --shp-last-change-bg-mid: rgba(255, 255, 255, 0.24);
-            --shp-last-change-bg-recent: rgba(255, 255, 255, 0.3);
-            --shp-last-change-bg-alert: rgba(180, 48, 48, 0.48);
+            --shp-last-change-bg-muted: var(--shp-door-window-last-change-bg-muted, rgba(255, 255, 255, 0.18));
+            --shp-last-change-bg-mid: var(--shp-door-window-last-change-bg-mid, rgba(255, 255, 255, 0.24));
+            --shp-last-change-bg-recent: var(--shp-door-window-last-change-bg-recent, rgba(255, 255, 255, 0.3));
+            --shp-last-change-bg-alert: var(--shp-door-window-last-change-bg-alert, rgba(180, 48, 48, 0.48));
             --shp-last-change-shadow-blur: 4px;
             --shp-last-change-shadow-spread: 0px;
-            --shp-last-change-shadow-muted: rgba(255, 255, 255, 0.03);
-            --shp-last-change-shadow-mid: rgba(255, 255, 255, 0.05);
-            --shp-last-change-shadow-recent: rgba(255, 255, 255, 0.07);
-            --shp-last-change-shadow-alert: rgba(200, 60, 60, 0.16);
+            --shp-last-change-shadow-muted: var(--shp-door-window-last-change-shadow-muted, rgba(255, 255, 255, 0.03));
+            --shp-last-change-shadow-mid: var(--shp-door-window-last-change-shadow-mid, rgba(255, 255, 255, 0.05));
+            --shp-last-change-shadow-recent: var(--shp-door-window-last-change-shadow-recent, rgba(255, 255, 255, 0.07));
+            --shp-last-change-shadow-alert: var(--shp-door-window-last-change-shadow-alert, rgba(200, 60, 60, 0.16));
         }
 
         .label {
