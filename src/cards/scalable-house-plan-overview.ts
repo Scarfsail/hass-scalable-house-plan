@@ -30,6 +30,7 @@ export class ScalableHousePlanOverview extends LitElement {
     private _lastScaleY = 1.0;
     private _lastVisibleW = 0;
     private _lastVisibleH = 0;
+    private _roomClickHandlers = new WeakMap<Room, () => void>();
 
     static get styles() {
         return css`
@@ -61,15 +62,10 @@ export class ScalableHousePlanOverview extends LitElement {
 
         const viewportHeight = window.innerHeight;
         const viewportWidth = window.innerWidth;
-        let visibleHeight = 0;
-        let visibleWidth = 0;
 
-        if (hasViewportChanged(this.previousViewport)) {
-            this.requestUpdate();
-        } else {
-            visibleHeight = Math.max(0, Math.min(viewportHeight, clientRect.bottom) - Math.max(0, clientRect.top));
-            visibleWidth = Math.max(0, Math.min(viewportWidth, clientRect.right) - Math.max(0, clientRect.left));
-        }
+        hasViewportChanged(this.previousViewport); // side-effect: updates previousViewport
+        let visibleHeight = Math.max(0, Math.min(viewportHeight, clientRect.bottom) - Math.max(0, clientRect.top));
+        let visibleWidth  = Math.max(0, Math.min(viewportWidth,  clientRect.right ) - Math.max(0, clientRect.left));
 
         if (visibleHeight === 0 || visibleWidth === 0) {
             visibleHeight = fitIntoHeight || 400;
@@ -154,7 +150,7 @@ export class ScalableHousePlanOverview extends LitElement {
                 .elementCards=${this._elementCards}
                 .houseCache=${this.houseCache}
                 .showRoomBackgrounds=${this.config!.show_room_backgrounds}
-                .onClick=${() => this._handleRoomClick(room, index)}
+                .onClick=${this._getRoomClickHandler(room, index)}
                 .cachedEntityIds=${this.roomEntityCache?.get(room.name)}
                 .editorMode=${this.editorMode}
                 .selectedElementKey=${this.selectedElementKey}
@@ -162,6 +158,15 @@ export class ScalableHousePlanOverview extends LitElement {
                 .viewId=${'main-card'}
             ></scalable-house-plan-room>
         `);
+    }
+
+    private _getRoomClickHandler(room: Room, index: number): () => void {
+        let h = this._roomClickHandlers.get(room);
+        if (!h) {
+            h = () => this._handleRoomClick(room, index);
+            this._roomClickHandlers.set(room, h);
+        }
+        return h;
     }
 
     private _handleRoomClick(room: Room, index: number) {
