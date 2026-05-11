@@ -1,6 +1,5 @@
 import { LitElement, html, css } from 'lit-element';
 import { customElement, property, state } from "lit/decorators.js";
-import dayjs from 'dayjs';
 import { Utils } from '../utils/utils';
 import type { HassEntity } from 'home-assistant-js-websocket';
 import { timerService } from '../utils/timer-service';
@@ -69,8 +68,9 @@ class LastChangeText extends LitElement {
       return html`<div>No entity defined</div>`
 
     const lastChanged = this.entity.attributes["state_last_changed"] ?? this.entity.last_changed;
-    const lastChangeBefore = lastChanged && dayjs.duration(dayjs().diff(lastChanged));
-    const secondsSinceChange = lastChangeBefore ? lastChangeBefore.asSeconds() : Infinity;
+    const secondsSinceChange = lastChanged
+      ? (Date.now() - new Date(lastChanged).getTime()) / 1000
+      : Infinity;
 
     let textColor = 'var(--shp-last-change-text-muted, rgba(192, 192, 192, 0.6))';
     let backgroundColor = 'var(--shp-last-change-bg-muted, rgba(0, 0, 0, 0.3))';
