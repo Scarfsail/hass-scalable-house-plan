@@ -76,6 +76,10 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedOverviewRoom?: Room;
     private _cachedClipId?: string;  // Clip path ID for detail mode
     private _prevColorKey?: string;  // Memoization key for _updateDynamicColor
+    private _trackedStateRefs = new Map<string, any>();
+    private _nextDelayExpiryMs = 0;  // 0 = "always recompute next time" (initial state)
+    private _delayTimer?: number;
+    private _prevConfigGateKey?: string;  // captures config flags that change calculateDynamicRoomColor output
     
     // Cached entity IDs (computed once when room changes, used with fresh hass.states lookups)
     private _cachedEntityIds?: {
@@ -139,6 +143,8 @@ export class ScalableHousePlanRoom extends LitElement {
             };
             // Entity IDs changed: force full color recalculation
             this._prevColorKey = undefined;
+            this._trackedStateRefs.clear();
+            this._nextDelayExpiryMs = 0;
         }
 
         // Update dynamic colors when hass or room changes
@@ -327,6 +333,39 @@ export class ScalableHousePlanRoom extends LitElement {
             return;
         }
 
+        // Capture config/room flags that gate calculateDynamicRoomColor output.
+        // Without this, runtime YAML edits (e.g. flipping show_room_backgrounds) wouldn't
+        // be picked up unless an entity state also changed.
+        const dc = this.config?.dynamic_colors;
+        const configGateKey =
+            `${this.room.disable_dynamic_color ?? false}|${this.config?.show_room_backgrounds ?? false}` +
+            `|${this.room.color ?? ''}|${dc?.motion_occupancy ?? ''}|${dc?.lights ?? ''}` +
+            `|${dc?.ambient_lights ?? ''}|${dc?.default ?? ''}|${dc?.motion_delay_seconds ?? 60}` +
+            `|${dc?.show_idle_overlay ?? false}|${dc?.show_border ?? false}`;
+        const configChanged = configGateKey !== this._prevConfigGateKey;
+        this._prevConfigGateKey = configGateKey;
+
+        // Cheap pre-check: skip the heavy scan unless something tracked changed
+        // OR config changed OR a motion-delay window has expired.
+        const now = Date.now();
+        const trackedIds = [
+            ...this._cachedEntityIds.motionSensors,
+            ...this._cachedEntityIds.occupancySensors,
+            ...this._cachedEntityIds.lights,
+            ...this._cachedEntityIds.ambientLights,
+        ];
+        let anyChanged = false;
+        for (const id of trackedIds) {
+            const cur = this.hass.states[id];
+            if (cur !== this._trackedStateRefs.get(id)) {
+                anyChanged = true;
+                this._trackedStateRefs.set(id, cur);
+            }
+        }
+        if (!anyChanged && !configChanged && now < this._nextDelayExpiryMs) {
+            return;
+        }
+
         // Calculate color using cached entity IDs and timestamp-based delay checking
         const newColor = calculateDynamicRoomColor(
             this.hass,
@@ -340,6 +379,13 @@ export class ScalableHousePlanRoom extends LitElement {
         const newActiveLightColor = (newHasMotion && newColor.activeTypes.includes('lights'))
             ? (this.config?.dynamic_colors?.lights || 'rgba(255, 245, 170, 0.20)')
             : undefined;
+
+        // Schedule the next mandatory recompute based on motion-delay windows.
+        // Must happen before the memo short-circuit: when motion sensor flips ON→OFF,
+        // newColor often stays 'motion' (within delay), so the memo check would return
+        // before we ever scheduled the expiry timer.
+        this._nextDelayExpiryMs = this._computeNextDelayExpiry(now);
+        this._scheduleDelayTimer(this._nextDelayExpiryMs - now);
 
         // Memoization: skip re-render if nothing visually changed
         const newColorKey = `${newColor.type}|${newColor.color}|${newActiveLightColor ?? ''}`;
@@ -396,6 +442,44 @@ export class ScalableHousePlanRoom extends LitElement {
             this._currentGradient = undefined;
             this._currentGradientInverted = undefined;
         }
+    }
+
+    private _computeNextDelayExpiry(now: number): number {
+        if (!this._cachedEntityIds) return Number.POSITIVE_INFINITY;
+        const delaySeconds = this.config?.dynamic_colors?.motion_delay_seconds ?? 60;
+        let earliest = Number.POSITIVE_INFINITY;
+        for (const id of this._cachedEntityIds.motionSensors) {
+            const s = this.hass.states[id];
+            if (s?.state === 'off') {
+                const lastChangedMs = new Date(s.last_changed).getTime();
+                const expiry = lastChangedMs + delaySeconds * 1000;
+                if (expiry > now && expiry < earliest) earliest = expiry;
+            }
+        }
+        return earliest;
+    }
+
+    private _scheduleDelayTimer(deltaMs: number): void {
+        if (this._delayTimer) {
+            clearTimeout(this._delayTimer);
+            this._delayTimer = undefined;
+        }
+        if (!isFinite(deltaMs)) return;
+        // +50 ms buffer ensures the delay window has fully expired before recompute
+        this._delayTimer = window.setTimeout(() => {
+            this._delayTimer = undefined;
+            this._prevColorKey = undefined;  // force the existing memoization to update
+            this.requestUpdate();
+        }, Math.max(0, deltaMs) + 50);
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        if (this._delayTimer) {
+            clearTimeout(this._delayTimer);
+            this._delayTimer = undefined;
+        }
+        this._trackedStateRefs.clear();
     }
 
     /**
