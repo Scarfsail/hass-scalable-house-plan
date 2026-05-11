@@ -40,8 +40,6 @@ interface PictureElement {
  * Shared across all views and rooms within a card instance
  */
 export class HouseCache {
-    elementMetadata: Map<string, any> = new Map();
-    elementStructure: Map<string, any> = new Map();
     position: Map<string, any> = new Map();
 }
 
