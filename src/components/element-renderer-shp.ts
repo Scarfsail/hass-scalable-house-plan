@@ -166,11 +166,17 @@ export function generateElementKey(elementType: string, plan: any, roomIndex?: n
 
 /**
  * Build element structure for a room.
- * 
- * IMPORTANT: This is NOT cached. Caching plan references caused stale positions
- * after drag-drop because the editor creates new plan objects (via spread) on each
- * config update, but stale cached references still pointed to old positions.
- * This operation is cheap (filter/map on small arrays) so caching is unnecessary.
+ *
+ * Cached via buildElementStructureCached below, keyed on room.entities array
+ * reference (WeakMap). Cache is invalidated when:
+ *   - room.entities is replaced (editor spreads on save → new array ref)
+ *   - hass.entities or hass.devices reference changes (registry edits)
+ *   - elementDefaults reference changes
+ *   - any tracked entity state was missing at cache time (allStatesPresent=false)
+ *
+ * The metadata stored in the cache intentionally excludes tap_action/hold_action;
+ * those depend on hass.states attributes and are re-derived per render in the
+ * post-build loop inside renderElements.
  */
 function buildElementStructure(
     allEntities: EntityConfig[],
@@ -204,6 +210,49 @@ function buildElementStructure(
             return { entity, plan, elementConfig: metadata.elementConfig, uniqueKey };
         })
         .filter((el): el is { entity: string; plan: any; elementConfig: any; uniqueKey: string } => el !== null);
+}
+
+interface BuildCacheEntry {
+    elementDefaults?: ElementDefaultConfig[];
+    hassEntities: any;
+    hassDevices: any;
+    allStatesPresent: boolean;
+    result: Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }>;
+}
+
+const buildStructureCache = new WeakMap<EntityConfig[], BuildCacheEntry>();
+
+function buildElementStructureCached(
+    entities: EntityConfig[],
+    hass: HomeAssistant,
+    roomIndex?: number,
+    elementDefaults?: ElementDefaultConfig[]
+): Array<{ entity: string; plan: any; elementConfig: any; uniqueKey: string }> {
+    const cached = buildStructureCache.get(entities);
+    if (cached &&
+        cached.elementDefaults === elementDefaults &&
+        cached.hassEntities === (hass as any).entities &&
+        cached.hassDevices === (hass as any).devices &&
+        cached.allStatesPresent) {
+        return cached.result;
+    }
+
+    const result = buildElementStructure(entities, hass, roomIndex, elementDefaults);
+
+    // "all states present" check: every entity-bearing element has a state object.
+    // While false, we keep re-running buildElementStructure so getElementTypeForEntity
+    // can pick up the right device_class once states finish loading.
+    const allStatesPresent = result.every(el => !el.entity || hass.states[el.entity] !== undefined);
+
+    buildStructureCache.set(entities, {
+        elementDefaults,
+        hassEntities: (hass as any).entities,
+        hassDevices: (hass as any).devices,
+        allStatesPresent,
+        result,
+    });
+
+    return result;
 }
 
 /**
@@ -255,15 +304,11 @@ function buildElementMetadata(
         elementConfig = mergeElementProperties(defaultElement, plan.element || {});
     }
 
-    // Add default tap_action and hold_action for entities (if not already set by user)
-    if (entity && isEntityActionable(entity, hass)) {
-        if (!elementConfig.tap_action) {
-            elementConfig.tap_action = getDefaultTapAction(entity, hass);
-        }
-        if (!elementConfig.hold_action) {
-            elementConfig.hold_action = getDefaultHoldAction();
-        }
-    }
+    // NOTE: default tap_action/hold_action are intentionally NOT injected here.
+    // isEntityActionable reads hass.states[id].attributes.icon, which can change
+    // at runtime without hass.entities/hass.devices changing. Injecting defaults
+    // here would freeze the actionability decision in the cached metadata.
+    // The post-cache loop in renderElements re-derives them per render.
 
     return {
         defaultElement,
@@ -801,20 +846,39 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
     const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
     const roomForInfoBox = originalRoom || room;
 
-    // Build element structure fresh each render
-    // NOT cached: plan references go stale after drag-drop position changes
-    const elements = buildElementStructure(room.entities || [], hass, roomIndex, elementDefaults);
+    // Build element structure (cached on room.entities ref; see buildElementStructureCached)
+    const elements = buildElementStructureCached(room.entities || [], hass, roomIndex, elementDefaults);
 
-    // Auto-inject runtime properties for info-box elements.
-    // These cannot be user-configured because they are computed at render time.
+    // Per-render mutations: re-derive everything that depends on hass.states or on
+    // mode (overview vs detail), since the cached elementConfig is shared across renders.
     for (const el of elements) {
         if (el.elementConfig?.type === 'custom:info-box-shp') {
             el.elementConfig.room_entities = options.roomEntityIds ?? getAllRoomEntityIds(hass, roomForInfoBox, null);
             el.elementConfig.mode = mode;
-            // Compute mode-specific show_background from user config properties
             const showBgOverview = el.elementConfig.show_background_overview ?? true;
             const showBgDetail = el.elementConfig.show_background_detail ?? true;
             el.elementConfig.show_background = mode === 'overview' ? showBgOverview : showBgDetail;
+        }
+
+        // Re-derive default tap/hold each render — these depend on hass.states.attributes.icon
+        // via isEntityActionable, so they cannot live inside the cached metadata.
+        // Gate on el.plan?.tap_action (the source-of-truth user override) rather than
+        // el.elementConfig.tap_action (which may carry a stale write from a prior render).
+        if (el.entity) {
+            if (el.plan?.tap_action) {
+                el.elementConfig.tap_action = el.plan.tap_action;
+            } else if (isEntityActionable(el.entity, hass)) {
+                el.elementConfig.tap_action = getDefaultTapAction(el.entity, hass);
+            } else {
+                delete el.elementConfig.tap_action;
+            }
+            if (el.plan?.hold_action) {
+                el.elementConfig.hold_action = el.plan.hold_action;
+            } else if (isEntityActionable(el.entity, hass)) {
+                el.elementConfig.hold_action = getDefaultHoldAction();
+            } else {
+                delete el.elementConfig.hold_action;
+            }
         }
     }
 
