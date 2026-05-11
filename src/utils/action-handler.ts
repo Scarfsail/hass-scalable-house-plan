@@ -80,13 +80,24 @@ class ActionHandlerController {
   }
 
   public bind(element: ActionHandlerElement, options: ActionHandlerOptions = {}) {
-    if (element.actionHandler) {
-      element.removeEventListener('touchstart', element.actionHandler.start!);
-      element.removeEventListener('touchend', element.actionHandler.end!);
-      element.removeEventListener('touchcancel', element.actionHandler.end!);
-      element.removeEventListener('mousedown', element.actionHandler.start!);
-      element.removeEventListener('click', element.actionHandler.end!);
-      element.removeEventListener('keydown', element.actionHandler.handleKeyDown!);
+    const existing = element.actionHandler;
+
+    // Skip rebind when no bind-relevant option changed. If new options are added
+    // that affect listener wiring (see uses of `options.*` below), extend this check.
+    if (existing &&
+        existing.options.hasHold === options.hasHold &&
+        existing.options.disabled === options.disabled &&
+        existing.options.hasDoubleClick === options.hasDoubleClick) {
+      return;
+    }
+
+    if (existing) {
+      element.removeEventListener('touchstart', existing.start!);
+      element.removeEventListener('touchend', existing.end!);
+      element.removeEventListener('touchcancel', existing.end!);
+      element.removeEventListener('mousedown', existing.start!);
+      element.removeEventListener('click', existing.end!);
+      element.removeEventListener('keydown', existing.handleKeyDown!);
     } else {
       element.addEventListener('contextmenu', (ev: Event) => {
         const e = ev || window.event;
