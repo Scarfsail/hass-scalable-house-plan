@@ -85,7 +85,7 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
         detail_element: { type: 'tile' }
     },
     'climate': {
-        plan_element: { type: 'custom:state-icon-shp' },
+        plan_element: { type: 'custom:climate-shp' },
         detail_element: { type: 'tile' }
     },
     'switch': {
