@@ -4,7 +4,7 @@ import type { HomeAssistant } from "../../hass-frontend/src/types";
 import { actionHandler, type ActionHandlerEvent } from "../utils/action-handler";
 import type { Room, EntityConfig, RoomEntityCache } from "../cards/types";
 import type { ScalableHousePlanConfig, HouseCache } from "../cards/scalable-house-plan";
-import { CreateCardElement, getRoomEntities } from "../utils";
+import { CreateCardElement, getRoomEntities, isEntityActive, getOverviewActiveOnlyDefault } from "../utils";
 import { renderElements, getRoomBounds } from "./element-renderer-shp";
 import "./boundary-handles-shp";
 import {
@@ -74,6 +74,7 @@ export class ScalableHousePlanRoom extends LitElement {
     private _cachedRoomBounds?: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number };
     private _cachedRelativePoints?: string;
     private _cachedOverviewRoom?: Room;
+    private _overviewVisibleEntities?: EntityConfig[];  // Pre-filtered by `overview !== false` (room-keyed)
     private _cachedClipId?: string;  // Clip path ID for detail mode
     private _prevColorKey?: string;  // Memoization key for _updateDynamicColor
     private _trackedStateRefs = new Map<string, any>();
@@ -112,16 +113,14 @@ export class ScalableHousePlanRoom extends LitElement {
             // Pre-compute clip path ID for detail mode
             this._cachedClipId = `room-clip-${this.room.name.replace(/\s+/g, '-')}-detail`;
             
-            // Filter entities for overview mode
-            this._cachedOverviewRoom = {
-                ...this.room,
-                entities: (this.room.entities || []).filter((entityConfig: EntityConfig) => {
-                    // String shorthand = detail-only, no overview
-                    if (typeof entityConfig === 'string') return false;
-                    // Only include entities with plan section and overview !== false
-                    return entityConfig.plan && (entityConfig.plan.overview !== false);
-                })
-            };
+            // Filter entities for overview mode (visibility-only; active-state filter applied below)
+            this._overviewVisibleEntities = (this.room.entities || []).filter((entityConfig: EntityConfig) => {
+                // String shorthand = detail-only, no overview
+                if (typeof entityConfig === 'string') return false;
+                // Only include entities with plan section and overview !== false
+                return entityConfig.plan && (entityConfig.plan.overview !== false);
+            });
+            this._cachedOverviewRoom = { ...this.room, entities: this._overviewVisibleEntities };
             
             // Only compute entity IDs if not provided by parent (backward compatibility)
             // Parent cache is preferred as it's computed once for all rooms
@@ -151,6 +150,33 @@ export class ScalableHousePlanRoom extends LitElement {
         if (changedProperties.has('hass') || changedProperties.has('room')) {
             this._updateDynamicColor();
         }
+
+        // Re-evaluate overview active-only filter when hass or room changes.
+        // Keep entities-array reference stable when result is unchanged so the
+        // downstream buildElementStructure cache (keyed on entities ref) stays warm.
+        if ((changedProperties.has('hass') || changedProperties.has('room')) && this._overviewVisibleEntities) {
+            const filtered = this._applyOverviewActiveFilter(this._overviewVisibleEntities);
+            const prev = this._cachedOverviewRoom?.entities;
+            if (!prev || prev.length !== filtered.length || filtered.some((e, i) => e !== prev[i])) {
+                this._cachedOverviewRoom = { ...this.room, entities: filtered };
+            }
+        }
+    }
+
+    /**
+     * Apply per-entity `plan.overview_active_only` filter against current hass state.
+     * Defaults to true for climate entities.
+     */
+    private _applyOverviewActiveFilter(entities: EntityConfig[]): EntityConfig[] {
+        return entities.filter((entityConfig) => {
+            if (typeof entityConfig === 'string') return true;
+            const entityId = entityConfig.entity;
+            if (!entityId) return true;
+            const explicit = entityConfig.plan?.overview_active_only;
+            const activeOnly = explicit ?? getOverviewActiveOnlyDefault(entityId);
+            if (!activeOnly) return true;
+            return isEntityActive(this.hass, entityId);
+        });
     }
 
     static get styles() {

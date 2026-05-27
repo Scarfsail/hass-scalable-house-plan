@@ -53,6 +53,7 @@ export interface PlanConfig {
     width?: string | number;
     height?: string | number;
     overview?: boolean;  // Default true - show on overview
+    overview_active_only?: boolean;  // When true, only show on overview if entity is "active" (e.g. light on, climate not off). Default false; defaults to true for climate.
     style?: string | Record<string, string | number>;  // Custom CSS styles for element wrapper (string or object)
     element?: ElementConfig;  // Element config with optional type override
     position_scaling_horizontal?: PositionScalingMode;  // How horizontal position scales in detail view (default: "plan")
