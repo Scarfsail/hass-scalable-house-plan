@@ -303,7 +303,9 @@ export function resolveGaugeConfig(
     text_position: userConfig.text_position ?? 'end', // Default to 'end' (right-aligned)
     style: userConfig.style ?? getDefaultStyleFromEntity(entity),
     bars: userConfig.bars ?? 24,
-    encoding: userConfig.encoding ?? 'color',
+    // Default encoding depends on style: bars are only useful with varying
+    // heights, single bar fills horizontally so color-only is correct there.
+    encoding: userConfig.encoding ?? ((userConfig.style ?? getDefaultStyleFromEntity(entity)) === 'bars' ? 'height-color' : 'color'),
     bar_gap: userConfig.bar_gap ?? 1,
   };
 
