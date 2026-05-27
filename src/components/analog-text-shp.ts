@@ -1,11 +1,12 @@
 import { LitElement, html, css, TemplateResult } from 'lit-element';
 import { planTextShadow, planDropShadow } from '../utils/plan-styles';
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from 'lit/directives/style-map.js';
 import type { HassEntity } from 'home-assistant-js-websocket';
 import { shortenNumberAndAddPrefixUnits, ShortenNumberPrefixType, evalJsTemplate } from '../utils';
 import type { GaugeConfig, ResolvedGaugeConfig } from '../utils/gauge-presets';
 import { resolveGaugeConfig, getColorForValue, calculateBarWidth } from '../utils/gauge-presets';
+import { getHourlyHistory, subscribeHourlyHistory, scheduleHourlyTick } from '../utils/entity-history';
 import type { HomeAssistant } from '../../hass-frontend/src/types';
 
 @customElement('analog-text-shp')
@@ -22,6 +23,14 @@ class AnalogText extends LitElement {
   @property({ attribute: false }) public negate?: boolean;
 
   @property({ attribute: false }) public gauge?: boolean | GaugeConfig;
+
+  @state() private _hourlyValues: (number | null)[] | null = null;
+
+  private _unsubHistory?: () => void;
+  private _unsubTick?: () => void;
+  private _historyEntityId?: string;
+  private _historyBars?: number;
+  private _fetchToken = 0;
 
   static styles = css`
     /* Add component styles here */
@@ -155,7 +164,80 @@ class AnalogText extends LitElement {
             height: 100%;
             transition: width 0.3s ease, background-color 0.3s ease;
         }
+
+        .gauge-bars-container {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            width: 100%;
+            ${planDropShadow};
+        }
+
+        .gauge-bars-container .bar {
+            flex: 1 1 0;
+            min-width: 0;
+            background-color: var(--shp-gauge-track, rgba(0, 0, 0, 0.2));
+            border-radius: 1px;
+            transition: background-color 0.3s ease, height 0.3s ease;
+        }
   `;
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._teardownHistory();
+  }
+
+  updated(changed: Map<string, unknown>): void {
+    super.updated(changed);
+    if (changed.has('entity') || changed.has('gauge') || changed.has('hass')) {
+      this._maybeSetupHistory();
+    }
+  }
+
+  private _teardownHistory() {
+    this._unsubHistory?.();
+    this._unsubHistory = undefined;
+    this._unsubTick?.();
+    this._unsubTick = undefined;
+    this._historyEntityId = undefined;
+    this._historyBars = undefined;
+    this._hourlyValues = null;
+    this._fetchToken++;
+  }
+
+  private _maybeSetupHistory() {
+    if (!this.entity || !this.hass) return;
+    const gaugeConfig = this.resolveGaugeSettings();
+    const needsHistory = gaugeConfig?.style === 'bars';
+    const entityId = this.entity.entity_id;
+    const bars = gaugeConfig?.bars ?? 24;
+
+    if (!needsHistory) {
+      if (this._unsubHistory) this._teardownHistory();
+      return;
+    }
+
+    if (this._historyEntityId === entityId && this._historyBars === bars) return;
+
+    this._teardownHistory();
+    this._historyEntityId = entityId;
+    this._historyBars = bars;
+    const token = ++this._fetchToken;
+
+    this._unsubHistory = subscribeHourlyHistory(entityId, bars, () => {
+      if (token !== this._fetchToken) return;
+      const { values } = getHourlyHistory(this.hass!, entityId, bars);
+      this._hourlyValues = values ? [...values] : null;
+    });
+    this._unsubTick = scheduleHourlyTick(() => {
+      // Force a fresh fetch by reading current hour (cache invalidates on hour boundary)
+      getHourlyHistory(this.hass!, entityId, bars);
+    });
+
+    const { values } = getHourlyHistory(this.hass, entityId, bars);
+    if (values) this._hourlyValues = [...values];
+    // Subscriber callback above handles the fetch resolution.
+  }
 
   render() {
     if (!this.entity)
@@ -219,6 +301,9 @@ class AnalogText extends LitElement {
   }
 
   private renderGaugeBar(value: number, config: ResolvedGaugeConfig, barWidth?: string | number): TemplateResult {
+    if (config.style === 'bars') {
+      return this.renderHistoryBars(value, config, barWidth);
+    }
     const widthPercent = calculateBarWidth(value, config.min, config.max);
     const color = this.getGaugeColor(value, config);
 
@@ -234,6 +319,51 @@ class AnalogText extends LitElement {
           width: `${widthPercent}%`,
           backgroundColor: color
         })}></div>
+      </div>
+    `;
+  }
+
+  private renderHistoryBars(currentValue: number, config: ResolvedGaugeConfig, barWidth?: string | number): TemplateResult {
+    const total = config.bars;
+    const historical = this._hourlyValues ?? new Array(total - 1).fill(null);
+    const values: (number | null)[] = [...historical.slice(0, total - 1), currentValue];
+    while (values.length < total) values.unshift(null);
+
+    const containerStyles: any = {
+      height: `${config.height}px`,
+      gap: `${config.bar_gap}px`,
+    };
+    if (barWidth !== undefined) {
+      containerStyles.width = typeof barWidth === 'number' ? `${barWidth}px` : barWidth;
+    }
+
+    const lastIdx = values.length - 1;
+    const bars = values.map((v, i) => {
+      if (v === null || typeof v !== 'number' || isNaN(v)) {
+        return html`<div class="bar" style=${styleMap({ height: '100%', opacity: '0.25' })}></div>`;
+      }
+      // Only the current-hour bar can use the scriptable color template (which
+      // evaluates against the live entity state). Historical bars must use the
+      // threshold mapping so each bar reflects its own value.
+      const color = i === lastIdx
+        ? this.getGaugeColor(v, config)
+        : getColorForValue(v, config.thresholds);
+      if (config.encoding === 'height-color') {
+        const pct = calculateBarWidth(v, config.min, config.max);
+        return html`<div class="bar" style=${styleMap({
+          height: `${Math.max(8, pct)}%`,
+          backgroundColor: color,
+        })}></div>`;
+      }
+      return html`<div class="bar" style=${styleMap({
+        height: '100%',
+        backgroundColor: color,
+      })}></div>`;
+    });
+
+    return html`
+      <div class="gauge-bars-container" style=${styleMap(containerStyles)}>
+        ${bars}
       </div>
     `;
   }

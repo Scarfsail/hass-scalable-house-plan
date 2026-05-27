@@ -31,6 +31,11 @@ export interface GaugeConfig {
   color?: string; // Scriptable color that overrides threshold-based colors
   width?: string | number; // Fixed width for the gauge container (e.g., '100px', '100%', 100)
   text_position?: 'start' | 'center' | 'end'; // Text alignment within the width-constrained container
+  // Bars style (history visualization)
+  style?: 'bar' | 'bars';            // 'bar' = single filled bar (default), 'bars' = N hourly history bars
+  bars?: number;                     // Number of bars when style='bars' (default 24)
+  encoding?: 'color' | 'height-color'; // How each bar represents its value (default 'color')
+  bar_gap?: number;                  // Pixel gap between bars (default 1)
 }
 
 /**
@@ -46,6 +51,10 @@ export interface ResolvedGaugeConfig {
   color?: string; // Scriptable color that overrides threshold-based colors
   width?: string | number; // Fixed width for the gauge container (e.g., '100px', '100%', 100)
   text_position: 'start' | 'center' | 'end'; // Text alignment within the width-constrained container
+  style: 'bar' | 'bars';
+  bars: number;
+  encoding: 'color' | 'height-color';
+  bar_gap: number;
 }
 
 /**
@@ -124,8 +133,21 @@ export const GAUGE_PRESETS: Record<string, GaugePreset> = {
 };
 
 /**
+ * Default visual style based on the entity's device_class. Temperature and
+ * humidity get the 24-bar history strip by default; everything else gets the
+ * classic single-bar fill.
+ */
+export function getDefaultStyleFromEntity(entity: HassEntity): 'bar' | 'bars' {
+  const deviceClass = entity.attributes?.device_class;
+  if (deviceClass === 'temperature' || deviceClass === 'humidity') {
+    return 'bars';
+  }
+  return 'bar';
+}
+
+/**
  * Auto-detect the appropriate gauge preset based on entity device_class.
- * 
+ *
  * @param entity - Home Assistant entity
  * @returns Preset name or undefined if no matching preset
  */
@@ -279,6 +301,10 @@ export function resolveGaugeConfig(
     color: userConfig.color, // Pass through the scriptable color
     width: userConfig.width, // Pass through width as-is
     text_position: userConfig.text_position ?? 'end', // Default to 'end' (right-aligned)
+    style: userConfig.style ?? getDefaultStyleFromEntity(entity),
+    bars: userConfig.bars ?? 24,
+    encoding: userConfig.encoding ?? 'color',
+    bar_gap: userConfig.bar_gap ?? 1,
   };
 
   // Validate that we have valid thresholds OR a custom color

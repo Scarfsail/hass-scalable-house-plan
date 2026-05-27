@@ -228,7 +228,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
      */
     private _renderCardElement(entity: HassEntity, elementProps: Record<string, any>, isMotionOrOccupancy: boolean) {
         const entityId = entity.entity_id;
-        
+
         // Determine card type and merge properties
         let cardConfig: any;
         if (isMotionOrOccupancy) {
@@ -239,7 +239,6 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 ...elementProps
             };
         } else {
-            // Use analog-shp with gauge: true by default
             cardConfig = {
                 type: 'custom:analog-shp',
                 gauge: true,
