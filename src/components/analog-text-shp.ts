@@ -337,6 +337,33 @@ class AnalogText extends LitElement {
       containerStyles.width = typeof barWidth === 'number' ? `${barWidth}px` : barWidth;
     }
 
+    // For height-color encoding, auto-scale heights to the data's own range so
+    // bars stay visually distinct even when values cluster inside the
+    // threshold band (e.g. indoor temps 21–23 in an 18–27 preset range).
+    let scaleMin = config.min;
+    let scaleMax = config.max;
+    if (config.encoding === 'height-color') {
+      let dMin = Infinity;
+      let dMax = -Infinity;
+      for (const v of values) {
+        if (typeof v === 'number' && !isNaN(v)) {
+          if (v < dMin) dMin = v;
+          if (v > dMax) dMax = v;
+        }
+      }
+      if (dMin !== Infinity && dMax !== -Infinity) {
+        if (dMax === dMin) {
+          // All values equal: pad the range so bars show a mid height.
+          const pad = Math.abs(dMin) > 0 ? Math.abs(dMin) * 0.1 : 1;
+          scaleMin = dMin - pad;
+          scaleMax = dMax + pad;
+        } else {
+          scaleMin = dMin;
+          scaleMax = dMax;
+        }
+      }
+    }
+
     const lastIdx = values.length - 1;
     const bars = values.map((v, i) => {
       if (v === null || typeof v !== 'number' || isNaN(v)) {
@@ -349,9 +376,10 @@ class AnalogText extends LitElement {
         ? this.getGaugeColor(v, config)
         : getColorForValue(v, config.thresholds);
       if (config.encoding === 'height-color') {
-        const pct = calculateBarWidth(v, config.min, config.max);
+        const pct = calculateBarWidth(v, scaleMin, scaleMax);
         return html`<div class="bar" style=${styleMap({
-          height: `${Math.max(8, pct)}%`,
+          height: `${pct}%`,
+          minHeight: '1px',
           backgroundColor: color,
         })}></div>`;
       }
