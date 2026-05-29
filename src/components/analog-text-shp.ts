@@ -1,4 +1,4 @@
-import { LitElement, html, css, TemplateResult } from 'lit-element';
+import { LitElement, html, css, svg, TemplateResult } from 'lit-element';
 import { planTextShadow, planDropShadow } from '../utils/plan-styles';
 import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from 'lit/directives/style-map.js';
@@ -166,19 +166,9 @@ class AnalogText extends LitElement {
         }
 
         .gauge-bars-container {
-            display: flex;
-            flex-direction: row;
-            align-items: flex-end;
+            display: block;
             width: 100%;
             ${planDropShadow};
-        }
-
-        .gauge-bars-container .bar {
-            flex: 1 1 0;
-            min-width: 0;
-            background-color: var(--shp-gauge-track, rgba(0, 0, 0, 0.2));
-            border-radius: 1px;
-            transition: background-color 0.3s ease, height 0.3s ease;
         }
   `;
 
@@ -329,10 +319,7 @@ class AnalogText extends LitElement {
     const values: (number | null)[] = [...historical.slice(0, total - 1), currentValue];
     while (values.length < total) values.unshift(null);
 
-    const containerStyles: any = {
-      height: `${config.height}px`,
-      gap: `${config.bar_gap}px`,
-    };
+    const containerStyles: any = { height: `${config.height}px` };
     if (barWidth !== undefined) {
       containerStyles.width = typeof barWidth === 'number' ? `${barWidth}px` : barWidth;
     }
@@ -364,10 +351,21 @@ class AnalogText extends LitElement {
       }
     }
 
+    // Render as a single SVG with preserveAspectRatio="none" so bars are
+    // distributed by vector scaling, not per-element pixel rounding. This keeps
+    // spacing perfectly even at any container width (e.g. the narrow infobox),
+    // where flexbox would otherwise bunch sub-3px bars into uneven groups.
+    const SLOT = 10;
+    const gapUnits = Math.min(Math.max(config.bar_gap, 0), 4);
+    const barW = SLOT - gapUnits;
+    const VH = 100; // viewBox height units
+    const MIN_H = 8; // minimum bar height in units so the color stays visible
+
     const lastIdx = values.length - 1;
-    const bars = values.map((v, i) => {
+    const rects = values.map((v, i) => {
+      const x = i * SLOT + gapUnits / 2;
       if (v === null || typeof v !== 'number' || isNaN(v)) {
-        return html`<div class="bar" style=${styleMap({ height: '100%', opacity: '0.25' })}></div>`;
+        return svg`<rect x=${x} y=${0} width=${barW} height=${VH} fill="var(--shp-gauge-track, rgba(0,0,0,0.2))" opacity="0.25"></rect>`;
       }
       // Only the current-hour bar can use the scriptable color template (which
       // evaluates against the live entity state). Historical bars must use the
@@ -375,23 +373,24 @@ class AnalogText extends LitElement {
       const color = i === lastIdx
         ? this.getGaugeColor(v, config)
         : getColorForValue(v, config.thresholds);
+      let h = VH;
       if (config.encoding === 'height-color') {
-        const pct = calculateBarWidth(v, scaleMin, scaleMax);
-        return html`<div class="bar" style=${styleMap({
-          height: `${pct}%`,
-          minHeight: '1px',
-          backgroundColor: color,
-        })}></div>`;
+        h = Math.max(MIN_H, (calculateBarWidth(v, scaleMin, scaleMax) / 100) * VH);
       }
-      return html`<div class="bar" style=${styleMap({
-        height: '100%',
-        backgroundColor: color,
-      })}></div>`;
+      return svg`<rect x=${x} y=${VH - h} width=${barW} height=${h} fill=${color}></rect>`;
     });
 
     return html`
       <div class="gauge-bars-container" style=${styleMap(containerStyles)}>
-        ${bars}
+        <svg
+          width="100%"
+          height="100%"
+          viewBox="0 0 ${total * SLOT} ${VH}"
+          preserveAspectRatio="none"
+          style="display:block"
+        >
+          ${rects}
+        </svg>
       </div>
     `;
   }
