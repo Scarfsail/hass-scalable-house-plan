@@ -63,6 +63,11 @@ export interface ResolvedGaugeConfig {
 const DEFAULT_GAUGE_HEIGHT = 4;
 
 /**
+ * Default height in pixels for the multi-bar history style.
+ */
+const DEFAULT_BARS_HEIGHT = 8;
+
+/**
  * Default gauge bar position.
  */
 const DEFAULT_GAUGE_POSITION = 'bottom';
@@ -291,21 +296,25 @@ export function resolveGaugeConfig(
   }
 
   // Merge base config with user overrides
+  const style = userConfig.style ?? getDefaultStyleFromEntity(entity);
+
   const resolved: ResolvedGaugeConfig = {
     min: userConfig.min ?? baseConfig?.min ?? 0,
     max: userConfig.max ?? baseConfig?.max ?? 100,
     thresholds: userConfig.thresholds ?? baseConfig?.thresholds ?? [],
-    height: userConfig.height ?? DEFAULT_GAUGE_HEIGHT,
+    // Bars need more vertical room than a single fill bar for the height-color
+    // encoding to read; otherwise low values collapse into 1px dots.
+    height: userConfig.height ?? (style === 'bars' ? DEFAULT_BARS_HEIGHT : DEFAULT_GAUGE_HEIGHT),
     position: userConfig.position ?? DEFAULT_GAUGE_POSITION,
     gap: userConfig.gap ?? DEFAULT_GAUGE_GAP,
     color: userConfig.color, // Pass through the scriptable color
     width: userConfig.width, // Pass through width as-is
     text_position: userConfig.text_position ?? 'end', // Default to 'end' (right-aligned)
-    style: userConfig.style ?? getDefaultStyleFromEntity(entity),
+    style,
     bars: userConfig.bars ?? 24,
     // Default encoding depends on style: bars are only useful with varying
     // heights, single bar fills horizontally so color-only is correct there.
-    encoding: userConfig.encoding ?? ((userConfig.style ?? getDefaultStyleFromEntity(entity)) === 'bars' ? 'height-color' : 'color'),
+    encoding: userConfig.encoding ?? (style === 'bars' ? 'height-color' : 'color'),
     bar_gap: userConfig.bar_gap ?? 1,
   };
 

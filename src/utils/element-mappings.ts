@@ -55,11 +55,7 @@ export const DEFAULT_ELEMENT_MAPPINGS: Record<string, ElementMapping> = {
         detail_element: { type: 'custom:analog-bar-shp', orientation: 'horizontal' }
     },
     'sensor.temperature': {
-        plan_element: {
-            type: 'custom:analog-shp',
-            style: { "font-size": "20px" },
-            gauge: { height: 8 }
-        },
+        plan_element: { type: 'custom:analog-shp', style: { "font-size": "20px" }, gauge: true },
         detail_element: { type: 'tile' }
     },
     'sensor.humidity': {
