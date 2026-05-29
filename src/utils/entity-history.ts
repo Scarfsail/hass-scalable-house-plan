@@ -27,51 +27,37 @@ function bucketIndex(ts: number, firstHour: number): number {
   return Math.floor((ts - firstHour) / 3600000);
 }
 
+interface StatisticValue {
+  start: number; // epoch ms of the hour bucket start
+  mean?: number | null;
+}
+type Statistics = Record<string, StatisticValue[]>;
+
 /**
- * Fetch history and bucket into hourly values for the past `bars - 1` hours
- * (excluding the current hour, which the caller already has from entity.state).
+ * Fetch hourly values for the past `bars - 1` hours (excluding the current
+ * hour, which the caller already has from entity.state).
  *
- * Strategy: take the LAST recorded state inside each hour bucket. For hours
- * with no state changes, carry forward the previous bucket's value.
+ * Primary path: the recorder statistics API, which returns one pre-computed
+ * `mean` per hour (~24 samples) for entities with long-term statistics.
+ * Fallback: raw history bucketed into hourly averages, for sensors without
+ * statistics. Empty buckets carry forward the previous value.
  */
 async function fetchHourlyValues(
   hass: HomeAssistant,
   entityId: string,
   bars: number
 ): Promise<(number | null)[]> {
-  const now = new Date();
-  const currentHourStart = hourStartMs(now);
+  const currentHourStart = hourStartMs(new Date());
   const firstHourStart = currentHourStart - (bars - 1) * 3600000;
-
-  const startTime = new Date(firstHourStart);
-  const endTime = new Date(currentHourStart);
-
-  const result = await hass.callWS<HistoryStates>({
-    type: 'history/history_during_period',
-    start_time: startTime.toISOString(),
-    end_time: endTime.toISOString(),
-    minimal_response: true,
-    no_attributes: true,
-    entity_ids: [entityId],
-  });
-
-  const states = result?.[entityId] ?? [];
   const slots: (number | null)[] = new Array(bars - 1).fill(null);
 
-  for (const s of states) {
-    const ts = (s.lc ?? s.lu) * 1000;
-    if (ts < firstHourStart || ts >= currentHourStart) continue;
-    const idx = bucketIndex(ts, firstHourStart);
-    if (idx < 0 || idx >= slots.length) continue;
-    const n = parseFloat(s.s);
-    if (!isNaN(n)) slots[idx] = n;
+  const filled = await fillFromStatistics(hass, entityId, slots, firstHourStart, currentHourStart);
+  if (!filled) {
+    await fillFromHistory(hass, entityId, slots, firstHourStart, currentHourStart);
   }
 
-  // Carry-forward fill for empty buckets
+  // Carry-forward fill for empty buckets (e.g. sensor offline that hour).
   let last: number | null = null;
-  // First, try seeding `last` from the very first non-null we find searching back
-  // (which we don't have - so look for the earliest state before firstHourStart not
-  //  available given our window). Carry-forward only from within window.
   for (let i = 0; i < slots.length; i++) {
     if (slots[i] === null) {
       slots[i] = last;
@@ -81,6 +67,83 @@ async function fetchHourlyValues(
   }
 
   return slots;
+}
+
+/**
+ * Fill slots from recorder statistics (hourly mean). Returns true if any
+ * value was placed, false if statistics are unavailable for this entity.
+ */
+async function fillFromStatistics(
+  hass: HomeAssistant,
+  entityId: string,
+  slots: (number | null)[],
+  firstHourStart: number,
+  currentHourStart: number
+): Promise<boolean> {
+  let stats: StatisticValue[] = [];
+  try {
+    const result = await hass.callWS<Statistics>({
+      type: 'recorder/statistics_during_period',
+      start_time: new Date(firstHourStart).toISOString(),
+      end_time: new Date(currentHourStart).toISOString(),
+      statistic_ids: [entityId],
+      period: 'hour',
+      types: ['mean'],
+    });
+    stats = result?.[entityId] ?? [];
+  } catch {
+    return false;
+  }
+
+  let placed = false;
+  for (const s of stats) {
+    if (s.mean === null || s.mean === undefined) continue;
+    if (s.start < firstHourStart || s.start >= currentHourStart) continue;
+    const idx = bucketIndex(s.start, firstHourStart);
+    if (idx < 0 || idx >= slots.length) continue;
+    slots[idx] = s.mean;
+    placed = true;
+  }
+  return placed;
+}
+
+/**
+ * Fill slots from raw history, averaging all numeric states within each hour.
+ */
+async function fillFromHistory(
+  hass: HomeAssistant,
+  entityId: string,
+  slots: (number | null)[],
+  firstHourStart: number,
+  currentHourStart: number
+): Promise<void> {
+  const result = await hass.callWS<HistoryStates>({
+    type: 'history/history_during_period',
+    start_time: new Date(firstHourStart).toISOString(),
+    end_time: new Date(currentHourStart).toISOString(),
+    minimal_response: true,
+    no_attributes: true,
+    entity_ids: [entityId],
+  });
+
+  const states = result?.[entityId] ?? [];
+  const sums = new Array(slots.length).fill(0);
+  const counts = new Array(slots.length).fill(0);
+
+  for (const s of states) {
+    const ts = (s.lc ?? s.lu) * 1000;
+    if (ts < firstHourStart || ts >= currentHourStart) continue;
+    const idx = bucketIndex(ts, firstHourStart);
+    if (idx < 0 || idx >= slots.length) continue;
+    const n = parseFloat(s.s);
+    if (isNaN(n)) continue;
+    sums[idx] += n;
+    counts[idx] += 1;
+  }
+
+  for (let i = 0; i < slots.length; i++) {
+    if (counts[i] > 0) slots[i] = sums[i] / counts[i];
+  }
 }
 
 /**
