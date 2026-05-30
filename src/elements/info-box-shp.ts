@@ -29,6 +29,7 @@ interface InfoBoxItem {
 // Pre-computed type config for caching
 interface TypeConfigCache {
     show: boolean;
+    show_icon: boolean;  // Whether the leading icon is shown in the current mode
     size: string;
     scale: number;  // Pre-parsed scale value
     icon_position: 'inline' | 'separate';
@@ -159,9 +160,14 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 show = typeConfig?.visible_detail ?? typeConfig?.show ?? true;
             }
             
+            // Mode-specific icon visibility (default: only in detail view)
+            const iconVisibility = typeConfig?.icon_visibility ?? 'detail';
+            const showIcon = iconVisibility === 'all' || iconVisibility === mode;
+
             const size = typeConfig?.size ?? "100%";
             this._typeConfigs[type] = {
                 show,
+                show_icon: showIcon,
                 size,
                 scale: parseFloat(size) / 100,
                 icon_position: typeConfig?.icon_position ?? 'inline',
@@ -201,7 +207,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                             style="${transformStyle}"
                             @click=${() => this._showMoreInfo(item.entity.entity_id)}
                         >
-                            <ha-icon icon="${item.icon}"></ha-icon>
+                            ${typeConfig.show_icon ? html`<ha-icon icon="${item.icon}"></ha-icon>` : nothing}
                             ${this._renderCardElement(item.entity, typeConfig.element || {}, isMotionOrOccupancy)}
                         </div>
                     `;
