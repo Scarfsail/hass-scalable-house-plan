@@ -145,7 +145,11 @@ class AnalogText extends LitElement {
         }
 
         .text-content.text-bg .gauge-bar-fill {
+            top: auto;
+            bottom: 0;
+            width: 100%;
             opacity: 0.6;
+            transition: height 0.3s ease, background-color 0.3s ease;
         }
         
         .text-overlay {
@@ -310,15 +314,17 @@ class AnalogText extends LitElement {
       return html`<div class="text-content ${alignClass}">${textHtml}</div>`;
     }
 
-    const widthPercent = calculateBarWidth(value, config.min, config.max);
+    const fillPercent = calculateBarWidth(value, config.min, config.max);
     const color = this.getGaugeColor(value, config);
 
+    // The chip fills vertically (bottom → top); the scoped CSS anchors the fill
+    // to the bottom and spans the full width, so height encodes the value.
     return html`
       <div class="text-content text-bg ${alignClass}">
         <div class="gauge-bar-background-layer">
           <div class="gauge-bar-background"></div>
           <div class="gauge-bar-fill" style=${styleMap({
-            width: `${widthPercent}%`,
+            height: `${fillPercent}%`,
             backgroundColor: color
           })}></div>
         </div>
