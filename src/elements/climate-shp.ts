@@ -50,6 +50,14 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
             cursor: pointer;
         }
 
+        /* Let touches/clicks fall through to the button trigger so the dropdown
+           opens reliably. Otherwise the icon's internal action-handler calls
+           preventDefault() on touchstart, which suppresses the synthesized
+           click on mobile and the menu never opens. */
+        .trigger > * {
+            pointer-events: none;
+        }
+
         .icon-container {
             position: relative;
             display: inline-flex;
