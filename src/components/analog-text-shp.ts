@@ -119,6 +119,34 @@ class AnalogText extends LitElement {
         .text-content.align-end {
             text-align: end;
         }
+
+        /* Current-value gauge fill painted behind the text. The fill layer is
+           absolutely positioned and clipped to this box; the text span (the
+           only inline child) is lifted above it via z-index. */
+        .text-content.text-bg {
+            position: relative;
+            padding: 1px 8px;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .text-content.text-bg > span {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Darker, more opaque track and a slightly translucent fill so the
+           value reads as a subtle backdrop behind the text rather than a
+           solid block. Scoped to text-bg so the history strip / gauge bar
+           keep their original look. */
+        .text-content.text-bg .gauge-bar-background {
+            background-color: var(--shp-gauge-text-bg-track, rgba(0, 0, 0, 0.4));
+            box-shadow: none;
+        }
+
+        .text-content.text-bg .gauge-bar-fill {
+            opacity: 0.6;
+        }
         
         .text-overlay {
             position: relative;
@@ -260,15 +288,43 @@ class AnalogText extends LitElement {
 
     switch (gaugeConfig.position) {
       case 'top':
-        return this.renderTopGauge(textHtml, barHtml, gaugeConfig);
+        return this.renderTopGauge(textHtml, barHtml, gaugeConfig, value);
       case 'left':
-        return this.renderLeftGauge(textHtml, barHtml, gaugeConfig);
+        return this.renderLeftGauge(textHtml, barHtml, gaugeConfig, value);
       case 'right':
-        return this.renderRightGauge(textHtml, barHtml, gaugeConfig);
+        return this.renderRightGauge(textHtml, barHtml, gaugeConfig, value);
       case 'bottom':
       default:
-        return this.renderBottomGauge(textHtml, barHtml, gaugeConfig);
+        return this.renderBottomGauge(textHtml, barHtml, gaugeConfig, value);
     }
+  }
+
+  /**
+   * Render the text container. When `text_background` is enabled, the current
+   * value's gauge fill is painted behind the text (the text stays on top), so a
+   * reading is visible at a glance even when the gauge bar lives elsewhere
+   * (e.g. the 24h history strip below). Otherwise it's a plain text container.
+   */
+  private renderTextSection(textHtml: TemplateResult, value: number, config: ResolvedGaugeConfig, alignClass: string): TemplateResult {
+    if (!config.text_background) {
+      return html`<div class="text-content ${alignClass}">${textHtml}</div>`;
+    }
+
+    const widthPercent = calculateBarWidth(value, config.min, config.max);
+    const color = this.getGaugeColor(value, config);
+
+    return html`
+      <div class="text-content text-bg ${alignClass}">
+        <div class="gauge-bar-background-layer">
+          <div class="gauge-bar-background"></div>
+          <div class="gauge-bar-fill" style=${styleMap({
+            width: `${widthPercent}%`,
+            backgroundColor: color
+          })}></div>
+        </div>
+        ${textHtml}
+      </div>
+    `;
   }
 
   private renderText(value: number): TemplateResult {
@@ -395,58 +451,58 @@ class AnalogText extends LitElement {
     `;
   }
 
-  private renderBottomGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+  private renderBottomGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig, value: number): TemplateResult {
     const hasWidth = gaugeConfig.width !== undefined;
     const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
     const containerClass = hasWidth ? 'gauge-container-bottom has-width' : 'gauge-container-bottom';
     const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
-    const containerStyle = hasWidth 
-      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any) 
+    const containerStyle = hasWidth
+      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any)
       : styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
 
     return html`
       <div class="${containerClass}" style=${containerStyle}>
-        <div class="text-content ${textAlignClass}">${textHtml}</div>
+        ${this.renderTextSection(textHtml, value, gaugeConfig, textAlignClass)}
         ${barHtml}
       </div>
     `;
   }
 
-  private renderTopGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+  private renderTopGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig, value: number): TemplateResult {
     const hasWidth = gaugeConfig.width !== undefined;
     const textAlignClass = hasWidth ? `align-${gaugeConfig.text_position}` : '';
     const containerClass = hasWidth ? 'gauge-container-top has-width' : 'gauge-container-top';
     const widthValue = hasWidth ? (typeof gaugeConfig.width === 'number' ? `${gaugeConfig.width}px` : gaugeConfig.width) : undefined;
-    const containerStyle = hasWidth 
-      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any) 
+    const containerStyle = hasWidth
+      ? styleMap({ '--gauge-width': widthValue, '--gauge-gap': `${gaugeConfig.gap}px` } as any)
       : styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
 
     return html`
       <div class="${containerClass}" style=${containerStyle}>
-        <div class="text-content ${textAlignClass}">${textHtml}</div>
+        ${this.renderTextSection(textHtml, value, gaugeConfig, textAlignClass)}
         ${barHtml}
       </div>
     `;
   }
 
-  private renderLeftGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+  private renderLeftGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig, value: number): TemplateResult {
     const containerStyle = styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
 
     return html`
       <div class="gauge-container-left" style=${containerStyle}>
         ${barHtml}
-        <div class="text-content">${textHtml}</div>
+        ${this.renderTextSection(textHtml, value, gaugeConfig, '')}
       </div>
     `;
   }
 
-  private renderRightGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig): TemplateResult {
+  private renderRightGauge(textHtml: TemplateResult, barHtml: TemplateResult, gaugeConfig: ResolvedGaugeConfig, value: number): TemplateResult {
     const containerStyle = styleMap({ '--gauge-gap': `${gaugeConfig.gap}px` } as any);
 
     return html`
       <div class="gauge-container-right" style=${containerStyle}>
         ${barHtml}
-        <div class="text-content">${textHtml}</div>
+        ${this.renderTextSection(textHtml, value, gaugeConfig, '')}
       </div>
     `;
   }

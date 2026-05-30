@@ -36,6 +36,7 @@ export interface GaugeConfig {
   bars?: number;                     // Number of bars when style='bars' (default 24)
   encoding?: 'color' | 'height-color'; // How each bar represents its value (default 'color')
   bar_gap?: number;                  // Pixel gap between bars (default 1)
+  text_background?: boolean;         // Paint the current-value gauge fill behind the text (default: on for 'bars')
 }
 
 /**
@@ -55,6 +56,7 @@ export interface ResolvedGaugeConfig {
   bars: number;
   encoding: 'color' | 'height-color';
   bar_gap: number;
+  text_background: boolean;
 }
 
 /**
@@ -290,6 +292,9 @@ export function resolveGaugeConfig(
     return null;
   }
 
+  // Resolve the visual style once: it drives several style-dependent defaults below.
+  const resolvedStyle = userConfig.style ?? getDefaultStyleFromEntity(entity);
+
   // Merge base config with user overrides
   const resolved: ResolvedGaugeConfig = {
     min: userConfig.min ?? baseConfig?.min ?? 0,
@@ -301,12 +306,17 @@ export function resolveGaugeConfig(
     color: userConfig.color, // Pass through the scriptable color
     width: userConfig.width, // Pass through width as-is
     text_position: userConfig.text_position ?? 'end', // Default to 'end' (right-aligned)
-    style: userConfig.style ?? getDefaultStyleFromEntity(entity),
+    style: resolvedStyle,
     bars: userConfig.bars ?? 24,
     // Default encoding depends on style: bars are only useful with varying
     // heights, single bar fills horizontally so color-only is correct there.
-    encoding: userConfig.encoding ?? ((userConfig.style ?? getDefaultStyleFromEntity(entity)) === 'bars' ? 'height-color' : 'color'),
+    encoding: userConfig.encoding ?? (resolvedStyle === 'bars' ? 'height-color' : 'color'),
     bar_gap: userConfig.bar_gap ?? 1,
+    // The history-bar strip ('bars', used by temperature/humidity) shows the
+    // trend below the text; painting the current value behind the text as well
+    // gives an at-a-glance reading without stealing vertical space. The single
+    // 'bar' style already sits under the text, so leave it off there.
+    text_background: userConfig.text_background ?? (resolvedStyle === 'bars'),
   };
 
   // Validate that we have valid thresholds OR a custom color

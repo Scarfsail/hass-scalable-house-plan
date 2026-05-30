@@ -21,6 +21,7 @@ Add a gauge visualization to `analog-shp` and `analog-text-shp` components. The 
 | **Preset Detection** | Auto-detect from device_class + allow explicit override |
 | **Backward Compatibility** | Opt-in via `gauge` config property |
 | **Bar Position** | Configurable (`bottom` or `background`), default: `bottom` |
+| **Text Background** | `text_background` paints the current-value fill behind the text independently of `position`, so the `bars` history strip can sit below while the text still reads as a gauge. Defaults on for the `bars` style (temperature/humidity), off for the single `bar`. |
 | **Value Outside Range** | Clamp bar to 0% or 100%, use first/last threshold color |
 | **Temperature Auto-detect** | Default to `temperature_indoor`, user must explicitly set `preset: "temperature_outdoor"` |
 
