@@ -35,6 +35,10 @@ export class GaugePill extends LitElement {
 
     .pill {
       position: relative;
+      /* NOTE: the vertical padding (1px) and the fully-rounded radius feed the
+         history-strip alignment in analog-text-shp (.gauge-bars-container
+         .aligned-to-pill). Changing either there affects the pill height /
+         corner radius — keep that inset in sync. */
       padding: var(--shp-gauge-pill-padding, 1px 8px);
       border-radius: var(--shp-gauge-pill-radius, 999px);
       overflow: hidden;

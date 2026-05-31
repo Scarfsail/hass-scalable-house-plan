@@ -42,6 +42,8 @@ class AnalogText extends LitElement {
             color: var(--shp-plan-text-color, inherit);
         }
         span {
+            /* line-height: 1 sets the value's line box to exactly 1em, which the
+               .aligned-to-pill chart inset relies on for the pill height. */
             line-height: 1;
             ${planTextShadow};
         }
@@ -190,6 +192,44 @@ class AnalogText extends LitElement {
             display: block;
             width: 100%;
             ${planDropShadow};
+        }
+
+        /* ---------------------------------------------------------------------
+           Aligning the history strip to the straight top of the value pill.
+
+           When the chart sits flush above the rounded value pill (gauge-pill-shp),
+           insetting its left/right edges makes it span the pill's straight top
+           section instead of overhanging the curved ends, which looks wrong.
+
+           WHY 0.375em:
+           The pill uses border-radius 999px, which the browser caps at half the
+           element height, so each rounded end occupies exactly one corner-radius
+           of horizontal space and the straight top begins one radius in from each
+           side. The pill height is the text line box (the value span has
+           line-height 1, i.e. 1em) plus its vertical padding (2x 1px from
+           gauge-pill-shp's --shp-gauge-pill-padding), = 1em + 2px. So the corner
+           radius = height / 2 = 0.5em + 1px (the exact tangent point).
+
+           Insetting by the FULL radius is geometrically exact but looks too narrow:
+           a circular arc is nearly flat near its apex, so the pill reads as
+           straight for a stretch before the true tangent. About 0.75x the radius
+           (~0.375em) lands the edges on the visually-flat top.
+
+           IF ALIGNMENT BREAKS, this 0.375em assumes all of:
+             - the value span keeps line-height 1 (pill height = 1em + padding)
+             - gauge-pill-shp keeps ~1px vertical padding on .pill
+             - gauge-pill-shp keeps the fully-rounded border-radius 999px
+           If the pill height or vertical padding changes, re-derive from
+           radius = (line-box + 2 * vertical-padding) / 2 and re-apply the ~0.75
+           visual factor. Keep the unit in em so it tracks font-size (and the
+           info-box scale transform, which scales pill and chart together).
+
+           width:auto lets the block fill the parent minus the margins.
+           --------------------------------------------------------------------- */
+        .gauge-bars-container.aligned-to-pill {
+            width: auto;
+            margin-left: 0.375em;
+            margin-right: 0.375em;
         }
   `;
 
@@ -424,8 +464,14 @@ class AnalogText extends LitElement {
       return svg`<rect x=${x} y=${VH - h} width=${barW} height=${h} fill=${color}></rect>`;
     });
 
+    // When stacked over the value pill (top/bottom with the current value painted
+    // behind the text), align the strip to the pill's straight section.
+    const alignToPill = config.text_background &&
+      (config.position === 'top' || config.position === 'bottom');
+    const containerClass = alignToPill ? 'gauge-bars-container aligned-to-pill' : 'gauge-bars-container';
+
     return html`
-      <div class="gauge-bars-container" style=${styleMap(containerStyles)}>
+      <div class="${containerClass}" style=${styleMap(containerStyles)}>
         <svg
           width="100%"
           height="100%"

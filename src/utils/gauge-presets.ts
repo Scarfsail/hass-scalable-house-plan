@@ -301,8 +301,10 @@ export function resolveGaugeConfig(
     max: userConfig.max ?? baseConfig?.max ?? 100,
     thresholds: userConfig.thresholds ?? baseConfig?.thresholds ?? [],
     height: userConfig.height ?? DEFAULT_GAUGE_HEIGHT,
-    position: userConfig.position ?? DEFAULT_GAUGE_POSITION,
-    gap: userConfig.gap ?? DEFAULT_GAUGE_GAP,
+    // The history strip ('bars') sits flush above the pill: chart's bottom edge
+    // aligned with the pill's top, no gap. The single 'bar' stays below the text.
+    position: userConfig.position ?? (resolvedStyle === 'bars' ? 'top' : DEFAULT_GAUGE_POSITION),
+    gap: userConfig.gap ?? (resolvedStyle === 'bars' ? 0 : DEFAULT_GAUGE_GAP),
     color: userConfig.color, // Pass through the scriptable color
     width: userConfig.width, // Pass through width as-is
     text_position: userConfig.text_position ?? 'end', // Default to 'end' (right-aligned)
