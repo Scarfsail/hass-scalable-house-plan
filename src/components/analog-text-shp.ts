@@ -8,6 +8,7 @@ import type { GaugeConfig, ResolvedGaugeConfig } from '../utils/gauge-presets';
 import { resolveGaugeConfig, getColorForValue, calculateBarWidth } from '../utils/gauge-presets';
 import { getHourlyHistory, subscribeHourlyHistory, scheduleHourlyTick } from '../utils/entity-history';
 import type { HomeAssistant } from '../../hass-frontend/src/types';
+import './gauge-pill-shp';
 
 @customElement('analog-text-shp')
 class AnalogText extends LitElement {
@@ -120,38 +121,26 @@ class AnalogText extends LitElement {
             text-align: end;
         }
 
-        /* Current-value gauge fill painted behind the text. The fill layer is
-           absolutely positioned and clipped to this box; the text span (the
-           only inline child) is lifted above it via z-index. */
-        .text-content.text-bg {
-            position: relative;
-            padding: 1px 8px;
-            border-radius: 999px;
-            overflow: hidden;
+        /* Current-value gauge fill painted behind the text, via the shared
+           gauge-pill-shp primitive. Block display so the chip stretches to the
+           container width (matching the rest of the gauge layout); the align
+           class controls how the reading sits inside it. */
+        gauge-pill-shp.text-bg {
+            display: block;
         }
 
-        .text-content.text-bg > span {
-            position: relative;
-            z-index: 1;
+        gauge-pill-shp.text-bg.align-start {
+            text-align: start;
         }
 
-        /* Darker, more opaque track and a slightly translucent fill so the
-           value reads as a subtle backdrop behind the text rather than a
-           solid block. Scoped to text-bg so the history strip / gauge bar
-           keep their original look. */
-        .text-content.text-bg .gauge-bar-background {
-            background-color: var(--shp-gauge-text-bg-track, rgba(0, 0, 0, 0.4));
-            box-shadow: none;
+        gauge-pill-shp.text-bg.align-center {
+            text-align: center;
         }
 
-        .text-content.text-bg .gauge-bar-fill {
-            top: auto;
-            bottom: 0;
-            width: 100%;
-            opacity: 0.6;
-            transition: height 0.3s ease, background-color 0.3s ease;
+        gauge-pill-shp.text-bg.align-end {
+            text-align: end;
         }
-        
+
         .text-overlay {
             position: relative;
             z-index: 1;
@@ -317,19 +306,12 @@ class AnalogText extends LitElement {
     const fillPercent = calculateBarWidth(value, config.min, config.max);
     const color = this.getGaugeColor(value, config);
 
-    // The chip fills vertically (bottom → top); the scoped CSS anchors the fill
-    // to the bottom and spans the full width, so height encodes the value.
+    // The chip fills vertically (bottom → top): the pill anchors the fill to the
+    // bottom and spans the full width, so height encodes the value.
     return html`
-      <div class="text-content text-bg ${alignClass}">
-        <div class="gauge-bar-background-layer">
-          <div class="gauge-bar-background"></div>
-          <div class="gauge-bar-fill" style=${styleMap({
-            height: `${fillPercent}%`,
-            backgroundColor: color
-          })}></div>
-        </div>
+      <gauge-pill-shp class="text-bg ${alignClass}" .fillPercent=${fillPercent} .color=${color}>
         ${textHtml}
-      </div>
+      </gauge-pill-shp>
     `;
   }
 
