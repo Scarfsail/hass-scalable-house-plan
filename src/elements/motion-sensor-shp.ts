@@ -36,6 +36,7 @@ export class MotionSensorElement extends ElementEntityArmableBase<MotionSensorEl
                 .secondsForSuperHighlight=${15}
                 .trackColor=${occupied ? 'rgba(24, 58, 110, 0.55)' : undefined}
                 .muteWhenIdle=${!occupied}
+                .pulseTrack=${occupied}
             ></last-change-text-shp>
         `
     }

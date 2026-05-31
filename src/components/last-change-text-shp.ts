@@ -21,6 +21,10 @@ class LastChangeText extends LitElement {
    *  instead of muting it — used to show how long a room stays occupied. */
   @property({ attribute: false }) public muteWhenIdle: boolean = true;
 
+  /** When true, the track pulses continuously as a persistent active signal
+   *  (e.g. an occupied room), independent of the super-highlight flash. */
+  @property({ attribute: false }) public pulseTrack: boolean = false;
+
   @state() private _text: string = '';
   @state() private _fillPercent: number = 0;
   @state() private _pulse: boolean = false;
@@ -106,6 +110,7 @@ class LastChangeText extends LitElement {
         .fillPercent=${this._fillPercent}
         .color=${'var(--shp-last-change-fill, #6f9fd8)'}
         ?pulse=${this._pulse}
+        .pulseTrack=${this.pulseTrack}
       >${this._text}</gauge-pill-shp>
     `;
   }

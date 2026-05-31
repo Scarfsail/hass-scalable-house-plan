@@ -23,6 +23,10 @@ export class GaugePill extends LitElement {
   /** When set, the fill flashes (opacity fade in/out) for emphasis. */
   @property({ type: Boolean, reflect: true }) public pulse = false;
 
+  /** When set, the track flashes continuously (independent of `pulse`) — used
+   *  as a persistent "active" signal, e.g. an occupied room. */
+  @property({ type: Boolean, reflect: true, attribute: 'pulse-track' }) public pulseTrack = false;
+
   static styles = css`
     :host {
       display: inline-block;
@@ -59,6 +63,10 @@ export class GaugePill extends LitElement {
     }
 
     :host([pulse]) .fill {
+      animation: shp-pill-flash 2s ease-in-out infinite;
+    }
+
+    :host([pulse-track]) .track-bg {
       animation: shp-pill-flash 2s ease-in-out infinite;
     }
 
