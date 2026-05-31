@@ -23,14 +23,20 @@ export class MotionSensorElement extends ElementEntityArmableBase<MotionSensorEl
 
 
         const alarmState = this.getAlarmoSensorState();
-        const color = (entity?.attributes["device_class"] == "occupancy" && entity?.state == "on")
+        const occupied = entity?.attributes["device_class"] == "occupancy" && entity?.state == "on";
+        const color = occupied
             ? "#ffc107"
             : (alarmState ? (alarmState.armed ? 'red' : 'green') : 'var(--shp-plan-text-color, white)')
 
 
         return html`
             ${this._config?.hide_icon ? nothing : html`<ha-icon style="color:${color}" icon="mdi:motion-sensor"></ha-icon>`}
-            <last-change-text-shp .entity=${entity}></last-change-text-shp>
+            <last-change-text-shp
+                .entity=${entity}
+                .secondsForSuperHighlight=${15}
+                .trackColor=${occupied ? 'rgba(24, 58, 110, 0.55)' : undefined}
+                .muteWhenIdle=${!occupied}
+            ></last-change-text-shp>
         `
     }
 }

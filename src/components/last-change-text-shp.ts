@@ -1,5 +1,6 @@
 import { LitElement, html, css, PropertyValues } from 'lit';
 import { customElement, property, state } from "lit/decorators.js";
+import { styleMap } from 'lit/directives/style-map.js';
 import { Utils } from '../utils/utils';
 import type { HassEntity } from 'home-assistant-js-websocket';
 import { timerService } from '../utils/timer-service';
@@ -12,6 +13,13 @@ const COUNTDOWN_WINDOW_SECONDS = 120;
 class LastChangeText extends LitElement {
   @property({ attribute: false }) public entity?: HassEntity;
   @property({ attribute: false }) public secondsForSuperHighlight?: number;
+
+  /** Override the track (inactive background) color, e.g. while occupied. */
+  @property() public trackColor?: string;
+
+  /** When false, keep the text at full brightness after the countdown drains
+   *  instead of muting it — used to show how long a room stays occupied. */
+  @property({ attribute: false }) public muteWhenIdle: boolean = true;
 
   @state() private _text: string = '';
   @state() private _fillPercent: number = 0;
@@ -89,9 +97,12 @@ class LastChangeText extends LitElement {
     if (!this.entity)
       return html`<div>No entity defined</div>`;
 
+    const muted = this._fillPercent === 0 && this.muteWhenIdle;
+
     return html`
       <gauge-pill-shp
-        class=${this._fillPercent === 0 ? 'idle' : ''}
+        class=${muted ? 'idle' : ''}
+        style=${styleMap(this.trackColor ? { '--shp-gauge-text-bg-track': this.trackColor } : {})}
         .fillPercent=${this._fillPercent}
         .color=${'var(--shp-last-change-fill, #6f9fd8)'}
         ?pulse=${this._pulse}
