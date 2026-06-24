@@ -28,7 +28,7 @@ const HVAC_MODE_ICONS: Record<string, string> = {
 };
 
 // House-plan default whitelists. Overridable per element via config.
-const DEFAULT_HVAC_MODES = ["heat", "cool"];
+const DEFAULT_HVAC_MODES = ["heat", "cool", "off"];
 const DEFAULT_FAN_MODES = ["Auto", "Quiet"];
 
 const MORE_INFO_VALUE = "__more_info__";
