@@ -1,10 +1,16 @@
-import { html, css } from "lit"
-import { customElement } from "lit/decorators.js";
+import { html, css, nothing, PropertyValues } from "lit"
+import { customElement, state } from "lit/decorators.js";
 import { ElementEntityBase, ElementEntityBaseConfig } from "./base";
 import { planDropShadow } from '../utils/plan-styles';
 import { HassEntity } from "home-assistant-js-websocket";
 
 interface ClimateElementConfig extends ElementEntityBaseConfig {
+    // Whitelist of HVAC modes to show in the menu. Only modes that the entity
+    // actually supports are shown. Defaults to heating and cooling.
+    hvac_modes?: string[];
+    // Whitelist of fan modes to show in the menu. Only modes that the entity
+    // actually supports are shown. Defaults to Auto and Quiet.
+    fan_modes?: string[];
 }
 
 // HVAC mode ordering, matching the climate more-info dialog (compareClimateHvacModes).
@@ -21,7 +27,12 @@ const HVAC_MODE_ICONS: Record<string, string> = {
     off: "mdi:power",
 };
 
+// House-plan default whitelists. Overridable per element via config.
+const DEFAULT_HVAC_MODES = ["heat", "cool"];
+const DEFAULT_FAN_MODES = ["Auto", "Quiet"];
+
 const MORE_INFO_VALUE = "__more_info__";
+const FAN_VALUE_PREFIX = "__fan__:";
 
 @customElement("climate-shp")
 export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
@@ -88,9 +99,78 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
             margin: 4px 8px;
             background-color: var(--divider-color, rgba(0, 0, 0, 0.12));
         }
+
+        .temp-control {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 4px 12px;
+        }
+
+        .temp-control button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            background-color: var(--ha-color-fill-neutral-quiet-resting, rgba(0, 0, 0, 0.06));
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .temp-control button:hover {
+            background-color: var(--ha-color-fill-neutral-quiet-hover, rgba(0, 0, 0, 0.12));
+        }
+
+        .temp-control button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .temp-value {
+            font-size: 15px;
+            font-weight: var(--ha-font-weight-medium, 500);
+            min-width: 56px;
+            text-align: center;
+            white-space: nowrap;
+        }
     `;
 
     private icon: any;
+    private _serviceTimeout?: number;
+    // Entity temperature at the moment optimistic editing began; used to detect
+    // when the backend has caught up so we can drop the optimistic value.
+    private _pendingBaseline?: number | null;
+
+    // Optimistic target temperature while the +/- buttons are being tapped,
+    // before the entity state catches up.
+    @state() private _pendingTemp?: number;
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        if (this._serviceTimeout) {
+            clearTimeout(this._serviceTimeout);
+            this._serviceTimeout = undefined;
+        }
+    }
+
+    willUpdate(changed: PropertyValues) {
+        // Once the entity's temperature changes from the value present when we
+        // started adjusting, the backend has applied the change — drop the
+        // optimistic value and show the real one (no flicker back-and-forth).
+        if (this._pendingTemp != null && this._config && this.hass) {
+            const entity = this.hass.states[this._config.entity];
+            const temp = entity?.attributes.temperature;
+            if (temp !== this._pendingBaseline) {
+                this._pendingTemp = undefined;
+                this._pendingBaseline = undefined;
+            }
+        }
+    }
 
     protected override renderEntityContent(entity: HassEntity) {
         if (!this.icon) {
@@ -106,6 +186,7 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
 
         const setTemp = this.getSetTemperatureLabel(entity);
         const modes = this.getOrderedHvacModes(entity);
+        const fanModes = this.getFanModes(entity);
 
         return html`
             <ha-dropdown placement="bottom" @wa-select=${this._handleMenuSelect}>
@@ -119,6 +200,18 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
                         <ha-icon slot="icon" .icon=${HVAC_MODE_ICONS[mode] ?? "mdi:thermostat"}></ha-icon>
                     </ha-dropdown-item>
                 `)}
+                ${this.renderTemperatureControl(entity)}
+                ${fanModes.length ? html`
+                    <div class="menu-divider" role="separator"></div>
+                    ${fanModes.map(mode => html`
+                        <ha-dropdown-item
+                            .value=${FAN_VALUE_PREFIX + mode}
+                            ?selected=${mode === entity.attributes.fan_mode}>
+                            ${this.hass!.formatEntityAttributeValue(entity, "fan_mode", mode)}
+                            <ha-icon slot="icon" icon="mdi:fan"></ha-icon>
+                        </ha-dropdown-item>
+                    `)}
+                ` : nothing}
                 <div class="menu-divider" role="separator"></div>
                 <ha-dropdown-item .value=${MORE_INFO_VALUE}>
                     ${this.hass!.localize("ui.panel.lovelace.cards.show_more_info")}
@@ -126,6 +219,38 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
                 </ha-dropdown-item>
             </ha-dropdown>
         `
+    }
+
+    private renderTemperatureControl(entity: HassEntity) {
+        const current = this.getTargetTemperature(entity);
+        if (current == null) {
+            return nothing;
+        }
+
+        const step = this.getTempStep(entity);
+        const min = entity.attributes.min_temp;
+        const max = entity.attributes.max_temp;
+        const unit = this.hass?.config?.unit_system?.temperature ?? '°C';
+        const digits = step.toString().split(".")?.[1]?.length ?? 0;
+
+        // Click handlers live on plain buttons (not ha-dropdown-item) so they
+        // don't fire wa-select and keep the dropdown open.
+        return html`
+            <div class="menu-divider" role="separator"></div>
+            <div class="temp-control">
+                <button
+                    @click=${() => this._adjustTemperature(entity, -step)}
+                    ?disabled=${min != null && current <= min}>
+                    <ha-icon icon="mdi:minus"></ha-icon>
+                </button>
+                <span class="temp-value">${current.toFixed(digits)}${unit}</span>
+                <button
+                    @click=${() => this._adjustTemperature(entity, step)}
+                    ?disabled=${max != null && current >= max}>
+                    <ha-icon icon="mdi:plus"></ha-icon>
+                </button>
+            </div>
+        `;
     }
 
     private _handleMenuSelect(ev: CustomEvent<{ item?: { value?: string } }>) {
@@ -143,17 +268,85 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
             return;
         }
 
+        if (value.startsWith(FAN_VALUE_PREFIX)) {
+            this.hass.callService("climate", "set_fan_mode", {
+                entity_id: this._config.entity,
+                fan_mode: value.slice(FAN_VALUE_PREFIX.length),
+            });
+            return;
+        }
+
         this.hass.callService("climate", "set_hvac_mode", {
             entity_id: this._config.entity,
             hvac_mode: value,
         });
     }
 
+    private _adjustTemperature(entity: HassEntity, delta: number) {
+        if (!this.hass || !this._config) {
+            return;
+        }
+
+        const current = this.getTargetTemperature(entity) ?? 0;
+        const min = entity.attributes.min_temp;
+        const max = entity.attributes.max_temp;
+
+        let next = current + delta;
+        if (min != null) next = Math.max(next, min);
+        if (max != null) next = Math.min(next, max);
+
+        // Round to the step grid to avoid floating point drift.
+        next = Math.round(next * 1e6) / 1e6;
+        if (next === current) {
+            return;
+        }
+
+        if (this._pendingTemp == null) {
+            // Remember the entity value we're diverging from so willUpdate can
+            // tell when the backend has applied our change.
+            this._pendingBaseline = entity.attributes.temperature ?? null;
+        }
+        this._pendingTemp = next;
+
+        // Debounce so rapid taps result in a single service call.
+        if (this._serviceTimeout) {
+            clearTimeout(this._serviceTimeout);
+        }
+        this._serviceTimeout = window.setTimeout(() => {
+            this.hass!.callService("climate", "set_temperature", {
+                entity_id: this._config!.entity,
+                temperature: this._pendingTemp,
+            });
+        }, 600);
+    }
+
+    private getTargetTemperature(entity: HassEntity): number | null {
+        if (this._pendingTemp != null) {
+            return this._pendingTemp;
+        }
+        const temp = entity.attributes.temperature;
+        return typeof temp === "number" ? temp : null;
+    }
+
+    private getTempStep(entity: HassEntity): number {
+        return (
+            entity.attributes.target_temp_step ||
+            (this.hass?.config?.unit_system?.temperature === "°F" ? 1 : 0.5)
+        );
+    }
+
     private getOrderedHvacModes(entity: HassEntity): string[] {
         const modes: string[] = entity.attributes.hvac_modes ?? [];
+        const whitelist = this._config?.hvac_modes ?? DEFAULT_HVAC_MODES;
         return modes
-            .concat()
+            .filter(mode => whitelist.includes(mode))
             .sort((a, b) => HVAC_MODE_ORDER.indexOf(a) - HVAC_MODE_ORDER.indexOf(b));
+    }
+
+    private getFanModes(entity: HassEntity): string[] {
+        const modes: string[] = entity.attributes.fan_modes ?? [];
+        const whitelist = this._config?.fan_modes ?? DEFAULT_FAN_MODES;
+        return modes.filter(mode => whitelist.includes(mode));
     }
 
     private getSetTemperatureLabel(entity: HassEntity): string | null {
