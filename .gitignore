@@ -2,3 +2,11 @@ node_modules/
 /hass-frontend/
 /dist/
 nul
+
+# Playwright / e2e tests
+/.env
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/tests/.auth/
