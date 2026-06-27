@@ -89,22 +89,22 @@ export class EditorGroupShp extends LitElement {
             <div class="field-row">
                 <div class="field">
                     <label class="field-label">Width (px)</label>
-                    <ha-textfield
+                    <ha-input
                         type="number"
                         .value=${String(this.elementSection?.width || 100)}
                         @input=${this._widthChanged}
                         .min=${"1"}
-                    ></ha-textfield>
+                    ></ha-input>
                 </div>
 
                 <div class="field">
                     <label class="field-label">Height (px)</label>
-                    <ha-textfield
+                    <ha-input
                         type="number"
                         .value=${String(this.elementSection?.height || 100)}
                         @input=${this._heightChanged}
                         .min=${"1"}
-                    ></ha-textfield>
+                    ></ha-input>
                 </div>
             </div>
 

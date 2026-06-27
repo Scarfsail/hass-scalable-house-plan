@@ -78,7 +78,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                 gap: 16px;
             }
 
-            .basic-config ha-textfield {
+            .basic-config ha-input {
                 width: 100%;
             }
 
@@ -162,39 +162,39 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             @selected=${this._readabilityModeChanged}
                             @closed=${(e: Event) => e.stopPropagation()}
                         ></ha-select>
-                        <ha-textfield
+                        <ha-input
                             label="${this.localize('editor.image_url')}"
                             .value=${this._config.image || ""}
                             @input=${this._imageChanged}
                             placeholder="${this.localize('editor.image_url_placeholder')}"
-                        ></ha-textfield>
-                        <ha-textfield
+                        ></ha-input>
+                        <ha-input
                             label="${this.localize('editor.image_width')}"
                             type="number"
                             .value=${this._config.image_width || 1360}
                             @input=${this._imageWidthChanged}
-                        ></ha-textfield>
-                        <ha-textfield
+                        ></ha-input>
+                        <ha-input
                             label="${this.localize('editor.image_height')}"
                             type="number"
                             .value=${this._config.image_height || 849}
                             @input=${this._imageHeightChanged}
-                        ></ha-textfield>
-                        <ha-textfield
+                        ></ha-input>
+                        <ha-input
                             label="${this.localize('editor.min_scale')}"
                             type="number"
                             step="0.1"
                             .value=${this._config.min_scale || 0.5}
                             @input=${this._minScaleChanged}
-                        ></ha-textfield>
-                        <ha-textfield
+                        ></ha-input>
+                        <ha-input
                             label="${this.localize('editor.max_scale')}"
                             type="number"
                             step="0.1"
                             .value=${this._config.max_scale || 3}
                             @input=${this._maxScaleChanged}
-                        ></ha-textfield>
-                        <ha-textfield
+                        ></ha-input>
+                        <ha-input
                             label="${this.localize('editor.element_detail_scale_ratio')}"
                             type="number"
                             step="0.05"
@@ -203,7 +203,7 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                             .value=${this._config.element_detail_scale_ratio ?? 0.1}
                             @input=${this._elementDetailScaleRatioChanged}
                             helper-text="${this.localize('editor.element_detail_scale_ratio_helper')}"
-                        ></ha-textfield>
+                        ></ha-input>
                         <ha-formfield label="${this.localize('editor.show_room_backgrounds')}">
                             <ha-switch
                                 .checked=${this._config.show_room_backgrounds || false}
@@ -252,14 +252,14 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                                 'rgba(100, 100, 100, 0.20)',
                                 this._defaultColorChanged
                             )}
-                            <ha-textfield
+                            <ha-input
                                 label="${this.localize('editor.motion_delay_seconds')}"
                                 type="number"
                                 min="0"
                                 step="1"
                                 .value=${this._config.dynamic_colors?.motion_delay_seconds ?? 60}
                                 @input=${this._motionDelaySecondsChanged}
-                            ></ha-textfield>
+                            ></ha-input>
                             <ha-formfield label="${this.localize('editor.show_idle_overlay')}">
                                 <ha-switch
                                     .checked=${this._config.dynamic_colors?.show_idle_overlay ?? false}
@@ -1038,12 +1038,12 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
     ) {
         return html`
             <div class="color-field-wrapper">
-                <ha-textfield
+                <ha-input
                     label="${label}"
                     .value=${value}
                     @input=${handler}
                     placeholder="${placeholder}"
-                ></ha-textfield>
+                ></ha-input>
                 <div class="color-swatch" style="background-color: ${value}" title="${value}"></div>
             </div>
         `;

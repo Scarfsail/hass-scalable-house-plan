@@ -238,7 +238,7 @@ export const sharedStyles = css`
         gap: 16px;
     }
 
-    .form-grid ha-textfield {
+    .form-grid ha-input {
         width: 100%;
     }
 
@@ -381,7 +381,7 @@ export const sharedStyles = css`
         gap: 8px;
     }
 
-    .color-field-wrapper ha-textfield {
+    .color-field-wrapper ha-input {
         flex: 1;
         min-width: 0;
     }

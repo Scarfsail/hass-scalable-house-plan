@@ -84,7 +84,7 @@ export class EditorRoomShp extends LitElement {
                 align-items: center;
             }
 
-            .boundary-point ha-textfield {
+            .boundary-point ha-input {
                 flex: 1;
             }
 
@@ -192,11 +192,11 @@ export class EditorRoomShp extends LitElement {
                                 </div>
                                 ${!this.room.area ? html`
                                     <div class="room-field">
-                                        <ha-textfield
+                                        <ha-input
                                             label="${this.localize('editor.room_name')}"
                                             .value=${this.room.name || ""}
                                             @input=${this._nameChanged}
-                                        ></ha-textfield>
+                                        ></ha-input>
                                     </div>
                                 ` : html`
                                     <div class="room-field">
@@ -264,7 +264,7 @@ export class EditorRoomShp extends LitElement {
                                         ></ha-select>
                                     </div>
                                     <div class="room-field">
-                                        <ha-textfield
+                                        <ha-input
                                             label="${this.localize('editor.dashboard_overview_opacity')}"
                                             type="number"
                                             min="0"
@@ -273,11 +273,11 @@ export class EditorRoomShp extends LitElement {
                                             @input=${this._dashboardOpacityChanged}
                                             helper-persistent
                                             helper-text="${this.localize('editor.dashboard_overview_opacity_helper')}"
-                                        ></ha-textfield>
+                                        ></ha-input>
                                     </div>
                                 ` : ''}
                                 <div class="room-field">
-                                    <ha-textfield
+                                    <ha-input
                                         label="${this.localize('editor.detail_view')}"
                                         .value=${this.room.detail_view || ''}
                                         @input=${this._detailViewChanged}
@@ -285,18 +285,18 @@ export class EditorRoomShp extends LitElement {
                                         helper-persistent
                                         helper-text="${this.localize('editor.detail_view_helper')}"
                                         style="width: 100%"
-                                    ></ha-textfield>
+                                    ></ha-input>
                                 </div>
                                 <div class="room-field">
                                     <div class="color-field-wrapper">
-                                        <ha-textfield
+                                        <ha-input
                                             label="${this.localize('editor.room_color')}"
                                             .value=${this.room.color || ''}
                                             @input=${this._colorChanged}
                                             placeholder="rgba(100, 150, 200, 0.3)"
                                             helper-persistent
                                             helper-text="${this.localize('editor.room_color_helper')}"
-                                        ></ha-textfield>
+                                        ></ha-input>
                                         <div class="color-swatch"
                                              style="background-color: ${this.room.color || 'transparent'}"
                                              title="${this.room.color || ''}">
@@ -330,18 +330,18 @@ export class EditorRoomShp extends LitElement {
                                 <div class="boundary-points">
                                     ${(this.room.boundary || []).map((point, index) => html`
                                         <div class="boundary-point">
-                                            <ha-textfield
+                                            <ha-input
                                                 label="${this.localize('editor.x_coordinate')}"
                                                 type="number"
                                                 .value=${point[0]}
                                                 @input=${(e: Event) => this._boundaryPointChanged(index, 0, e)}
-                                            ></ha-textfield>
-                                            <ha-textfield
+                                            ></ha-input>
+                                            <ha-input
                                                 label="${this.localize('editor.y_coordinate')}"
                                                 type="number"
                                                 .value=${point[1]}
                                                 @input=${(e: Event) => this._boundaryPointChanged(index, 1, e)}
-                                            ></ha-textfield>
+                                            ></ha-input>
                                             <ha-icon-button
                                                 @click=${() => this._removeBoundaryPoint(index)}
                                             >
