@@ -1,8 +1,10 @@
 import { html, css, nothing, PropertyValues } from "lit"
 import { customElement, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 import { ElementEntityBase, ElementEntityBaseConfig } from "./base";
 import { planDropShadow } from '../utils/plan-styles';
 import { HassEntity } from "home-assistant-js-websocket";
+import { getLocalizeFunction, type LocalizeFunction } from "../localize";
 
 interface ClimateElementConfig extends ElementEntityBaseConfig {
     // Whitelist of HVAC modes to show in the menu. Only modes that the entity
@@ -77,6 +79,23 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
             ${planDropShadow};
         }
 
+        /* Self-cleaning runs after the unit is switched off from cooling/heating,
+           so it must read as visually distinct from an active hvac mode -
+           otherwise it looks like the "off" command failed. The theme sets
+           per-mode colors (--state-climate-cool-color etc.) that take
+           precedence over the generic active-color fallback, so each one
+           needs to be overridden here too. */
+        .icon-container.self-cleaning {
+            --state-climate-auto-color: var(--disabled-text-color, #9e9e9e);
+            --state-climate-cool-color: var(--disabled-text-color, #9e9e9e);
+            --state-climate-dry-color: var(--disabled-text-color, #9e9e9e);
+            --state-climate-fan_only-color: var(--disabled-text-color, #9e9e9e);
+            --state-climate-heat-color: var(--disabled-text-color, #9e9e9e);
+            --state-climate-heat-cool-color: var(--disabled-text-color, #9e9e9e);
+            --state-climate-active-color: var(--disabled-text-color, #9e9e9e);
+            --state-active-color: var(--disabled-text-color, #9e9e9e);
+        }
+
         .set-temp {
             font-size: 11px;
             line-height: 1;
@@ -141,6 +160,7 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
     `;
 
     private icon: any;
+    private _localize?: LocalizeFunction;
     private _serviceTimeout?: number;
     // Entity temperature at the moment optimistic editing began; used to detect
     // when the backend has caught up so we can drop the optimistic value.
@@ -149,6 +169,13 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
     // Optimistic target temperature while the +/- buttons are being tapped,
     // before the entity state catches up.
     @state() private _pendingTemp?: number;
+
+    private get localize(): LocalizeFunction {
+        if (!this._localize) {
+            this._localize = getLocalizeFunction(this.hass!);
+        }
+        return this._localize;
+    }
 
     disconnectedCallback() {
         super.disconnectedCallback();
@@ -184,19 +211,20 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
         }
         this.icon.hass = this.hass;
 
-        const setTemp = this.getSetTemperatureLabel(entity);
+        const selfCleaning = this.isSelfCleaning(entity);
+        const setTemp = this.getSetTemperatureLabel(entity, selfCleaning);
         const modes = this.getOrderedHvacModes(entity);
         const fanModes = this.getFanModes(entity);
 
         return html`
             <ha-dropdown placement="bottom" @wa-select=${this._handleMenuSelect}>
                 <button class="trigger" slot="trigger">
-                    <div class="icon-container">${this.icon}</div>
+                    <div class="icon-container ${classMap({ "self-cleaning": selfCleaning })}">${this.icon}</div>
                     ${setTemp ? html`<div class="set-temp">${setTemp}</div>` : null}
                 </button>
                 ${modes.map(mode => html`
                     <ha-dropdown-item .value=${mode} ?selected=${mode === entity.state}>
-                        ${this.hass!.formatEntityState(entity, mode)}
+                        ${this.hass!.formatEntityState(entity, mode)}${selfCleaning && mode === entity.state ? html` (${this.localize("climate.self_cleaning")})` : nothing}
                         <ha-icon slot="icon" .icon=${HVAC_MODE_ICONS[mode] ?? "mdi:thermostat"}></ha-icon>
                     </ha-dropdown-item>
                 `)}
@@ -349,7 +377,16 @@ export class ClimateElement extends ElementEntityBase<ClimateElementConfig> {
         return modes.filter(mode => whitelist.includes(mode));
     }
 
-    private getSetTemperatureLabel(entity: HassEntity): string | null {
+    private isSelfCleaning(entity: HassEntity): boolean {
+        const selfCleaning = entity.attributes.self_cleaning;
+        return typeof selfCleaning === "string" && selfCleaning.toUpperCase() === "ON";
+    }
+
+    private getSetTemperatureLabel(entity: HassEntity, selfCleaning: boolean): string | null {
+        if (selfCleaning) {
+            return this.localize("climate.self_cleaning");
+        }
+
         if (entity.state === 'off' || entity.state === 'unavailable' || entity.state === 'unknown') {
             return null;
         }

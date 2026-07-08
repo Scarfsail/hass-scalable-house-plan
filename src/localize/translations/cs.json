@@ -15,6 +15,9 @@
     "show_all": "Vše",
     "show_not_on_detail": "Nejsou na detailu"
   },
+  "climate": {
+    "self_cleaning": "Čištění"
+  },
   "editor": {
     "loading": "Načítání...",
     "house_plan_editor": "Editor půdorysu domu",
