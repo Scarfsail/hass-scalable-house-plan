@@ -115,6 +115,11 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
         .value {
             font-weight: 500;
         }
+
+        .value-wrapper {
+            display: inline-flex;
+            align-items: center;
+        }
     `;
 
     async setConfig(config: InfoBoxElementConfig) {
@@ -185,21 +190,24 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                     const isMotionOrOccupancy = item.type === 'motion' || item.type === 'occupancy';
                     const isSeparate = typeConfig.icon_position === 'separate';
                     const itemClass = isSeparate ? 'info-item separate' : 'info-item';
-                    const transformStyle = typeConfig.scale !== 1 
-                        ? `transform: scale(${typeConfig.scale}); transform-origin: ${isSeparate ? 'center center' : 'left center'};`
+                    // Use `zoom` instead of `transform: scale()` so the scaled content
+                    // still occupies layout space; `transform` scales only visually and
+                    // makes enlarged items overflow the info box. Zoom the value only
+                    // (not the leading icon) so icons stay a consistent size and keep
+                    // their left alignment across rows.
+                    const valueStyle = typeConfig.scale !== 1
+                        ? `zoom: ${typeConfig.scale};`
                         : '';
-                    
-                    // Get element properties for this type
-                    const elementProps = typeConfig.element || {};
-                    
+
                     return html`
-                        <div 
-                            class="${itemClass}" 
-                            style="${transformStyle}"
+                        <div
+                            class="${itemClass}"
                             @click=${() => this._showMoreInfo(item.entity.entity_id)}
                         >
                             ${typeConfig.show_icon ? html`<ha-icon icon="${item.icon}"></ha-icon>` : nothing}
-                            ${this._renderCardElement(item.entity, typeConfig.element || {}, isMotionOrOccupancy)}
+                            <span class="value-wrapper" style="${valueStyle}">
+                                ${this._renderCardElement(item.entity, typeConfig.element || {}, isMotionOrOccupancy)}
+                            </span>
                         </div>
                     `;
                 })}
