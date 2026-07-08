@@ -17,6 +17,7 @@ export interface InfoBoxTypeConfig {
     size?: string;   // Default: "100%" - percentage scale (e.g., "200%" for double size)
     icon_position?: 'inline' | 'separate';  // Default: "inline" - icon on same line or separate line
     icon_visibility?: 'all' | 'overview' | 'detail';  // Default: "detail" - which view(s) show the leading icon
+    overview_active_only?: boolean;  // Default: true for climate, false otherwise - on overview, only show when the entity is "active" (e.g. climate not off), matching plan-placed elements
     element?: Record<string, any>;  // Parameters to spread to the child component (e.g., analog-text-shp)
 }
 

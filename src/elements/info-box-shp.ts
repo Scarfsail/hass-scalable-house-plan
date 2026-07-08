@@ -5,6 +5,7 @@ import type { HassEntity } from "home-assistant-js-websocket";
 import type { InfoBoxTypeConfig } from "../cards/types";
 import { getCreateCardElement, CreateCardElement } from "../utils/getCreateCardElement";
 import { getOrCreateElementCard } from "../utils/card-element-cache";
+import { isEntityActive } from "../utils/entity-active-state";
 
 export interface InfoBoxElementConfig extends ElementBaseConfig {
     room_entities: string[];  // All entity IDs in the room
@@ -34,6 +35,7 @@ interface TypeConfigCache {
     size: string;
     scale: number;  // Pre-parsed scale value
     icon_position: 'inline' | 'separate';
+    overview_active_only: boolean;  // On overview, only show when the entity is "active"
     element?: Record<string, any>;  // Parameters to spread to child component
 }
 
@@ -45,6 +47,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
     // Cached type configurations (computed once in setConfig)
     private _typeConfigs!: Record<string, TypeConfigCache>;
     private _containerClass!: string;
+    private _isOverview!: boolean;
     // Cache for created card elements (key: entityId, value: card instance)
     private _elementCache = new Map<string, any>();
     // Home Assistant card creator function
@@ -136,6 +139,7 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
         
         // Pre-compute container class
         const mode = config.mode || 'detail';
+        this._isOverview = mode === 'overview';
         const showBackground = config.show_background ?? true;
         const classes = ['info-box-container'];
         if (mode === 'overview') classes.push('overview');
@@ -168,6 +172,8 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 size,
                 scale: parseFloat(size) / 100,
                 icon_position: typeConfig?.icon_position ?? 'inline',
+                // Match plan-placed elements: climate hides on overview when off.
+                overview_active_only: typeConfig?.overview_active_only ?? (type === 'climate'),
                 element: typeConfig?.element
             };
         }
@@ -370,9 +376,17 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             }
         }
 
-        // Sort by type order using static constant
-        items.sort((a, b) => TYPE_ORDER.indexOf(a.type as typeof TYPE_ORDER[number]) - TYPE_ORDER.indexOf(b.type as typeof TYPE_ORDER[number]));
+        // On overview, drop active-only items (climate by default) whose entity
+        // isn't active, matching plan-placed elements' overview_active_only.
+        const visibleItems = this._isOverview
+            ? items.filter(item =>
+                !this._typeConfigs[item.type].overview_active_only ||
+                isEntityActive(this.hass, item.entity.entity_id))
+            : items;
 
-        return items;
+        // Sort by type order using static constant
+        visibleItems.sort((a, b) => TYPE_ORDER.indexOf(a.type as typeof TYPE_ORDER[number]) - TYPE_ORDER.indexOf(b.type as typeof TYPE_ORDER[number]));
+
+        return visibleItems;
     }
 }
