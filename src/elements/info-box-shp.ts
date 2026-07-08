@@ -15,6 +15,7 @@ export interface InfoBoxElementConfig extends ElementBaseConfig {
         occupancy?: InfoBoxTypeConfig;
         temperature?: InfoBoxTypeConfig;
         humidity?: InfoBoxTypeConfig;
+        climate?: InfoBoxTypeConfig;
     }
 }
 
@@ -37,7 +38,7 @@ interface TypeConfigCache {
 }
 
 // Type order for sorting - defined once as static constant
-const TYPE_ORDER = ['motion', 'occupancy', 'temperature', 'humidity'] as const;
+const TYPE_ORDER = ['motion', 'occupancy', 'temperature', 'humidity', 'climate'] as const;
 
 @customElement("info-box-shp")
 export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
@@ -187,9 +188,12 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             <div class="${this._containerClass}">
                 ${items.map(item => {
                     const typeConfig = this._typeConfigs[item.type];
-                    const isMotionOrOccupancy = item.type === 'motion' || item.type === 'occupancy';
                     const isSeparate = typeConfig.icon_position === 'separate';
                     const itemClass = isSeparate ? 'info-item separate' : 'info-item';
+                    // Climate renders the interactive climate-shp element, which
+                    // handles its own taps (dropdown) — don't wrap it in a
+                    // more-info click that would also fire.
+                    const isClimate = item.type === 'climate';
                     // Use `zoom` instead of `transform: scale()` so the scaled content
                     // still occupies layout space; `transform` scales only visually and
                     // makes enlarged items overflow the info box. Zoom the value only
@@ -202,11 +206,11 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                     return html`
                         <div
                             class="${itemClass}"
-                            @click=${() => this._showMoreInfo(item.entity.entity_id)}
+                            @click=${isClimate ? nothing : () => this._showMoreInfo(item.entity.entity_id)}
                         >
-                            ${typeConfig.show_icon ? html`<ha-icon icon="${item.icon}"></ha-icon>` : nothing}
+                            ${typeConfig.show_icon && item.icon ? html`<ha-icon icon="${item.icon}"></ha-icon>` : nothing}
                             <span class="value-wrapper" style="${valueStyle}">
-                                ${this._renderCardElement(item.entity, typeConfig.element || {}, isMotionOrOccupancy)}
+                                ${this._renderCardElement(item.entity, typeConfig.element || {}, item.type)}
                             </span>
                         </div>
                     `;
@@ -228,19 +232,24 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
      * Render card element using standard card creation
      * @param entity - The entity to display
      * @param elementProps - Additional properties from config
-     * @param isMotionOrOccupancy - Whether this is a motion/occupancy sensor
+     * @param type - The info-box item type (motion/occupancy/temperature/humidity/climate)
      * @returns Card element with hass set
      */
-    private _renderCardElement(entity: HassEntity, elementProps: Record<string, any>, isMotionOrOccupancy: boolean) {
+    private _renderCardElement(entity: HassEntity, elementProps: Record<string, any>, type: string) {
         const entityId = entity.entity_id;
 
         // Determine card type and merge properties
         let cardConfig: any;
-        if (isMotionOrOccupancy) {
+        if (type === 'motion' || type === 'occupancy') {
             // Use motion-sensor-shp with hide_icon: true
             cardConfig = {
                 type: 'custom:motion-sensor-shp',
                 hide_icon: true,
+                ...elementProps
+            };
+        } else if (type === 'climate') {
+            cardConfig = {
+                type: 'custom:climate-shp',
                 ...elementProps
             };
         } else {
@@ -341,6 +350,22 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                             icon_position: config.icon_position
                         });
                     }
+                }
+            }
+
+            // Climate entities (no device_class; matched by domain). The
+            // climate-shp element renders its own state icon, so no leading
+            // info-box icon is supplied.
+            else if (entityId.split('.')[0] === 'climate') {
+                const config = this._typeConfigs.climate;
+                if (config.show) {
+                    items.push({
+                        icon: '',
+                        entity: entity,
+                        type: 'climate',
+                        size: config.size,
+                        icon_position: config.icon_position
+                    });
                 }
             }
         }
