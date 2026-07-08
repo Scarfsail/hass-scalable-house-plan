@@ -104,6 +104,12 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
             gap: 2px;
         }
 
+        /* Climate is the last row and reads as a control rather than a reading;
+           center it horizontally in the box while sensor rows stay left-aligned. */
+        .info-item.climate {
+            align-self: center;
+        }
+
         .info-item.separate last-change-text-shp {
             display: block;
         }
@@ -195,11 +201,11 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 ${items.map(item => {
                     const typeConfig = this._typeConfigs[item.type];
                     const isSeparate = typeConfig.icon_position === 'separate';
-                    const itemClass = isSeparate ? 'info-item separate' : 'info-item';
                     // Climate renders the interactive climate-shp element, which
                     // handles its own taps (dropdown) — don't wrap it in a
                     // more-info click that would also fire.
                     const isClimate = item.type === 'climate';
+                    const itemClass = `info-item${isSeparate ? ' separate' : ''}${isClimate ? ' climate' : ''}`;
                     // Use `zoom` instead of `transform: scale()` so the scaled content
                     // still occupies layout space; `transform` scales only visually and
                     // makes enlarged items overflow the info box. Zoom the value only
