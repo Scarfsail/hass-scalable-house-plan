@@ -337,6 +337,35 @@ test.describe("Scalable House Plan - hass coalescing", () => {
         expect(overviewSeq).toBe(3);
     });
 
+    test("detail renders the info box without waiting for a hass publish", async ({ page }) => {
+        const [livingRoom, ...otherRooms] = FIXTURE_CARD.rooms;
+        await setupPlan(page, {
+            // An info box needs a matching element_defaults entry: without one its frozen
+            // config is used as-is and renderElements can't write room_entities into it.
+            element_defaults: [{ element: { type: "custom:info-box-shp" } }],
+            rooms: [
+                {
+                    ...livingRoom,
+                    entities: [
+                        ...livingRoom.entities,
+                        { entity: "", plan: { left: 350, top: 50, element: { type: "custom:info-box-shp" } } },
+                    ],
+                },
+                ...otherRooms,
+            ],
+        });
+
+        // The clock stays paused and nothing is pushed, so no further publish can re-render the detail.
+        const before = await publishCount(page);
+        await openDetail(page);
+        await expect.poll(() => page.evaluate(() => {
+            const detail = (window as any).__shp.el.shadowRoot.querySelector("scalable-house-plan-detail");
+            const infoBox = detail?.shadowRoot.querySelector("scalable-house-plan-room")?.shadowRoot.querySelector("info-box-shp");
+            return infoBox?.shadowRoot?.querySelectorAll(".info-item").length ?? 0;
+        }), { timeout: 5_000 }).toBeGreaterThan(0);
+        expect(await publishCount(page)).toBe(before);
+    });
+
     test("actions: immediate publishing until 5 s after the last call settles", async ({ page }) => {
         await setupPlan(page);
         const haCallServiceSame = () =>
