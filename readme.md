@@ -131,6 +131,7 @@ readability_mode: bright-image    # Optional: overlay contrast preset for bright
 max_scale: 2.0                    # Optional: Maximum scale factor
 min_scale: 0.5                    # Optional: Minimum scale factor
 card_size: 1                      # Optional: Card size for layout calculation
+realtime_updates: false           # Optional: true = pass every HA update immediately (default: coalesce to once per second)
 layers_visibility_persistence_id: "unique-id"  # Optional: Custom persistence ID
 
 # Entity-Based Room Structure
