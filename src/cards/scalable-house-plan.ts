@@ -1,5 +1,5 @@
 import { LitElement, html, css } from "lit-element"
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { LovelaceCardConfig } from "../../hass-frontend/src/data/lovelace/config/card";
@@ -55,6 +55,7 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
     element_detail_scale_ratio?: number;  // Proportional element scaling ratio for detail view (0=no scale, 1=full scale, default=0.25)
     card_size?: number;
     show_room_backgrounds?: boolean;  // Show room background colors (helpful for editing boundaries)
+    realtime_updates?: boolean;  // Pass every hass update to children immediately (default: coalesce to once per second)
     dynamic_colors?: DynamicColorsConfig;  // Dynamic room color configuration
     element_defaults?: ElementDefaultConfig[];  // House-level element defaults (keyed by element type)
     _previewRoomIndex?: number;  // Internal: room index to preview in detail view (not persisted, used during editing)
@@ -66,6 +67,9 @@ export interface ScalableHousePlanConfig extends LovelaceCardConfig {
 
 @customElement("scalable-house-plan")
 export class ScalableHousePlan extends LitElement implements LovelaceCard {
+    private static readonly HASS_PUBLISH_INTERVAL_MS = 1000;
+    private static readonly SERVICE_SETTLE_MS = 5000;
+
     private resizeObserver: ResizeObserver;
 
     private config?: ScalableHousePlanConfig;
@@ -75,6 +79,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     @state() private _editorMode = false;
     @state() private _selectedElementKey: string | null = null;
     @state() private _selectedBoundaryPointIndex: number | null = null;
+    @state() private _hass?: HomeAssistant;
 
     // Performance optimization: Cache entity IDs per room to avoid expensive lookups
     private _roomEntityCache: Map<string, RoomEntityCache> = new Map();
@@ -85,7 +90,16 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     // Debounce timer for resize events
     private _resizeTimer?: number;
 
-    @property({ attribute: false }) hass?: HomeAssistant;
+    // hass coalescing: HA's latest object is kept here and published to children
+    // (as _hass) at most once per HASS_PUBLISH_INTERVAL_MS, except in immediate mode
+    // (a service call from the plan is pending or settled less than SERVICE_SETTLE_MS ago)
+    private _incomingHass?: HomeAssistant;
+    private _hassDirty = false;
+    private _lastHassPublish = 0;
+    private _hassPublishTimer?: number;
+    private _pendingServiceCalls = 0;
+    private _serviceCallGeneration = 0;  // Bumped when realtime_updates resets the counter, so older calls don't settle into it
+    private _serviceSettleTimer?: number;
 
     static get styles() {
         return css`
@@ -180,11 +194,54 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         this.resizeObserver = new ResizeObserver(this.onResize.bind(this));
     }
 
+    set hass(hass: HomeAssistant | undefined) {
+        if (!hass) return;
+        this._incomingHass = hass;
+
+        // Opt-out: publish every object as-is (no copy, no callService wrapper, no timers)
+        if (this.config?.realtime_updates) {
+            this._hass = hass;
+            return;
+        }
+
+        this._hassDirty = true;
+        // Detached: connectedCallback publishes on reconnect
+        if (!this.isConnected) return;
+
+        const immediateMode = this._pendingServiceCalls > 0 || this._serviceSettleTimer !== undefined;
+        const nextPublish = this._lastHassPublish + ScalableHousePlan.HASS_PUBLISH_INTERVAL_MS;
+        if (immediateMode || Date.now() >= nextPublish) {
+            this._publishHass();
+        } else if (this._hassPublishTimer === undefined) {
+            // Throttle, never debounce: a pending timer is never restarted
+            this._hassPublishTimer = window.setTimeout(() => this._publishHass(), nextPublish - Date.now());
+        }
+    }
+
+    get hass(): HomeAssistant | undefined {
+        return this._incomingHass;
+    }
+
     setConfig(config: ScalableHousePlanConfig) {
+        const wasRealtime = !!this.config?.realtime_updates;
         this.config = {
             ...config,
             rooms: config.rooms || [],
         };
+
+        // Switching realtime_updates on: drop coalescing state and publish HA's object as-is.
+        // Switching it off: publish the wrapped copy so calls from the plan enter immediate mode.
+        if (!!config.realtime_updates !== wasRealtime && this._incomingHass) {
+            if (config.realtime_updates) {
+                this._clearHassTimers();
+                this._pendingServiceCalls = 0;
+                this._serviceCallGeneration++;
+                this._hassDirty = false;
+                this._hass = this._incomingHass;
+            } else {
+                this._publishHass();
+            }
+        }
 
         // Automatically show detail view for preview room (used during editing)
         if (this._isEditMode() && config._previewRoomIndex !== undefined && config._previewRoomIndex !== null) {
@@ -205,7 +262,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
         // Recompute entity cache immediately when config changes and hass is already available
         // (covers config re-saves; initial load is handled by willUpdate on first hass assignment)
-        if (this.hass) {
+        if (this._hass) {
             this._computeRoomEntityCaches();
         }
     }
@@ -220,9 +277,9 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         //   - First hass assignment (initial card load; config already set via setConfig)
         //   - Entity/device registry change (entity reassigned to different area in HA UI)
         // Does NOT run on normal state updates (hass.states changes) — entities/devices refs are stable
-        if (changedProperties.has('hass') && this.config && this.hass) {
-            const prevHass = changedProperties.get('hass') as HomeAssistant | undefined;
-            if (!prevHass || prevHass.entities !== this.hass.entities || prevHass.devices !== this.hass.devices) {
+        if (changedProperties.has('_hass') && this.config && this._hass) {
+            const prevHass = changedProperties.get('_hass') as HomeAssistant | undefined;
+            if (!prevHass || prevHass.entities !== this._hass.entities || prevHass.devices !== this._hass.devices) {
                 this._computeRoomEntityCaches();
             }
         }
@@ -242,16 +299,16 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
      * This expensive operation runs once when config changes, not on every render
      */
     private _computeRoomEntityCaches(): void {
-        if (!this.config || !this.hass) return;
+        if (!this.config || !this._hass) return;
 
         this._roomEntityCache.clear();
 
         for (const room of this.config.rooms) {
             // Get area entities once for this room (expensive call)
-            const areaEntityIds = room.area ? getAreaEntities(this.hass, room.area) : [];
+            const areaEntityIds = room.area ? getAreaEntities(this._hass, room.area) : [];
 
             // Get all entity IDs (uses getAllRoomEntityIds logic)
-            const allEntityIds = getAllRoomEntityIds(this.hass, room, areaEntityIds);
+            const allEntityIds = getAllRoomEntityIds(this._hass, room, areaEntityIds);
 
             // Analyze and categorize entities in a single traversal (optimization)
             const {
@@ -259,7 +316,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 ambientLightIds,
                 lightIds,
                 occupancySensorIds
-            } = analyzeRoomEntities(this.hass, room, areaEntityIds);
+            } = analyzeRoomEntities(this._hass, room, areaEntityIds);
 
             // Store in cache
             this._roomEntityCache.set(room.name, {
@@ -292,7 +349,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             const room = this.config.rooms[this._selectedRoomIndex];
             return html`
                 <scalable-house-plan-entities
-                    .hass=${this.hass}
+                    .hass=${this._hass}
                     .room=${room}
                     .onBack=${() => this._closeEntitiesView()}
                 ></scalable-house-plan-entities>
@@ -311,7 +368,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         const overviewHtml = html`
             <scalable-house-plan-overview
                 style="${readabilityStyle}"
-                .hass=${this.hass}
+                .hass=${this._hass}
                 .config=${this.config}
                 .onRoomClick=${(room: Room, index: number) => this._openRoomDetail(index)}
                 .roomEntityCache=${this._roomEntityCache}
@@ -329,7 +386,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                 <div class="detail-content">
                     <scalable-house-plan-detail
                         style="${readabilityStyle}"
-                        .hass=${this.hass}
+                        .hass=${this._hass}
                         .room=${this.config.rooms[this._selectedRoomIndex]}
                         .config=${this.config}
                         .onBack=${() => this._closeRoomDetail()}
@@ -354,6 +411,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     private _openRoomDetail(roomIndex: number) {
+        this._flushHass();
         const room = this.config!.rooms[roomIndex];
 
         if (room.detail_view && !this._isEditMode()) {
@@ -381,6 +439,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     private _closeRoomDetail() {
+        this._flushHass();
         const closingRoomIndex = this._selectedRoomIndex;
         this._selectedRoomIndex = null;
         this._currentView = 'overview';
@@ -398,6 +457,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     private _openEntitiesView() {
+        this._flushHass();
         this._currentView = 'entities';
         // Only use history API when not in edit mode
         if (!this._isEditMode()) {
@@ -407,6 +467,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     private _closeEntitiesView() {
+        this._flushHass();
         this._currentView = 'detail';
         // Only pop history when not in edit mode
         if (!this._isEditMode() && window.history.state?.view === 'room-entities') {
@@ -422,6 +483,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         }
 
         const currentState = window.history.state;
+        this._flushHass();
 
         // Handle navigation based on current view
         if (this._currentView === 'entities') {
@@ -446,6 +508,8 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
         // Listen for browser back button
         window.addEventListener('popstate', this._handlePopState);
+
+        this._flushHass();
     }
 
     disconnectedCallback() {
@@ -457,6 +521,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         }
         cleanupDragControllers();
         super.disconnectedCallback();
+        this._clearHassTimers();
 
         // Remove popstate listener
         window.removeEventListener('popstate', this._handlePopState);
@@ -472,6 +537,50 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             this._resizeTimer = undefined;
             this.requestUpdate();
         }, 100);
+    }
+
+    private _publishHass() {
+        clearTimeout(this._hassPublishTimer);
+        this._hassPublishTimer = undefined;
+        this._hassDirty = false;
+        this._lastHassPublish = Date.now();
+        // Fresh shallow copy so children see a new object; HA's shared hass is never modified
+        this._hass = { ...this._incomingHass!, callService: this._callService };
+    }
+
+    private _flushHass() {
+        if (this._hassDirty) {
+            this._publishHass();
+        }
+    }
+
+    private _clearHassTimers() {
+        clearTimeout(this._hassPublishTimer);
+        this._hassPublishTimer = undefined;
+        clearTimeout(this._serviceSettleTimer);
+        this._serviceSettleTimer = undefined;
+    }
+
+    // Service calls made from the plan switch to immediate publishing until
+    // SERVICE_SETTLE_MS after the last call settles (confirming states often arrive later)
+    private _callService: HomeAssistant['callService'] = (...args) => {
+        this._pendingServiceCalls++;
+        this._flushHass();
+        const generation = this._serviceCallGeneration;
+        const settled = () => this._serviceCallSettled(generation);
+        const promise = this._incomingHass!.callService(...args);
+        promise.then(settled, settled);
+        return promise;
+    };
+
+    private _serviceCallSettled(generation: number) {
+        // Counter was reset by switching realtime_updates on while the call was in flight
+        if (generation !== this._serviceCallGeneration) return;
+        if (--this._pendingServiceCalls > 0) return;
+        clearTimeout(this._serviceSettleTimer);
+        this._serviceSettleTimer = window.setTimeout(() => {
+            this._serviceSettleTimer = undefined;
+        }, ScalableHousePlan.SERVICE_SETTLE_MS);
     }
 
     public static async getConfigElement(): Promise<LovelaceCardEditor> {

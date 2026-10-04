@@ -210,6 +210,12 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
                                 @change=${this._showRoomBackgroundsChanged}
                             ></ha-switch>
                         </ha-formfield>
+                        <ha-formfield label="${this.localize('editor.realtime_updates')}">
+                            <ha-switch
+                                .checked=${this._config.realtime_updates || false}
+                                @change=${this._realtimeUpdatesChanged}
+                            ></ha-switch>
+                        </ha-formfield>
                         </div>
                     </div>
                 </div>
@@ -945,6 +951,11 @@ export class ScalableHousePlanEditor extends LitElement implements LovelaceCardE
 
     private _showRoomBackgroundsChanged(ev: any): void {
         this._config = { ...this._config, show_room_backgrounds: ev.target.checked };
+        this._configChanged();
+    }
+
+    private _realtimeUpdatesChanged(ev: any): void {
+        this._config = { ...this._config, realtime_updates: ev.target.checked };
         this._configChanged();
     }
 
