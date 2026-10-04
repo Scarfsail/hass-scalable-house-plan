@@ -183,6 +183,11 @@ export class InfoBoxElement extends ElementBase<InfoBoxElementConfig> {
                 element: typeConfig?.element
             };
         }
+
+        // The first render ran while getCreateCardElement() was pending (before the
+        // card creator and type configs above existed): render again now instead of
+        // waiting for the next hass update
+        this.requestUpdate();
     }
 
     protected renderContent() {

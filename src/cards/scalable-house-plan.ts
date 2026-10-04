@@ -95,7 +95,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     // (a service call from the plan is pending or settled less than SERVICE_SETTLE_MS ago)
     private _incomingHass?: HomeAssistant;
     private _hassDirty = false;
-    private _lastHassPublish = 0;
+    private _lastHassPublish = -Infinity;  // performance.now() of the last publish
     private _hassPublishTimer?: number;
     private _pendingServiceCalls = 0;
     private _serviceCallGeneration = 0;  // Bumped when realtime_updates resets the counter, so older calls don't settle into it
@@ -210,11 +210,11 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
         const immediateMode = this._pendingServiceCalls > 0 || this._serviceSettleTimer !== undefined;
         const nextPublish = this._lastHassPublish + ScalableHousePlan.HASS_PUBLISH_INTERVAL_MS;
-        if (immediateMode || Date.now() >= nextPublish) {
+        if (immediateMode || performance.now() >= nextPublish) {
             this._publishHass();
         } else if (this._hassPublishTimer === undefined) {
             // Throttle, never debounce: a pending timer is never restarted
-            this._hassPublishTimer = window.setTimeout(() => this._publishHass(), nextPublish - Date.now());
+            this._hassPublishTimer = window.setTimeout(() => this._publishHass(), nextPublish - performance.now());
         }
     }
 
@@ -543,7 +543,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         clearTimeout(this._hassPublishTimer);
         this._hassPublishTimer = undefined;
         this._hassDirty = false;
-        this._lastHassPublish = Date.now();
+        this._lastHassPublish = performance.now();
         // Fresh shallow copy so children see a new object; HA's shared hass is never modified
         this._hass = { ...this._incomingHass!, callService: this._callService };
     }
