@@ -166,16 +166,19 @@ export function getElementTypeForEntity(
  * @returns Merged element configuration
  * 
  * Rules:
- * - If overrides contain explicit 'type', use overrides as-is (no merging)
+ * - If overrides contain explicit 'type', return a shallow copy of overrides (no merging)
  * - Otherwise, merge defaults with overrides (overrides win)
+ *
+ * Always returns a new object: overrides may be HA's frozen Lovelace config,
+ * and callers write per-render properties into the result.
  */
 export function mergeElementProperties(
     defaults: ElementDefinition,
     overrides?: any
 ): any {
-    // If explicit type is specified, don't merge - use overrides as-is
+    // If explicit type is specified, don't merge - copy overrides as-is
     if (overrides?.type) {
-        return overrides;
+        return { ...overrides };
     }
 
     // Merge: defaults + overrides (overrides win)

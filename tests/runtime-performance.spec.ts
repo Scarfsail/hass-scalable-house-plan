@@ -340,9 +340,6 @@ test.describe("Scalable House Plan - hass coalescing", () => {
     test("detail renders the info box without waiting for a hass publish", async ({ page }) => {
         const [livingRoom, ...otherRooms] = FIXTURE_CARD.rooms;
         await setupPlan(page, {
-            // An info box needs a matching element_defaults entry: without one its frozen
-            // config is used as-is and renderElements can't write room_entities into it.
-            element_defaults: [{ element: { type: "custom:info-box-shp" } }],
             rooms: [
                 {
                     ...livingRoom,
@@ -364,6 +361,35 @@ test.describe("Scalable House Plan - hass coalescing", () => {
             return infoBox?.shadowRoot?.querySelectorAll(".info-item").length ?? 0;
         }), { timeout: 5_000 }).toBeGreaterThan(0);
         expect(await publishCount(page)).toBe(before);
+    });
+
+    test("explicit element types without matching element_defaults render (issue #8)", async ({ page }) => {
+        const [livingRoom, ...otherRooms] = FIXTURE_CARD.rooms;
+        await setupPlan(page, {
+            // HA hands the card a frozen config; without a matching default, the explicit-type
+            // element config used to be that frozen object and the per-render writes threw.
+            element_defaults: [],
+            rooms: [
+                {
+                    ...livingRoom,
+                    entities: [
+                        { entity: LIGHT, plan: { left: 50, top: 50, element: { type: "custom:state-icon-shp" } } },
+                        { entity: "", plan: { left: 350, top: 50, element: { type: "custom:info-box-shp" } } },
+                    ],
+                },
+                ...otherRooms,
+            ],
+        });
+
+        const rendered = await page.evaluate(() => {
+            const shp = (window as any).__shp;
+            const [room] = shp.deepAll(shp.el.shadowRoot, "scalable-house-plan-room");
+            return {
+                stateIcon: shp.deepAll(room.shadowRoot, "state-icon-shp").length,
+                infoBox: shp.deepAll(room.shadowRoot, "info-box-shp").length,
+            };
+        });
+        expect(rendered).toEqual({ stateIcon: 1, infoBox: 1 });
     });
 
     test("actions: immediate publishing until 5 s after the last call settles", async ({ page }) => {
