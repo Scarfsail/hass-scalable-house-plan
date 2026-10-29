@@ -1,4 +1,5 @@
 import { LitElement, html, css } from "lit-element"
+import { nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
@@ -9,6 +10,7 @@ import "./scalable-house-plan-detail";
 import "./scalable-house-plan-entities";
 import { cleanupDragControllers } from "../components/element-renderer-shp";
 import { getReadabilityModeCssVars } from "../utils/plan-styles";
+import { HELMAN_ENTITY_DETAIL_TAG, loadHelmanEntityIds } from "../utils/helman";
 import type {
     PositionScalingMode,
     ReadabilityMode,
@@ -74,12 +76,16 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     private config?: ScalableHousePlanConfig;
 
+    // Entities with a Helman device detail: their more-info opens that detail instead (read once per page load)
+    private _helmanEntityIds: ReadonlySet<string> = new Set();
+
     @state() private _selectedRoomIndex: number | null = null;
     @state() private _currentView: 'overview' | 'detail' | 'entities' = 'overview';
     @state() private _editorMode = false;
     @state() private _selectedElementKey: string | null = null;
     @state() private _selectedBoundaryPointIndex: number | null = null;
     @state() private _hass?: HomeAssistant;
+    @state() private _helmanEntityId?: string;  // Entity whose Helman device detail is open
 
     // Performance optimization: Cache entity IDs per room to avoid expensive lookups
     private _roomEntityCache: Map<string, RoomEntityCache> = new Map();
@@ -196,6 +202,9 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     set hass(hass: HomeAssistant | undefined) {
         if (!hass) return;
+        if (!this._incomingHass) {
+            loadHelmanEntityIds(hass).then((ids) => this._helmanEntityIds = ids);
+        }
         this._incomingHass = hass;
 
         // Opt-out: publish every object as-is (no copy, no callService wrapper, no timers)
@@ -344,6 +353,14 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             return html`<div>Config is not defined</div>`;
         }
 
+        const helmanDetailHtml = this._helmanEntityId ? html`
+            <helman-entity-detail
+                .hass=${this._hass}
+                .entityId=${this._helmanEntityId}
+                @closed=${(e: Event) => { if (e.target === e.currentTarget) this._helmanEntityId = undefined; }}
+            ></helman-entity-detail>
+        ` : nothing;
+
         // Show entities list view
         if (this._currentView === 'entities' && this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex]) {
             const room = this.config.rooms[this._selectedRoomIndex];
@@ -353,6 +370,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                     .room=${room}
                     .onBack=${() => this._closeEntitiesView()}
                 ></scalable-house-plan-entities>
+                ${helmanDetailHtml}
             `;
         }
 
@@ -407,6 +425,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             ${overviewHtml}
             ${detailHtml}
             ${editModeBadge}
+            ${helmanDetailHtml}
         `;
     }
 
@@ -477,6 +496,8 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     private _handlePopState = (event: PopStateEvent) => {
+        this._helmanEntityId = undefined;
+
         // Don't interfere with edit mode history handling
         if (this._isEditMode()) {
             return;
@@ -508,6 +529,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
         // Listen for browser back button
         window.addEventListener('popstate', this._handlePopState);
+        this.addEventListener('hass-more-info', this._handleMoreInfo);
 
         this._flushHass();
     }
@@ -525,6 +547,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
         // Remove popstate listener
         window.removeEventListener('popstate', this._handlePopState);
+        this.removeEventListener('hass-more-info', this._handleMoreInfo);
     }
 
     onResize() {
@@ -582,6 +605,16 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             this._serviceSettleTimer = undefined;
         }, ScalableHousePlan.SERVICE_SETTLE_MS);
     }
+
+    // Every more-info from inside the card bubbles here; Helman entities get Helman's device detail.
+    // Helman's own more-info fallbacks (dispatched from inside its detail) pass through to HA.
+    private _handleMoreInfo = (event: Event) => {
+        const entityId = (event as CustomEvent<{ entityId: string }>).detail.entityId;
+        if (!this._helmanEntityIds.has(entityId)) return;
+        if (event.composedPath().some((node) => (node as Element).localName === HELMAN_ENTITY_DETAIL_TAG)) return;
+        event.stopPropagation();
+        this._helmanEntityId = entityId;
+    };
 
     public static async getConfigElement(): Promise<LovelaceCardEditor> {
         await import("./scalable-house-plan-editor");
