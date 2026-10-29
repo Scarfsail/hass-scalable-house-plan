@@ -225,6 +225,10 @@ layers:
    - Shows all entities in the room (with or without plan configuration)
    - Click back to return to Detail view
 
+**Helman Device Detail:**
+- With [Helman](https://github.com/Scarfsail/hass-helman) installed, anything that would open HA's more-info for an entity of a Helman-managed device (hold, `more-info` actions, the climate menu, info boxes) opens Helman's device detail instead (power, energy, schedule, controls)
+- Taps that toggle an entity are unchanged; without Helman everything opens HA's more-info as usual
+
 **Default Element Type Mapping:**
 - Element types are automatically selected based on entity domain and device_class
 - Example: `binary_sensor.door` → `door-window-shp` with default properties
