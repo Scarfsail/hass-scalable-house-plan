@@ -453,7 +453,7 @@ export class GroupElement extends ElementBase<GroupElementConfig> {
         // Add default tap_action and hold_action for entities (if not already set by user)
         if (entity && this.hass && isEntityActionable(entity, this.hass)) {
             if (!elementConfig.tap_action) {
-                elementConfig.tap_action = getDefaultTapAction(entity, this.hass);
+                elementConfig.tap_action = getDefaultTapAction();
             }
             if (!elementConfig.hold_action) {
                 elementConfig.hold_action = getDefaultHoldAction();

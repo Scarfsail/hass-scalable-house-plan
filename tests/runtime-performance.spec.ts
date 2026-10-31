@@ -484,6 +484,35 @@ test.describe("Scalable House Plan - hass coalescing", () => {
         expect((await cardTimers(page)).pendingCalls).toBe(2);
     });
 
+    test("plan light tap opens more-info and hold toggles", async ({ page }) => {
+        await setupPlan(page);
+
+        const result = await page.evaluate((entityId) => {
+            const shp = (window as any).__shp;
+            const room = shp.deepAll(shp.el.shadowRoot, "scalable-house-plan-room")
+                .find((r: any) => r.mode === "overview" && r.room.name === "Obývák");
+            const light = shp.deepAll(room.shadowRoot, "state-icon-shp")
+                .find((icon: any) => icon._config?.entity === entityId);
+            if (!light) throw new Error("overview light icon not rendered");
+            const inner = light.shadowRoot.querySelector("hui-state-icon-element");
+            const badge = inner?.shadowRoot?.querySelector("state-badge");
+            if (!badge) throw new Error("light action target not rendered");
+
+            const moreInfo: string[] = [];
+            shp.el.addEventListener("hass-more-info", (event: Event) => {
+                moreInfo.push((event as CustomEvent).detail.entityId);
+            });
+            badge.dispatchEvent(new CustomEvent("action", { detail: { action: "tap" }, bubbles: true, composed: true }));
+            const callsAfterTap = shp.calls.map((call: any) => call.args);
+            badge.dispatchEvent(new CustomEvent("action", { detail: { action: "hold" }, bubbles: true, composed: true }));
+            return { moreInfo, callsAfterTap, callsAfterHold: shp.calls.map((call: any) => call.args) };
+        }, LIGHT);
+
+        expect(result.moreInfo).toEqual([LIGHT]);
+        expect(result.callsAfterTap).toEqual([]);
+        expect(result.callsAfterHold).toEqual([["light", "turn_on", { entity_id: LIGHT }]]);
+    });
+
     test("opt-out: realtime_updates publishes every object as-is", async ({ page }) => {
         await setupPlan(page, { realtime_updates: true });
 
