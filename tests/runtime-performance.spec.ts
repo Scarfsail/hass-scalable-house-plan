@@ -745,6 +745,52 @@ test.describe("Scalable House Plan - hass coalescing", () => {
     });
 });
 
+test.describe("Scalable House Plan - gate touch controls", () => {
+    test.use({ hasTouch: true });
+
+    test("touching a gate button calls its cover service", async ({ page }) => {
+        const [livingRoom, ...otherRooms] = FIXTURE_CARD.rooms;
+        await setupPlan(page, {
+            rooms: [
+                {
+                    ...livingRoom,
+                    entities: [
+                        { entity: LIGHT, plan: { left: 50, top: 50, element: { type: "custom:gate-buttons-shp", orientation: "horizontal" } } },
+                    ],
+                },
+                ...otherRooms,
+            ],
+        });
+        await push(page, { [LIGHT]: { state: "closed" } });
+        await idle(page);
+        await openDetail(page);
+
+        await page.evaluate(() => {
+            const shp = (window as any).__shp;
+            shp.moreInfo = [];
+            shp.el.addEventListener("hass-more-info", (event: Event) => {
+                shp.moreInfo.push((event as CustomEvent).detail.entityId);
+            });
+        });
+
+        const button = page.locator("gate-buttons-shp ha-button").last();
+        await expect(button).toBeVisible();
+        const bounds = await button.boundingBox();
+        if (!bounds) throw new Error("gate button has no touch target");
+        await page.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+        await page.clock.runFor(350);
+
+        const result = await page.evaluate(() => {
+            const shp = (window as any).__shp;
+            return { calls: shp.calls.map((call: any) => call.args), moreInfo: shp.moreInfo };
+        });
+        expect(result).toEqual({
+            calls: [["cover", "open_cover", { entity_id: LIGHT }]],
+            moreInfo: [],
+        });
+    });
+});
+
 test.describe("Scalable House Plan - realtime_updates editor switch", () => {
     test("writes the realtime_updates option", async ({ page }) => {
         await openTestDashboard(page);

@@ -14,6 +14,8 @@ type GateActions = "open" | "close" | "stop";
 @customElement("gate-buttons-shp")
 export class GateButtonsElement extends ElementEntityBase<GateButtonsElementConfig> {
     protected showMoreInfoOnClick = false;
+    protected handleActionsInBase = false;
+
     protected override renderEntityContent(entity: HassEntity) {
 
         const renderButtons = (buttons: GateActions[]) => {
