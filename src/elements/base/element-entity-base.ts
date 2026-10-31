@@ -4,6 +4,7 @@ import type { HomeAssistant } from "../../../hass-frontend/src/types";
 import type { HassEntity } from "home-assistant-js-websocket";
 import { ElementBase, ElementBaseConfig } from "./element-base";
 import { handleAction } from "../../utils/handle-action";
+import { actionHandler, ActionHandlerEvent } from "../../utils/action-handler";
 
 export interface ElementEntityBaseConfig extends ElementBaseConfig {
     entity: string;
@@ -29,17 +30,15 @@ export abstract class ElementEntityBase<TConfig extends ElementEntityBaseConfig 
     }
 
     private _handleClick(ev: MouseEvent) {
-        if (!this.handleActionsInBase) {
-            return; // Let child element or wrapped HA element handle it
-        }
-
         // Prevent event from bubbling to wrapped elements
         ev.stopPropagation();
         ev.preventDefault();
+    }
 
-        // Trigger tap action
+    private _handleAction(ev: ActionHandlerEvent) {
+        ev.stopPropagation();
         if (this._config && this.hass) {
-            handleAction(this, this.hass, this._config, "tap");
+            handleAction(this, this.hass, this._config, ev.detail.action);
         }
     }
 
@@ -59,7 +58,11 @@ export abstract class ElementEntityBase<TConfig extends ElementEntityBaseConfig 
         }
 
         return html`
-        <div @click=${this._handleClick}>
+        <div
+            @click=${this.handleActionsInBase ? this._handleClick : null}
+            @action=${this.handleActionsInBase ? this._handleAction : null}
+            .actionHandler=${this.handleActionsInBase ? actionHandler({ hasHold: !!this._config.hold_action }) : null}
+        >
             ${this.renderEntityContent(entity)}
         </div>`
     }

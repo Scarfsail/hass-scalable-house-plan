@@ -513,6 +513,55 @@ test.describe("Scalable House Plan - hass coalescing", () => {
         expect(result.callsAfterHold).toEqual([["light", "turn_on", { entity_id: LIGHT }]]);
     });
 
+    test("base-managed custom light opens details on tap and toggles on hold", async ({ page }) => {
+        const [livingRoom, ...otherRooms] = FIXTURE_CARD.rooms;
+        await setupPlan(page, {
+            rooms: [
+                {
+                    ...livingRoom,
+                    entities: [
+                        { entity: LIGHT, plan: { left: 50, top: 50, element: { type: "custom:analog-shp" } } },
+                    ],
+                },
+                ...otherRooms,
+            ],
+        });
+
+        const tapped = await page.evaluate((entityId) => {
+            const shp = (window as any).__shp;
+            const analog = shp.deepAll(shp.el.shadowRoot, "analog-shp")
+                .find((element: any) => element._config?.entity === entityId);
+            if (!analog) throw new Error("custom analog light not rendered");
+            const target = analog.shadowRoot.querySelector("div");
+            if (!target) throw new Error("custom analog action target not rendered");
+            const moreInfo: string[] = [];
+            shp.el.addEventListener("hass-more-info", (event: Event) => {
+                moreInfo.push((event as CustomEvent).detail.entityId);
+            });
+            target.click();
+            return { moreInfo, calls: shp.calls.map((call: any) => call.args) };
+        }, LIGHT);
+        expect(tapped).toEqual({ moreInfo: [LIGHT], calls: [] });
+
+        await page.evaluate((entityId) => {
+            const shp = (window as any).__shp;
+            const analog = shp.deepAll(shp.el.shadowRoot, "analog-shp")
+                .find((element: any) => element._config?.entity === entityId);
+            analog.shadowRoot.querySelector("div").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+        }, LIGHT);
+        await page.clock.runFor(550);
+        const held = await page.evaluate((entityId) => {
+            const shp = (window as any).__shp;
+            const analog = shp.deepAll(shp.el.shadowRoot, "analog-shp")
+                .find((element: any) => element._config?.entity === entityId);
+            const target = analog.shadowRoot.querySelector("div");
+            target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+            target.click();
+            return shp.calls.map((call: any) => call.args);
+        }, LIGHT);
+        expect(held).toEqual([["homeassistant", "toggle", { entity_id: LIGHT }]]);
+    });
+
     test("opt-out: realtime_updates publishes every object as-is", async ({ page }) => {
         await setupPlan(page, { realtime_updates: true });
 

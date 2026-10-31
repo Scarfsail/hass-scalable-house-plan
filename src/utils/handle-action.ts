@@ -4,6 +4,7 @@ import type { HomeAssistant } from "../../hass-frontend/src/types";
 export interface ActionableConfig {
     entity?: string;
     tap_action?: ActionConfig;
+    hold_action?: ActionConfig;
 }
 
 export const handleAction = (
@@ -12,9 +13,9 @@ export const handleAction = (
     config: ActionableConfig,
     action: string
 ): void => {
-    // Custom elements only use tap action
-    // Wrapped HA elements handle their own tap/hold/double_tap actions
-    const actionConfig = config.tap_action || { action: "more-info" };
+    // Wrapped HA elements handle their own actions.
+    const actionConfig = action === "hold" ? config.hold_action : config.tap_action || { action: "more-info" };
+    if (!actionConfig) return;
 
     switch (actionConfig.action) {
         case "more-info": {
