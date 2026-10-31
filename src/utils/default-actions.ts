@@ -3,7 +3,7 @@ import type { HomeAssistant } from "../../hass-frontend/src/types";
 
 /**
  * Domains that are considered "actionable" by default - entities that can be toggled or controlled
- * Tap action will be "toggle" for these domains
+ * Hold action will be "toggle" for these domains
  */
 const ACTIONABLE_DOMAINS = new Set([
     'light',
@@ -25,7 +25,7 @@ const NON_ACTIONABLE_ICONS = new Set([
 ]);
 
 /**
- * Check if an entity should be actionable (can be toggled/controlled via tap)
+ * Check if an entity should be actionable (can be toggled/controlled via hold)
  * This checks multiple factors:
  * - Domain (light, switch, etc.)
  * - Icon (certain icons like mdi:fuse are excluded)
@@ -54,26 +54,19 @@ export function isEntityActionable(entityId: string, hass?: HomeAssistant): bool
 }
 
 /**
- * Get default tap action for an entity
- * Actionable entities (light, switch, etc.) get "toggle"
- * Non-actionable entities (sensor, camera, etc.) get "more-info"
- * 
- * @param entityId - Entity ID
- * @param hass - Home Assistant instance
+ * Get the default tap action, which opens entity details.
+ *
  * @returns Default tap action config
  */
-export function getDefaultTapAction(entityId: string, hass?: HomeAssistant): ActionConfig {
-    if (isEntityActionable(entityId, hass)) {
-        return { action: "toggle" };
-    }
+export function getDefaultTapAction(): ActionConfig {
     return { action: "more-info" };
 }
 
 /**
- * Get default hold action (always more-info)
+ * Get the default hold action for actionable entities.
  * 
  * @returns Default hold action config
  */
 export function getDefaultHoldAction(): ActionConfig {
-    return { action: "more-info" };
+    return { action: "toggle" };
 }

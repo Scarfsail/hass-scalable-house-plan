@@ -226,8 +226,9 @@ layers:
    - Click back to return to Detail view
 
 **Helman Device Detail:**
-- With [Helman](https://github.com/Scarfsail/hass-helman) installed, anything that would open HA's more-info for an entity of a Helman-managed device (hold, `more-info` actions, the climate menu, info boxes) opens Helman's device detail instead (power, energy, schedule, controls)
-- Taps that toggle an entity are unchanged; without Helman everything opens HA's more-info as usual
+- With [Helman](https://github.com/Scarfsail/hass-helman) installed, anything that would open HA's more-info for an entity of a Helman-managed device (`more-info` actions, the climate menu, info boxes) opens Helman's device detail instead (power, energy, schedule, controls)
+- Tapping a plan element opens its device detail: Helman's for managed devices, or HA more-info otherwise. Long-pressing an actionable entity (such as a light or switch) toggles it instead of opening more-info.
+- Set `tap_action: toggle` on an element to restore toggle-on-tap for that element.
 
 **Default Element Type Mapping:**
 - Element types are automatically selected based on entity domain and device_class

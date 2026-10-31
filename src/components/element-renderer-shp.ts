@@ -860,15 +860,15 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
             el.elementConfig.show_background = mode === 'overview' ? showBgOverview : showBgDetail;
         }
 
-        // Re-derive default tap/hold each render — these depend on hass.states.attributes.icon
-        // via isEntityActionable, so they cannot live inside the cached metadata.
+        // Re-derive default tap/hold each render — actionability depends on
+        // hass.states.attributes.icon, so defaults cannot live in cached metadata.
         // Gate on el.plan?.tap_action (the source-of-truth user override) rather than
         // el.elementConfig.tap_action (which may carry a stale write from a prior render).
         if (el.entity) {
             if (el.plan?.tap_action) {
                 el.elementConfig.tap_action = el.plan.tap_action;
             } else if (isEntityActionable(el.entity, hass)) {
-                el.elementConfig.tap_action = getDefaultTapAction(el.entity, hass);
+                el.elementConfig.tap_action = getDefaultTapAction();
             } else {
                 delete el.elementConfig.tap_action;
             }

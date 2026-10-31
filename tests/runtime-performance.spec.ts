@@ -484,6 +484,84 @@ test.describe("Scalable House Plan - hass coalescing", () => {
         expect((await cardTimers(page)).pendingCalls).toBe(2);
     });
 
+    test("plan light tap opens more-info and hold toggles", async ({ page }) => {
+        await setupPlan(page);
+
+        const result = await page.evaluate((entityId) => {
+            const shp = (window as any).__shp;
+            const room = shp.deepAll(shp.el.shadowRoot, "scalable-house-plan-room")
+                .find((r: any) => r.mode === "overview" && r.room.name === "Obývák");
+            const light = shp.deepAll(room.shadowRoot, "state-icon-shp")
+                .find((icon: any) => icon._config?.entity === entityId);
+            if (!light) throw new Error("overview light icon not rendered");
+            const inner = light.shadowRoot.querySelector("hui-state-icon-element");
+            const badge = inner?.shadowRoot?.querySelector("state-badge");
+            if (!badge) throw new Error("light action target not rendered");
+
+            const moreInfo: string[] = [];
+            shp.el.addEventListener("hass-more-info", (event: Event) => {
+                moreInfo.push((event as CustomEvent).detail.entityId);
+            });
+            badge.dispatchEvent(new CustomEvent("action", { detail: { action: "tap" }, bubbles: true, composed: true }));
+            const callsAfterTap = shp.calls.map((call: any) => call.args);
+            badge.dispatchEvent(new CustomEvent("action", { detail: { action: "hold" }, bubbles: true, composed: true }));
+            return { moreInfo, callsAfterTap, callsAfterHold: shp.calls.map((call: any) => call.args) };
+        }, LIGHT);
+
+        expect(result.moreInfo).toEqual([LIGHT]);
+        expect(result.callsAfterTap).toEqual([]);
+        expect(result.callsAfterHold).toEqual([["light", "turn_on", { entity_id: LIGHT }]]);
+    });
+
+    test("base-managed custom light opens details on tap and toggles on hold", async ({ page }) => {
+        const [livingRoom, ...otherRooms] = FIXTURE_CARD.rooms;
+        await setupPlan(page, {
+            rooms: [
+                {
+                    ...livingRoom,
+                    entities: [
+                        { entity: LIGHT, plan: { left: 50, top: 50, element: { type: "custom:analog-shp" } } },
+                    ],
+                },
+                ...otherRooms,
+            ],
+        });
+
+        const tapped = await page.evaluate((entityId) => {
+            const shp = (window as any).__shp;
+            const analog = shp.deepAll(shp.el.shadowRoot, "analog-shp")
+                .find((element: any) => element._config?.entity === entityId);
+            if (!analog) throw new Error("custom analog light not rendered");
+            const target = analog.shadowRoot.querySelector("div");
+            if (!target) throw new Error("custom analog action target not rendered");
+            const moreInfo: string[] = [];
+            shp.el.addEventListener("hass-more-info", (event: Event) => {
+                moreInfo.push((event as CustomEvent).detail.entityId);
+            });
+            target.click();
+            return { moreInfo, calls: shp.calls.map((call: any) => call.args) };
+        }, LIGHT);
+        expect(tapped).toEqual({ moreInfo: [LIGHT], calls: [] });
+
+        await page.evaluate((entityId) => {
+            const shp = (window as any).__shp;
+            const analog = shp.deepAll(shp.el.shadowRoot, "analog-shp")
+                .find((element: any) => element._config?.entity === entityId);
+            analog.shadowRoot.querySelector("div").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+        }, LIGHT);
+        await page.clock.runFor(550);
+        const held = await page.evaluate((entityId) => {
+            const shp = (window as any).__shp;
+            const analog = shp.deepAll(shp.el.shadowRoot, "analog-shp")
+                .find((element: any) => element._config?.entity === entityId);
+            const target = analog.shadowRoot.querySelector("div");
+            target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+            target.click();
+            return shp.calls.map((call: any) => call.args);
+        }, LIGHT);
+        expect(held).toEqual([["homeassistant", "toggle", { entity_id: LIGHT }]]);
+    });
+
     test("opt-out: realtime_updates publishes every object as-is", async ({ page }) => {
         await setupPlan(page, { realtime_updates: true });
 
@@ -664,6 +742,52 @@ test.describe("Scalable House Plan - hass coalescing", () => {
             return { runs: el.__cacheRuns, replaced: el._roomEntityCache.get("Obývák") !== el.__cacheBefore };
         });
         expect(recomputed).toEqual({ runs: 1, replaced: true });
+    });
+});
+
+test.describe("Scalable House Plan - gate touch controls", () => {
+    test.use({ hasTouch: true });
+
+    test("touching a gate button calls its cover service", async ({ page }) => {
+        const [livingRoom, ...otherRooms] = FIXTURE_CARD.rooms;
+        await setupPlan(page, {
+            rooms: [
+                {
+                    ...livingRoom,
+                    entities: [
+                        { entity: LIGHT, plan: { left: 50, top: 50, element: { type: "custom:gate-buttons-shp", orientation: "horizontal" } } },
+                    ],
+                },
+                ...otherRooms,
+            ],
+        });
+        await push(page, { [LIGHT]: { state: "closed" } });
+        await idle(page);
+        await openDetail(page);
+
+        await page.evaluate(() => {
+            const shp = (window as any).__shp;
+            shp.moreInfo = [];
+            shp.el.addEventListener("hass-more-info", (event: Event) => {
+                shp.moreInfo.push((event as CustomEvent).detail.entityId);
+            });
+        });
+
+        const button = page.locator("gate-buttons-shp ha-button").last();
+        await expect(button).toBeVisible();
+        const bounds = await button.boundingBox();
+        if (!bounds) throw new Error("gate button has no touch target");
+        await page.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+        await page.clock.runFor(350);
+
+        const result = await page.evaluate(() => {
+            const shp = (window as any).__shp;
+            return { calls: shp.calls.map((call: any) => call.args), moreInfo: shp.moreInfo };
+        });
+        expect(result).toEqual({
+            calls: [["cover", "open_cover", { entity_id: LIGHT }]],
+            moreInfo: [],
+        });
     });
 });
 
