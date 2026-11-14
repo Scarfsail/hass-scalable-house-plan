@@ -1,6 +1,6 @@
 import { LitElement, html, css } from "lit-element"
 import { nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../../hass-frontend/src/types";
 import type { LovelaceCard, LovelaceCardEditor } from "../../hass-frontend/src/panels/lovelace/types";
 import type { LovelaceCardConfig } from "../../hass-frontend/src/data/lovelace/config/card";
@@ -11,6 +11,7 @@ import "./scalable-house-plan-entities";
 import { cleanupDragControllers } from "../components/element-renderer-shp";
 import { getReadabilityModeCssVars } from "../utils/plan-styles";
 import { HELMAN_ENTITY_DETAIL_TAG, loadHelmanEntityIds } from "../utils/helman";
+import { watchHassRestart } from "../utils/restart-reload";
 import type {
     PositionScalingMode,
     ReadabilityMode,
@@ -78,6 +79,9 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     // Entities with a Helman device detail: their more-info opens that detail instead (read once per page load)
     private _helmanEntityIds: ReadonlySet<string> = new Set();
+
+    // Set by HA on cards shown in the card-editor dialog
+    @property({ type: Boolean }) public preview = false;
 
     @state() private _selectedRoomIndex: number | null = null;
     @state() private _currentView: 'overview' | 'detail' | 'entities' = 'overview';
@@ -202,6 +206,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     set hass(hass: HomeAssistant | undefined) {
         if (!hass) return;
+        watchHassRestart(hass, () => !this.isConnected || this._editorMode || this.preview || this._isEditMode());
         if (!this._incomingHass) {
             loadHelmanEntityIds(hass).then((ids) => this._helmanEntityIds = ids);
         }
