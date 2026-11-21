@@ -9,8 +9,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: pages
-  # A pull request run never cancels a deploy from main.
+  # Pull request runs get their own group per PR ref, so they can never cancel
+  # a production build or deploy. Production runs share the `pages` group.
+  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.ref) || 'pages' }}
+  # A newer push to the same PR supersedes its older run; production is never cancelled.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build:
