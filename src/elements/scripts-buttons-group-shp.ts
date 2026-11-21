@@ -1,6 +1,7 @@
 import { html, nothing } from "lit"
 import { customElement } from "lit/decorators.js";
 import { ElementBase, ElementBaseConfig } from "./base";
+import { getLocalizeFunction, type LocalizeFunction } from "../localize";
 
 interface ScriptButtonDefinition {
     entity: string;
@@ -20,6 +21,15 @@ interface ScriptButtonsGroupElementConfig extends ElementBaseConfig {
 
 @customElement("scripts-buttons-group-shp")
 export class ScriptButtonsGroupElement extends ElementBase<ScriptButtonsGroupElementConfig> {
+    private _localize?: LocalizeFunction;
+
+    private get localize(): LocalizeFunction {
+        if (!this._localize) {
+            this._localize = getLocalizeFunction(this.hass!);
+        }
+        return this._localize;
+    }
+
     private _runScript(entity: string) {
         this.hass?.callService('script', 'turn_on', { entity_id: entity });
     }
@@ -40,11 +50,11 @@ export class ScriptButtonsGroupElement extends ElementBase<ScriptButtonsGroupEle
             const runningScript = this.hass.states[runningScriptButton.entity];
             return html`
                 <div style="position:absolute;left:${this._config?.running_left ?? 0}px;top:${this._config?.running_top ?? 0}px;width:${this._config?.running_width ?? 200}px;height:${this._config?.running_height ?? 100}px;"> 
-                    <div>Probíhá: ${runningScriptButton.title}</div>
+                    <div>${this.localize('scripts.running').replace('{title}', () => runningScriptButton.title)}</div>
                     <div>${runningScript.attributes["last_action"]}</div>
                     <div>
                         <ha-button raised style="--mdc-theme-primary: var(--warning-color); " @click=${() => this._stopScript(runningScriptButton.entity)}>
-                            ${`Zrušit ${runningScriptButton.title}`}
+                            ${this.localize('scripts.cancel').replace('{title}', () => runningScriptButton.title)}
                         </ha-button>
                     </div>
                 </div>

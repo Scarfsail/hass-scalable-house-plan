@@ -2,6 +2,7 @@ import { html } from "lit"
 import { customElement } from "lit/decorators.js";
 import { ElementEntityBase, ElementEntityBaseConfig } from "./base";
 import { HassEntity } from "home-assistant-js-websocket";
+import { getLocalizeFunction, type LocalizeFunction } from "../localize";
 
 
 interface GateButtonsElementConfig extends ElementEntityBaseConfig {
@@ -15,6 +16,14 @@ type GateActions = "open" | "close" | "stop";
 export class GateButtonsElement extends ElementEntityBase<GateButtonsElementConfig> {
     protected showMoreInfoOnClick = false;
     protected handleActionsInBase = false;
+    private _localize?: LocalizeFunction;
+
+    private get localize(): LocalizeFunction {
+        if (!this._localize) {
+            this._localize = getLocalizeFunction(this.hass!);
+        }
+        return this._localize;
+    }
 
     protected override renderEntityContent(entity: HassEntity) {
 
@@ -45,15 +54,16 @@ export class GateButtonsElement extends ElementEntityBase<GateButtonsElementConf
     }
 
     private getGateButton(type: GateActions, entity_id: string) {
-        const buttonTextAndColor = this.getGateButtonTextAncColor(type);
-        return html`<ha-button raised style="--mdc-theme-primary: ${buttonTextAndColor.color}; " @click=${() => this.performGateAction(type, entity_id)}>${buttonTextAndColor.text}</ha-button>`
+        const color = this.getGateButtonColor(type);
+        const text = this.localize(`gate.${type}`);
+        return html`<ha-button raised style="--mdc-theme-primary: ${color}; " @click=${() => this.performGateAction(type, entity_id)}>${text}</ha-button>`
     }
 
-    private getGateButtonTextAncColor(type: GateActions) {
+    private getGateButtonColor(type: GateActions) {
         switch (type) {
-            case "open": return { text: "Otevřít", color: "var(--success-color)" }
-            case "stop": return { text: "Zastavit", color: "var(--warning-color)" }
-            case "close": return { text: "Zavřít", color: "var(--primary-color)" }
+            case "open": return "var(--success-color)"
+            case "stop": return "var(--warning-color)"
+            case "close": return "var(--primary-color)"
 
             default: throw new Error("Unsupported button type: " + type);
 
