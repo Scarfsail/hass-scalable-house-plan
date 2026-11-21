@@ -10,3 +10,7 @@ nul
 /blob-report/
 /playwright/.cache/
 /tests/.auth/
+
+# MkDocs manual (docs/)
+/site/
+/.venv/
