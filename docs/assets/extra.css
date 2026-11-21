@@ -1,0 +1,41 @@
+/* Colours of the Willow Lane render: oak floors and lawn green. */
+:root {
+  --md-primary-fg-color: #8a5a2b;
+  --md-primary-fg-color--light: #b07a43;
+  --md-primary-fg-color--dark: #5e3c1b;
+  --md-accent-fg-color: #4f8f2f;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #2b2118;
+  --md-primary-fg-color--light: #3d2f22;
+  --md-primary-fg-color--dark: #1d160f;
+  --md-accent-fg-color: #9ccc65;
+  --md-default-bg-color: #16130f;
+  --md-typeset-a-color: #e0a96d;
+}
+
+/* Screenshots: framed, never wider than the column. */
+.md-typeset img.shot {
+  border-radius: 10px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  max-width: 100%;
+  height: auto;
+}
+
+.md-typeset img.shot--narrow {
+  max-width: 360px;
+}
+
+/* Two screenshots side by side, stacking on a phone. */
+.md-typeset .shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+/* Markdown wraps the images in one paragraph; let them be the grid items. */
+.md-typeset .shots > p {
+  display: contents;
+}

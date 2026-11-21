@@ -41,10 +41,13 @@ npm run test:report # open the last HTML report
   websocket API (`lovelace/dashboards/create` + `lovelace/config/save`) and its
   config is reset to a clean, room-less state on every run.
 - The **`chromium`** project reuses that auth state and runs the specs.
+- The **`docs`** project (`scripts/docs-screenshots.spec.ts`) regenerates the
+  manual's screenshots. It exists only when named, so `npm test` never runs it;
+  use `npm run docs:screenshots`.
 - `tests/helpers/ha.ts` contains reusable steps: `login`, `openTestDashboard`,
   `enterDashboardEditMode` (calls `lovelace.setEditMode(true)`), and
-  `openCardEditor` (clicks the card's "Upravit" button to open the editor
-  dialog).
+  `openCardEditor` (clicks the card's Edit button, "Upravit" by default, to
+  open the editor dialog).
 
 ## Tests
 

@@ -19,11 +19,11 @@ export const CLEAN_CARD_CONFIG = {
 };
 
 /** Panel-mode dashboard config wrapping the card in a single full-width view. */
-export function buildDashboardConfig(card: Record<string, unknown> = CLEAN_CARD_CONFIG) {
+export function buildDashboardConfig(card: Record<string, unknown> = CLEAN_CARD_CONFIG, title = TEST_DASHBOARD_TITLE) {
     return {
         views: [
             {
-                title: TEST_DASHBOARD_TITLE,
+                title,
                 panel: true,
                 cards: [card],
             },
@@ -31,15 +31,26 @@ export function buildDashboardConfig(card: Record<string, unknown> = CLEAN_CARD_
     };
 }
 
-/**
- * Create (if missing) the test dashboard and (re)write its config to a clean
- * state, talking to the Home Assistant websocket connection the frontend has
- * already opened. Must be called on a page that is logged in and has finished
- * loading a Home Assistant panel.
- */
-export async function provisionTestDashboard(
+/** Create (if missing) the test dashboard and reset its config to a clean state. */
+export function provisionTestDashboard(
     page: Page,
     config: ReturnType<typeof buildDashboardConfig> = buildDashboardConfig()
+): Promise<void> {
+    return provisionDashboard(page, TEST_DASHBOARD_URL_PATH, TEST_DASHBOARD_TITLE, config);
+}
+
+/**
+ * Create (if missing) a storage-mode dashboard and (re)write its config,
+ * talking to the Home Assistant websocket connection the frontend has already
+ * opened. Must be called on a page that is logged in and has finished loading
+ * a Home Assistant panel. `showInSidebar` is applied to an existing dashboard too.
+ */
+export async function provisionDashboard(
+    page: Page,
+    urlPath: string,
+    title: string,
+    config: ReturnType<typeof buildDashboardConfig>,
+    showInSidebar = true
 ): Promise<void> {
     await page.waitForFunction(() => {
         const ha = document.querySelector("home-assistant") as any;
@@ -47,21 +58,28 @@ export async function provisionTestDashboard(
     }, { timeout: 30_000 });
 
     await page.evaluate(
-        async ({ urlPath, title, cfg }) => {
+        async ({ urlPath, title, cfg, showInSidebar }) => {
             const ha = document.querySelector("home-assistant") as any;
             const conn = ha.hass.connection;
 
-            const dashboards: Array<{ url_path: string }> =
+            const dashboards: Array<{ id: string; url_path: string; show_in_sidebar: boolean }> =
                 await conn.sendMessagePromise({ type: "lovelace/dashboards/list" });
+            const existing = dashboards.find((d) => d.url_path === urlPath);
 
-            if (!dashboards.some((d) => d.url_path === urlPath)) {
+            if (!existing) {
                 await conn.sendMessagePromise({
                     type: "lovelace/dashboards/create",
                     url_path: urlPath,
                     mode: "storage",
                     title,
-                    show_in_sidebar: true,
+                    show_in_sidebar: showInSidebar,
                     require_admin: false,
+                });
+            } else if (existing.show_in_sidebar !== showInSidebar) {
+                await conn.sendMessagePromise({
+                    type: "lovelace/dashboards/update",
+                    dashboard_id: existing.id,
+                    show_in_sidebar: showInSidebar,
                 });
             }
 
@@ -71,6 +89,6 @@ export async function provisionTestDashboard(
                 config: cfg,
             });
         },
-        { urlPath: TEST_DASHBOARD_URL_PATH, title: TEST_DASHBOARD_TITLE, cfg: config }
+        { urlPath, title, cfg: config, showInSidebar }
     );
 }

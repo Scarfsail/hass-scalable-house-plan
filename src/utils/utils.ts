@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import duration from 'dayjs/plugin/duration'
 import isoWeek from 'dayjs/plugin/isoWeek'
+import { getLanguage, localize } from '../localize'
 
 dayjs.extend(duration);
 dayjs.extend(isoWeek);
@@ -23,17 +24,19 @@ export class Utils {
         const hours = duration.hours();
         const minutes = duration.minutes();
         const seconds = duration.seconds();
+        // No hass here: Home Assistant keeps <html lang> on the user's language.
+        const week = localize('duration.week', getLanguage(document.documentElement.lang));
 
         if (duration.asMonths() >= 1) {
             const weeks = duration.weeks();
             const months = Math.floor(duration.asMonths());
-            return `${months}m` + (roundWhenOlderThanHours ? '':` ${weeks}t`);
+            return `${months}m` + (roundWhenOlderThanHours ? '':` ${weeks}${week}`);
         }
 
         if (duration.asWeeks() >= 1) {
             const weeks = duration.weeks();
             const days = duration.days() - (weeks * 7);
-            return `${weeks}t` + (roundWhenOlderThanHours ? '':` ${days}d`);
+            return `${weeks}${week}` + (roundWhenOlderThanHours ? '':` ${days}d`);
         }
 
         if (duration.asDays() >= 1)

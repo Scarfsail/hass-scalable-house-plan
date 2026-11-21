@@ -10,7 +10,8 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "docs:screenshots": "playwright test --project=setup --project=docs"
   },
   "dependencies": {
     "dayjs": "1.11.19",
@@ -22,9 +23,11 @@
     "@semantic-release/git": "^10.0.1",
     "dotenv": "^17.4.2",
     "semantic-release": "^25.0.2",
+    "sharp": "^0.35.5",
     "ts-lit-plugin": "2.0.2",
     "typescript": "^5.7.2",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "yaml": "^2.9.1"
   },
   "release": {
     "branches": [
