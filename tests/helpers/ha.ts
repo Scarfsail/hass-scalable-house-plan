@@ -62,15 +62,16 @@ export async function enterDashboardEditMode(page: Page): Promise<void> {
 }
 
 /**
- * Click the card's "Upravit" (Edit) button rendered at the bottom of the panel
- * view in edit mode, opening the card configuration dialog. Playwright auto
- * scrolls the (tall) card so the button comes into view before clicking.
+ * Click the card's Edit button (labelled in HA's UI language, Czech "Upravit"
+ * by default) rendered at the bottom of the panel view in edit mode, opening
+ * the card configuration dialog. Playwright auto scrolls the (tall) card so
+ * the button comes into view before clicking.
  */
-export async function openCardEditor(page: Page): Promise<void> {
+export async function openCardEditor(page: Page, editLabel = "Upravit"): Promise<void> {
     const editButton = page
         .locator("hui-card-options")
         .first()
-        .getByRole("button", { name: "Upravit", exact: true });
+        .getByRole("button", { name: editLabel, exact: true });
 
     await editButton.scrollIntoViewIfNeeded();
     await editButton.click();

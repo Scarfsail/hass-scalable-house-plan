@@ -1,0 +1,325 @@
+# Willow Lane: the demo house of the Scalable House Plan manual.
+# Copy willow-lane.jpg to config/www/ and paste this card into a dashboard
+# (panel view). Replace the entity IDs with your own.
+type: custom:scalable-house-plan
+image: /local/willow-lane.jpg
+image_width: 1600
+image_height: 995
+readability_mode: bright-image
+dynamic_colors:
+  motion_delay_seconds: 120
+  motion_occupancy: "rgba(90, 170, 255, 0.45)"
+  lights: "rgba(255, 205, 90, 0.45)"
+  ambient_lights: "rgba(210, 150, 255, 0.40)"
+element_defaults:
+  - element:
+      type: custom:info-box-shp
+      types:
+        motion:
+          icon_visibility: all
+        humidity:
+          size: "120%"
+  - element:
+      type: custom:analog-shp
+      decimals: 0
+rooms:
+  - name: Driveway
+    area: driveway
+    elements_clickable_on_overview: true
+    boundary: [[150, 482], [418, 482], [418, 770], [438, 770], [438, 935], [150, 935]]
+    entities:
+      - entity: cover.driveway_gate
+        plan:
+          left: 95
+          top: 405
+          element:
+            type: custom:gate-buttons-shp
+            orientation: horizontal
+      - entity: camera.driveway
+        plan:
+          left: 200
+          top: 20
+      - entity: image.driveway_snapshot
+        plan:
+          left: 200
+          top: 90
+          element:
+            size: 44
+      - entity: binary_sensor.driveway_motion
+        plan:
+          left: 30
+          top: 30
+      - entity: ""
+        plan:
+          left: 20
+          top: 330
+          element:
+            type: custom:scripts-buttons-group-shp
+            scripts:
+              - entity: script.open_gate_for_guests
+                title: Guests
+                left: 0
+                top: 0
+
+  - name: Garage
+    area: garage
+    boundary: [[142, 155], [416, 155], [416, 470], [142, 470]]
+    entities:
+      - entity: cover.garage_door
+        plan:
+          left: 125
+          top: 280
+      - entity: light.garage
+        plan:
+          left: 40
+          top: 30
+      - entity: sensor.ev_charger_power
+        plan:
+          left: 170
+          top: 250
+          element:
+            shorten_and_use_prefix: k
+            decimals: 1
+
+  - name: Hallway
+    area: hallway
+    boundary: [[437, 430], [1220, 430], [1220, 522], [437, 522]]
+    entities:
+      - entity: binary_sensor.front_door
+        plan:
+          left: -12
+          top: 15
+      - entity: light.hallway
+        plan:
+          left: 250
+          top: 30
+      - entity: binary_sensor.hallway_motion
+        plan:
+          left: 420
+          top: 30
+      - entity: alarm_control_panel.home
+        plan:
+          left: 600
+          top: 25
+          element:
+            type: custom:badge-shp
+
+  - name: Utility room
+    area: utility_room
+    show_as_dashboard: true
+    dashboard_glare: lcd
+    dashboard_overview_opacity: 85
+    boundary: [[440, 155], [600, 155], [600, 415], [440, 415]]
+    entities:
+      - entity: sensor.hot_water_tank_temperature
+        plan:
+          left: 12
+          top: 15
+          element:
+            type: custom:analog-bar-shp
+            min: 20
+            max: 70
+            width: 48
+            height: 140
+            active_color: "[[[ return +entity.state >= 45 ? '#e65100' : '#1e88e5' ]]]"
+      - entity: ""
+        plan:
+          left: 58
+          top: 15
+          element:
+            type: custom:badges-shp
+            entities:
+              - sensor.heat_pump_power
+              - switch.washing_machine
+      - entity: ""
+        plan:
+          left: 10
+          top: 190
+          element:
+            type: custom:iframe-shp
+            width: 140
+            height: 56
+            src: "data:text/html,<body style='margin:0;padding:6px;font:12px sans-serif;background:%23202020;color:%23ddd'><b>Bin day</b><br>Tuesday: recycling</body>"
+
+  - name: Bathroom
+    area: bathroom
+    boundary: [[612, 155], [802, 155], [802, 415], [612, 415]]
+    entities:
+      - entity: ""
+        plan:
+          left: 8
+          top: 8
+          element:
+            type: custom:info-box-shp
+      - entity: light.bathroom
+        plan:
+          left: 95
+          top: 125
+      - sensor.bathroom_humidity
+      - fan.bathroom_extractor
+
+  - name: Kids' room
+    area: kids_room
+    boundary: [[812, 155], [1060, 155], [1060, 415], [812, 415]]
+    entities:
+      - entity: light.kids_room
+        plan:
+          left: 150
+          top: 120
+      - entity: binary_sensor.kids_room_window
+        plan:
+          left: 90
+          top: -8
+          element:
+            width: 60
+      - entity: sensor.kids_room_co2
+        plan:
+          left: 20
+          top: 225
+          element:
+            gauge:
+              min: 400
+              max: 2000
+              thresholds:
+                - value: 400
+                  color: "#4CAF50"
+                - value: 1000
+                  color: "#FF9800"
+                - value: 1500
+                  color: "#F44336"
+
+  - name: Main bedroom
+    area: main_bedroom
+    boundary: [[1072, 155], [1434, 155], [1434, 415], [1072, 415]]
+    entities:
+      - entity: light.main_bedroom
+        plan:
+          left: 210
+          top: 160
+      - entity: climate.main_bedroom
+        plan:
+          left: 120
+          top: 200
+      - entity: binary_sensor.main_bedroom_window
+        plan:
+          left: 362
+          top: 85
+          element:
+            width: 70
+            orientation: vertical
+
+  - name: Kitchen & dining
+    area: kitchen_dining
+    boundary: [[437, 528], [767, 528], [767, 742], [437, 742]]
+    entities:
+      - entity: light.kitchen_ceiling
+        plan:
+          left: 150
+          top: 110
+      - entity: light.kitchen_under_cabinet
+        plan:
+          left: 70
+          top: 25
+          light: ambient
+      - entity: binary_sensor.kitchen_window
+        plan:
+          left: 70
+          top: 212
+          element:
+            width: 70
+
+  - name: Living room
+    area: living_room
+    boundary: [[767, 522], [1220, 522], [1220, 742], [767, 742]]
+    entities:
+      - entity: ""
+        plan:
+          left: 10
+          top: 10
+          element:
+            type: custom:info-box-shp
+      - entity: light.living_room_ceiling
+        plan:
+          left: 250
+          top: 75
+      - entity: light.living_room_floor_lamp
+        plan:
+          left: 400
+          top: 160
+          light: ambient
+      - entity: binary_sensor.terrace_door
+        plan:
+          left: 335
+          top: 213
+          element:
+            width: 70
+            orientation: horizontal
+      - climate.living_room
+      - binary_sensor.living_room_motion
+
+  - name: Office
+    area: office
+    boundary: [[1252, 427], [1434, 427], [1434, 672], [1252, 672]]
+    entities:
+      - entity: ""
+        plan:
+          left: 40
+          top: 60
+          element:
+            type: custom:group-shp
+            width: 130
+            height: 190
+            children:
+              - entity: light.office_desk
+                plan:
+                  left: 90
+                  top: 40
+              - entity: sensor.office_power
+                plan:
+                  left: 20
+                  top: 90
+                  element:
+                    decimals: 0
+              - entity: binary_sensor.office_window
+                plan:
+                  left: 62
+                  top: 160
+                  element:
+                    type: custom:state-icon-shp
+
+  - name: Terrace
+    area: terrace
+    boundary: [[770, 768], [1235, 768], [1235, 900], [770, 900]]
+    entities:
+      - entity: light.terrace_string_lights
+        plan:
+          left: 230
+          top: 15
+      - entity: camera.garden
+        plan:
+          left: 380
+          top: 45
+
+  - name: Garden
+    area: garden
+    boundary: [[1262, 705], [1580, 705], [1580, 965], [1245, 965], [1245, 770], [1262, 770]]
+    entities:
+      - entity: switch.garden_irrigation
+        plan:
+          left: 110
+          top: 150
+      - entity: sensor.garden_soil_moisture
+        plan:
+          left: 70
+          top: 200
+          element:
+            gauge:
+              min: 0
+              max: 100
+              thresholds:
+                - value: 0
+                  color: "#FF9800"
+                - value: 25
+                  color: "#4CAF50"
+                - value: 70
+                  color: "#2196F3"

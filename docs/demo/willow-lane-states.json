@@ -1,0 +1,74 @@
+{
+  "areas": [
+    { "area_id": "driveway", "name": "Driveway", "icon": "mdi:gate" },
+    { "area_id": "garage", "name": "Garage", "icon": "mdi:garage" },
+    { "area_id": "hallway", "name": "Hallway", "icon": "mdi:door" },
+    { "area_id": "utility_room", "name": "Utility room", "icon": "mdi:washing-machine" },
+    { "area_id": "bathroom", "name": "Bathroom", "icon": "mdi:shower" },
+    { "area_id": "kids_room", "name": "Kids' room", "icon": "mdi:teddy-bear" },
+    { "area_id": "main_bedroom", "name": "Main bedroom", "icon": "mdi:bed-king" },
+    { "area_id": "kitchen_dining", "name": "Kitchen & dining", "icon": "mdi:silverware-fork-knife" },
+    { "area_id": "living_room", "name": "Living room", "icon": "mdi:sofa" },
+    { "area_id": "office", "name": "Office", "icon": "mdi:desk" },
+    { "area_id": "terrace", "name": "Terrace", "icon": "mdi:table-chair" },
+    { "area_id": "garden", "name": "Garden", "icon": "mdi:flower" }
+  ],
+  "devices": [
+    { "id": "driveway_gate_motor", "name": "Driveway gate motor", "area_id": "driveway", "manufacturer": "Willow Lane Demo", "model": "Sliding gate" },
+    { "id": "living_room_thermostat", "name": "Living room thermostat", "area_id": "living_room", "manufacturer": "Willow Lane Demo", "model": "Thermostat" },
+    { "id": "main_bedroom_thermostat", "name": "Main bedroom thermostat", "area_id": "main_bedroom", "manufacturer": "Willow Lane Demo", "model": "Thermostat" },
+    { "id": "heat_pump", "name": "Heat pump", "area_id": "utility_room", "manufacturer": "Willow Lane Demo", "model": "Air-to-water heat pump" }
+  ],
+  "entities": [
+    { "entity_id": "cover.driveway_gate", "name": "Driveway gate", "state": "closed", "device": "driveway_gate_motor", "changed_minutes_ago": 95, "attributes": { "device_class": "gate", "current_position": 0, "supported_features": 15 } },
+    { "entity_id": "camera.driveway", "name": "Driveway camera", "state": "idle", "area": "driveway", "attributes": { "access_token": "willow-lane-demo", "entity_picture": "/api/camera_proxy/camera.driveway?token=willow-lane-demo", "supported_features": 0 } },
+    { "entity_id": "binary_sensor.driveway_motion", "name": "Driveway motion", "state": "off", "area": "driveway", "changed_minutes_ago": 42, "attributes": { "device_class": "motion" } },
+    { "entity_id": "script.open_gate_for_guests", "name": "Open gate for guests", "state": "off", "area": "driveway", "changed_minutes_ago": 300, "attributes": { "icon": "mdi:gate-open", "mode": "single" } },
+    { "entity_id": "image.driveway_snapshot", "name": "Driveway snapshot", "state": "2026-11-21T07:40:00+00:00", "area": "driveway", "changed_minutes_ago": 42, "attributes": { "access_token": "willow-lane-demo", "entity_picture": "/api/image_proxy/image.driveway_snapshot?token=willow-lane-demo" } },
+
+    { "entity_id": "cover.garage_door", "name": "Garage door", "state": "closed", "area": "garage", "changed_minutes_ago": 95, "attributes": { "device_class": "garage", "supported_features": 3 } },
+    { "entity_id": "light.garage", "name": "Garage light", "state": "off", "area": "garage", "changed_minutes_ago": 95, "attributes": { "supported_color_modes": ["onoff"], "color_mode": null } },
+    { "entity_id": "sensor.ev_charger_power", "name": "EV charger power", "state": "7360", "area": "garage", "attributes": { "device_class": "power", "state_class": "measurement", "unit_of_measurement": "W" } },
+
+    { "entity_id": "binary_sensor.front_door", "name": "Front door", "state": "off", "area": "hallway", "changed_minutes_ago": 18, "attributes": { "device_class": "door" } },
+    { "entity_id": "light.hallway", "name": "Hallway light", "state": "on", "area": "hallway", "changed_minutes_ago": 6, "attributes": { "supported_color_modes": ["brightness"], "color_mode": "brightness", "brightness": 180 } },
+    { "entity_id": "binary_sensor.hallway_motion", "name": "Hallway motion", "state": "off", "area": "hallway", "changed_minutes_ago": 3, "attributes": { "device_class": "motion" } },
+    { "entity_id": "alarm_control_panel.home", "name": "Home alarm", "state": "disarmed", "area": "hallway", "changed_minutes_ago": 120, "attributes": { "code_format": null, "code_arm_required": false, "supported_features": 63 } },
+
+    { "entity_id": "sensor.hot_water_tank_temperature", "name": "Hot water tank", "state": "52.4", "device": "heat_pump", "attributes": { "device_class": "temperature", "state_class": "measurement", "unit_of_measurement": "°C" } },
+    { "entity_id": "sensor.heat_pump_power", "name": "Heat pump power", "state": "1240", "device": "heat_pump", "attributes": { "device_class": "power", "state_class": "measurement", "unit_of_measurement": "W" } },
+    { "entity_id": "switch.washing_machine", "name": "Washing machine", "state": "on", "area": "utility_room", "changed_minutes_ago": 34, "attributes": { "icon": "mdi:washing-machine" } },
+
+    { "entity_id": "light.bathroom", "name": "Bathroom light", "state": "off", "area": "bathroom", "changed_minutes_ago": 25, "attributes": { "supported_color_modes": ["onoff"], "color_mode": null } },
+    { "entity_id": "sensor.bathroom_humidity", "name": "Bathroom humidity", "state": "64", "area": "bathroom", "attributes": { "device_class": "humidity", "state_class": "measurement", "unit_of_measurement": "%" } },
+    { "entity_id": "fan.bathroom_extractor", "name": "Bathroom extractor", "state": "on", "area": "bathroom", "changed_minutes_ago": 25, "attributes": { "supported_features": 0 } },
+
+    { "entity_id": "light.kids_room", "name": "Kids' room light", "state": "off", "area": "kids_room", "changed_minutes_ago": 140, "attributes": { "supported_color_modes": ["brightness"], "color_mode": null } },
+    { "entity_id": "binary_sensor.kids_room_window", "name": "Kids' room window", "state": "off", "area": "kids_room", "changed_minutes_ago": 600, "attributes": { "device_class": "window" } },
+    { "entity_id": "sensor.kids_room_co2", "name": "Kids' room CO₂", "state": "780", "area": "kids_room", "attributes": { "device_class": "carbon_dioxide", "state_class": "measurement", "unit_of_measurement": "ppm" } },
+
+    { "entity_id": "light.main_bedroom", "name": "Main bedroom light", "state": "off", "area": "main_bedroom", "changed_minutes_ago": 480, "attributes": { "supported_color_modes": ["brightness"], "color_mode": null } },
+    { "entity_id": "climate.main_bedroom", "name": "Main bedroom", "state": "heat", "device": "main_bedroom_thermostat", "changed_minutes_ago": 200, "attributes": { "hvac_modes": ["off", "heat", "cool", "auto"], "fan_modes": ["auto", "quiet", "high"], "fan_mode": "auto", "min_temp": 7, "max_temp": 30, "target_temp_step": 0.5, "current_temperature": 20.5, "temperature": 20, "hvac_action": "idle", "supported_features": 393 } },
+    { "entity_id": "binary_sensor.main_bedroom_window", "name": "Main bedroom window", "state": "on", "area": "main_bedroom", "changed_minutes_ago": 12, "attributes": { "device_class": "window" } },
+
+    { "entity_id": "light.kitchen_ceiling", "name": "Kitchen ceiling", "state": "on", "area": "kitchen_dining", "changed_minutes_ago": 22, "attributes": { "supported_color_modes": ["brightness"], "color_mode": "brightness", "brightness": 230 } },
+    { "entity_id": "light.kitchen_under_cabinet", "name": "Kitchen under-cabinet", "state": "on", "area": "kitchen_dining", "changed_minutes_ago": 22, "attributes": { "supported_color_modes": ["onoff"], "color_mode": "onoff" } },
+    { "entity_id": "binary_sensor.kitchen_window", "name": "Kitchen window", "state": "off", "area": "kitchen_dining", "changed_minutes_ago": 180, "attributes": { "device_class": "window" } },
+
+    { "entity_id": "light.living_room_ceiling", "name": "Living room ceiling", "state": "off", "area": "living_room", "changed_minutes_ago": 75, "attributes": { "supported_color_modes": ["brightness"], "color_mode": null } },
+    { "entity_id": "light.living_room_floor_lamp", "name": "Floor lamp", "state": "on", "area": "living_room", "changed_minutes_ago": 40, "attributes": { "supported_color_modes": ["brightness"], "color_mode": "brightness", "brightness": 120 } },
+    { "entity_id": "climate.living_room", "name": "Living room", "state": "heat", "device": "living_room_thermostat", "changed_minutes_ago": 200, "attributes": { "hvac_modes": ["off", "heat", "cool", "auto"], "fan_modes": ["auto", "quiet", "high"], "fan_mode": "auto", "min_temp": 7, "max_temp": 30, "target_temp_step": 0.5, "current_temperature": 21.6, "temperature": 22, "hvac_action": "heating", "supported_features": 393 } },
+    { "entity_id": "binary_sensor.terrace_door", "name": "Terrace door", "state": "off", "area": "living_room", "changed_minutes_ago": 55, "attributes": { "device_class": "door" } },
+    { "entity_id": "binary_sensor.living_room_motion", "name": "Living room motion", "state": "on", "area": "living_room", "changed_minutes_ago": 0.2, "attributes": { "device_class": "motion" } },
+
+    { "entity_id": "light.office_desk", "name": "Desk lamp", "state": "on", "area": "office", "changed_minutes_ago": 65, "attributes": { "supported_color_modes": ["brightness"], "color_mode": "brightness", "brightness": 200 } },
+    { "entity_id": "sensor.office_power", "name": "Office power", "state": "186", "area": "office", "attributes": { "device_class": "power", "state_class": "measurement", "unit_of_measurement": "W" } },
+    { "entity_id": "binary_sensor.office_window", "name": "Office window", "state": "off", "area": "office", "changed_minutes_ago": 900, "attributes": { "device_class": "window" } },
+
+    { "entity_id": "light.terrace_string_lights", "name": "String lights", "state": "off", "area": "terrace", "changed_minutes_ago": 720, "attributes": { "supported_color_modes": ["onoff"], "color_mode": null } },
+    { "entity_id": "camera.garden", "name": "Garden camera", "state": "idle", "area": "terrace", "attributes": { "access_token": "willow-lane-demo", "entity_picture": "/api/camera_proxy/camera.garden?token=willow-lane-demo", "supported_features": 0 } },
+
+    { "entity_id": "switch.garden_irrigation", "name": "Irrigation", "state": "off", "area": "garden", "changed_minutes_ago": 400, "attributes": { "icon": "mdi:sprinkler-variant" } },
+    { "entity_id": "sensor.garden_soil_moisture", "name": "Soil moisture", "state": "38", "area": "garden", "attributes": { "device_class": "moisture", "state_class": "measurement", "unit_of_measurement": "%" } }
+  ]
+}
