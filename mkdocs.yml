@@ -1,0 +1,105 @@
+site_name: Scalable House Plan
+site_description: A Home Assistant Lovelace card that turns a picture of your floor plan into a live, tappable map of your home.
+site_url: https://scarfsail.github.io/hass-scalable-house-plan/
+repo_url: https://github.com/Scarfsail/hass-scalable-house-plan
+repo_name: Scarfsail/hass-scalable-house-plan
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+validation:
+  anchors: warn
+  unrecognized_links: warn
+
+exclude_docs: |
+  requirements.txt
+  demo/prompt.md
+
+theme:
+  name: material
+  icon:
+    logo: material/floor-plan
+  palette:
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - navigation.instant
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+extra_css:
+  - assets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - def_list
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/index.md
+      - Install: getting-started/install.md
+      - Your first plan: getting-started/first-plan.md
+      - The visual editor: getting-started/visual-editor.md
+  - Concepts:
+      - concepts/index.md
+      - Overview, room detail and entities: concepts/views.md
+      - Rooms and areas: concepts/rooms-and-areas.md
+      - Positioning and scaling: concepts/positioning.md
+      - Dynamic room colours: concepts/dynamic-colors.md
+      - House-level element defaults: concepts/element-defaults.md
+      - Tap and hold actions: concepts/actions.md
+  - Elements:
+      - elements/index.md
+      - State icon: elements/state-icon.md
+      - Analog, analog bar and gauge: elements/analog.md
+      - Badge and badges: elements/badges.md
+      - Climate: elements/climate.md
+      - Camera: elements/camera.md
+      - Door and window: elements/door-window.md
+      - Motion sensor: elements/motion-sensor.md
+      - Gate buttons: elements/gate-buttons.md
+      - Script buttons group: elements/scripts-buttons-group.md
+      - Info box: elements/info-box.md
+      - Group: elements/group.md
+      - Image last change: elements/image-last-change.md
+      - Iframe: elements/iframe.md
+  - Rooms as dashboards: dashboards.md
+  - Try the demo: demo.md
+  - Reference:
+      - reference/index.md
+      - Card options: reference/card-options.md
+      - Room options: reference/room-options.md
+      - Plan options: reference/plan-options.md
+      - Troubleshooting: reference/troubleshooting.md
+      - Development: reference/development.md

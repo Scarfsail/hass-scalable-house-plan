@@ -18,6 +18,18 @@
   "climate": {
     "self_cleaning": "Čištění"
   },
+  "gate": {
+    "open": "Otevřít",
+    "close": "Zavřít",
+    "stop": "Zastavit"
+  },
+  "duration": {
+    "week": "t"
+  },
+  "scripts": {
+    "running": "Probíhá: {title}",
+    "cancel": "Zrušit {title}"
+  },
   "editor": {
     "loading": "Načítání...",
     "house_plan_editor": "Editor půdorysu domu",
