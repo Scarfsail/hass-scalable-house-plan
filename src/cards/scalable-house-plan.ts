@@ -12,6 +12,7 @@ import { cleanupDragControllers } from "../components/element-renderer-shp";
 import { getReadabilityModeCssVars } from "../utils/plan-styles";
 import { HELMAN_ENTITY_DETAIL_TAG, loadHelmanEntityIds } from "../utils/helman";
 import { watchHassRestart } from "../utils/restart-reload";
+import "../components/door-window-detail-shp";
 import type {
     PositionScalingMode,
     ReadabilityMode,
@@ -90,6 +91,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     @state() private _selectedBoundaryPointIndex: number | null = null;
     @state() private _hass?: HomeAssistant;
     @state() private _helmanEntityId?: string;  // Entity whose Helman device detail is open
+    @state() private _doorWindowDetail?: { entityId: string; controlEntityId?: string };  // Door/window whose popup is open
 
     // Performance optimization: Cache entity IDs per room to avoid expensive lookups
     private _roomEntityCache: Map<string, RoomEntityCache> = new Map();
@@ -366,6 +368,16 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             ></helman-entity-detail>
         ` : nothing;
 
+        const doorWindowDetailHtml = this._doorWindowDetail ? html`
+            <door-window-detail-shp
+                .hass=${this._hass}
+                .entityId=${this._doorWindowDetail.entityId}
+                .controlEntityId=${this._doorWindowDetail.controlEntityId}
+                .helmanEntityIds=${this._helmanEntityIds}
+                @closed=${() => this._doorWindowDetail = undefined}
+            ></door-window-detail-shp>
+        ` : nothing;
+
         // Show entities list view
         if (this._currentView === 'entities' && this._selectedRoomIndex !== null && this.config.rooms[this._selectedRoomIndex]) {
             const room = this.config.rooms[this._selectedRoomIndex];
@@ -375,6 +387,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
                     .room=${room}
                     .onBack=${() => this._closeEntitiesView()}
                 ></scalable-house-plan-entities>
+                ${doorWindowDetailHtml}
                 ${helmanDetailHtml}
             `;
         }
@@ -430,6 +443,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
             ${overviewHtml}
             ${detailHtml}
             ${editModeBadge}
+            ${doorWindowDetailHtml}
             ${helmanDetailHtml}
         `;
     }
@@ -502,6 +516,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
 
     private _handlePopState = (event: PopStateEvent) => {
         this._helmanEntityId = undefined;
+        this._doorWindowDetail = undefined;
 
         // Don't interfere with edit mode history handling
         if (this._isEditMode()) {
@@ -535,6 +550,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         // Listen for browser back button
         window.addEventListener('popstate', this._handlePopState);
         this.addEventListener('hass-more-info', this._handleMoreInfo);
+        this.addEventListener('shp-door-window-detail', this._handleDoorWindowDetail);
 
         this._flushHass();
     }
@@ -553,6 +569,7 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
         // Remove popstate listener
         window.removeEventListener('popstate', this._handlePopState);
         this.removeEventListener('hass-more-info', this._handleMoreInfo);
+        this.removeEventListener('shp-door-window-detail', this._handleDoorWindowDetail);
     }
 
     onResize() {
@@ -612,13 +629,20 @@ export class ScalableHousePlan extends LitElement implements LovelaceCard {
     }
 
     // Every more-info from inside the card bubbles here; Helman entities get Helman's device detail.
-    // Helman's own more-info fallbacks (dispatched from inside its detail) pass through to HA.
+    // Helman's own more-info fallbacks (dispatched from inside its detail) and the door/window
+    // popup's links (shpSkipHelman) pass through to HA.
     private _handleMoreInfo = (event: Event) => {
-        const entityId = (event as CustomEvent<{ entityId: string }>).detail.entityId;
-        if (!this._helmanEntityIds.has(entityId)) return;
+        const { entityId, shpSkipHelman } = (event as CustomEvent<{ entityId: string; shpSkipHelman?: boolean }>).detail;
+        if (shpSkipHelman || !this._helmanEntityIds.has(entityId)) return;
         if (event.composedPath().some((node) => (node as Element).localName === HELMAN_ENTITY_DETAIL_TAG)) return;
         event.stopPropagation();
         this._helmanEntityId = entityId;
+    };
+
+    // A tap on a door/window opens its popup above every view
+    private _handleDoorWindowDetail = (event: Event) => {
+        event.stopPropagation();
+        this._doorWindowDetail = (event as CustomEvent<{ entityId: string; controlEntityId?: string }>).detail;
     };
 
     public static async getConfigElement(): Promise<LovelaceCardEditor> {

@@ -18,6 +18,11 @@ export function isGroupShp(entityConfig: EntityConfig): boolean {
     return elementType === 'custom:group-shp' || elementType === 'group-shp';
 }
 
+/** The control_entity (lock/cover) of a door/window element, if set */
+function getControlEntityId(entityConfig: EntityConfig): string | undefined {
+    return typeof entityConfig === 'string' ? undefined : entityConfig.plan?.element?.control_entity;
+}
+
 /**
  * Recursively collect all entity IDs from an EntityConfig array, including entities within groups
  * 
@@ -135,6 +140,17 @@ export function collectAllEntityConfigs(
             if (Array.isArray(children) && children.length > 0) {
                 const childConfigs = collectAllEntityConfigs(children, visited, depth + 1);
                 entityConfigs.push(...childConfigs);
+            }
+        }
+    }
+
+    // A door/window's control_entity (lock/cover) is placed on the plan with it, unless the
+    // room lists that entity itself (added last, so its own config wins whatever the order)
+    if (depth === 0) {
+        for (const controlEntityId of entityConfigs.map(getControlEntityId)) {
+            if (controlEntityId && !visited.has(controlEntityId)) {
+                visited.add(controlEntityId);
+                entityConfigs.push(controlEntityId);
             }
         }
     }
@@ -387,11 +403,11 @@ export function getRoomEntities(
         )
     );
 
-    // Get entities with plan config (shown on detail page)
+    // Get entities with plan config (shown on detail page), including door/window controls
     const detailEntityIds = new Set(
         room.entities
             .filter(cfg => typeof cfg !== 'string' && (cfg as any).plan)
-            .map(cfg => (cfg as any).entity)
+            .flatMap(cfg => [(cfg as any).entity, getControlEntityId(cfg)])
     );
 
     // Combine explicit entities and area entities (deduplicated)

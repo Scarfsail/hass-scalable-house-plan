@@ -9,6 +9,8 @@
 
 An entity whose icon is `mdi:fuse` gets no toggle on hold, even in a toggleable domain, so a circuit breaker can't be switched off by a long press.
 
+A [door or window](../elements/door-window.md) opens its own popup on tap, and a hold operates its `control_entity` (lock or cover).
+
 Some elements have their own controls instead: [gate buttons](../elements/gate-buttons.md), [script buttons](../elements/scripts-buttons-group.md) and the [climate](../elements/climate.md) control act on their own buttons, and an [info box](../elements/info-box.md) opens the more-info of the row you tap.
 
 ## Your own actions
@@ -44,4 +46,4 @@ On the overview, a tap opens the room, not the element. To make the elements of 
 
 ## With Helman
 
-When [Helman](https://github.com/Scarfsail/hass-helman) is installed, every more-info the card would open for an entity of a Helman-managed device (a tap on an element, the climate menu, an info box row) opens Helman's device detail instead, with its power, energy, schedule and controls. Entities Helman doesn't manage still open Home Assistant's more-info.
+When [Helman](https://github.com/Scarfsail/hass-helman) is installed, every more-info the card would open for an entity of a Helman-managed device (a tap on an element, the climate menu, an info box row) opens Helman's device detail instead, with its power, energy, schedule and controls. Entities Helman doesn't manage still open Home Assistant's more-info. The door/window popup is the exception: its links always open Home Assistant's more-info, with a separate link to Helman's detail.

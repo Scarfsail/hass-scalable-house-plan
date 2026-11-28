@@ -328,11 +328,11 @@ function getBoundsKey(bounds: { width: number; height: number }): string {
  * Generate position cache key
  * Includes position values to detect when positions change
  */
-function getPositionCacheKey(uniqueKey: string, scale: number, scaleRatio: number, boundsKey: string, plan: any): string {
+function getPositionCacheKey(uniqueKey: string, scale: number, scaleRatio: number, lengthScale: number, boundsKey: string, plan: any): string {
     // Include position values in cache key to invalidate when they change
     const positionKey = `${plan.left}-${plan.top}-${plan.right}-${plan.bottom}-${plan.width}-${plan.height}`;
     const scalingKey = `${plan.position_scaling_horizontal || 'plan'}-${plan.position_scaling_vertical || 'plan'}`;
-    return `${uniqueKey}-${scale.toFixed(2)}-${scaleRatio}-${boundsKey}-${positionKey}-${scalingKey}`;
+    return `${uniqueKey}-${scale.toFixed(2)}-${scaleRatio}-${lengthScale}-${boundsKey}-${positionKey}-${scalingKey}`;
 }
 
 /**
@@ -343,7 +343,8 @@ function calculatePositionStyles(
     scale: number,
     scaleRatio: number,
     roomBounds: { width: number; height: number },
-    elementScale: number
+    elementScale: number,
+    lengthScale: number
 ): PositionCache {
     // Get position scaling modes
     const horizontalScaling: PositionScalingMode = plan.position_scaling_horizontal || "plan";
@@ -427,6 +428,9 @@ function calculatePositionStyles(
         .map(([k, v]) => `${k}: ${v}`)
         .join('; ');
 
+    // Lengths along the plan (door/window bars) follow the plan scale, not the element scale
+    styleString += `; --shp-length-scale: ${lengthScale}`;
+
     // Apply custom styles
     if (plan.style) {
         const customStyles = typeof plan.style === 'string'
@@ -468,9 +472,10 @@ function preparePositionData(
     boundsKey: string,
     roomBounds: { width: number; height: number },
     elementScale: number,
+    lengthScale: number,
     posCache: Map<string, any>
 ): PositionCache {
-    const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, boundsKey, plan);
+    const positionCacheKey = getPositionCacheKey(uniqueKey, scale, scaleRatio, lengthScale, boundsKey, plan);
     let positionData = posCache.get(positionCacheKey);
 
     if (!positionData) {
@@ -479,7 +484,7 @@ function preparePositionData(
             posCache.clear();
         }
         // Cache miss - calculate and store
-        positionData = calculatePositionStyles(plan, scale, scaleRatio, roomBounds, elementScale);
+        positionData = calculatePositionStyles(plan, scale, scaleRatio, roomBounds, elementScale, lengthScale);
         posCache.set(positionCacheKey, positionData);
     }
 
@@ -524,6 +529,7 @@ function prepareElementCard(
  * @param posCache - Position cache from HouseCache
  * @param boundsKey - Room bounds cache key
  * @param elementScale - Calculated element scale factor
+ * @param lengthScale - Factor for lengths along the plan (--shp-length-scale)
  * @param mode - Current view mode ('overview' | 'detail')
  * @returns Array of rendered Lit templates
  */
@@ -533,13 +539,14 @@ function renderReadOnlyElements(
     posCache: Map<string, any>,
     boundsKey: string,
     elementScale: number,
+    lengthScale: number,
     mode: 'overview' | 'detail'
 ): unknown[] {
     const { hass, roomBounds, createCardElement, elementCards, scale = 1, scaleRatio = 0, elementsClickable } = options;
 
     return elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
         // Get or create cached position styles (shared helper)
-        const positionData = preparePositionData(uniqueKey, plan, scale, scaleRatio, boundsKey, roomBounds, elementScale, posCache);
+        const positionData = preparePositionData(uniqueKey, plan, scale, scaleRatio, boundsKey, roomBounds, elementScale, lengthScale, posCache);
 
         // Get or create the element card (shared helper)
         const card = prepareElementCard(uniqueKey, entity, elementConfig, hass, createCardElement, elementCards, mode);
@@ -745,6 +752,7 @@ function setupDragController(
  * @param posCache - Position cache from HouseCache
  * @param boundsKey - Room bounds cache key
  * @param elementScale - Calculated element scale factor
+ * @param lengthScale - Factor for lengths along the plan (--shp-length-scale)
  * @param mode - Current view mode ('overview' | 'detail')
  * @param currentKeys - Set to track active element keys for cleanup
  * @returns Array of rendered Lit templates
@@ -755,6 +763,7 @@ function renderEditableElements(
     posCache: Map<string, any>,
     boundsKey: string,
     elementScale: number,
+    lengthScale: number,
     mode: 'overview' | 'detail',
     currentKeys: Set<string>
 ): unknown[] {
@@ -762,7 +771,7 @@ function renderEditableElements(
 
     return elements.map(({ entity, plan, elementConfig, uniqueKey }) => {
         // Get or create cached position styles (shared helper)
-        const positionData = preparePositionData(uniqueKey, plan, scale, scaleRatio, boundsKey, roomBounds, elementScale, posCache);
+        const positionData = preparePositionData(uniqueKey, plan, scale, scaleRatio, boundsKey, roomBounds, elementScale, lengthScale, posCache);
 
         // Get or create the element card (shared helper)
         const card = prepareElementCard(uniqueKey, entity, elementConfig, hass, createCardElement, elementCards, mode);
@@ -844,6 +853,10 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
 
     const isOverview = !!originalRoom;
     const mode: 'overview' | 'detail' = isOverview ? 'overview' : 'detail';
+
+    // Factor that makes a length (door/window bar) follow the plan scale on screen despite the
+    // wrapper's scale(elementScale). The overview content is already scaled by the plan as a whole.
+    const lengthScale = isOverview ? 1 : scale / elementScale;
     const roomForInfoBox = originalRoom || room;
 
     // Build element structure (cached on room.entities ref; see buildElementStructureCached)
@@ -886,12 +899,12 @@ export function renderElements(options: ElementRendererOptions): unknown[] {
     // Normal view: Zero editor overhead (no drag, no selection, no click handlers)
     // Editor view: Full features (drag controllers, selection, click handling, cleanup)
     if (!editorMode) {
-        return renderReadOnlyElements(options, elements, posCache, boundsKey, elementScale, mode);
+        return renderReadOnlyElements(options, elements, posCache, boundsKey, elementScale, lengthScale, mode);
     }
 
     // Editor mode: Build tracking set for controller cleanup
     const currentKeys = new Set<string>();
-    const renderedElements = renderEditableElements(options, elements, posCache, boundsKey, elementScale, mode, currentKeys);
+    const renderedElements = renderEditableElements(options, elements, posCache, boundsKey, elementScale, lengthScale, mode, currentKeys);
     
     // Cleanup: Remove controllers for keys that weren't in this render
     // This handles uniqueKey changes when elements are moved (position in key changes)
