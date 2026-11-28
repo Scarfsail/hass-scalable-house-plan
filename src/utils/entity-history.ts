@@ -1,6 +1,6 @@
 import type { HomeAssistant } from '../../hass-frontend/src/types';
 
-interface EntityHistoryState {
+export interface EntityHistoryState {
   s: string;
   lc?: number;
   lu: number;

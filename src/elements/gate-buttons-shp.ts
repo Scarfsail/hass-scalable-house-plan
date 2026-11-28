@@ -3,14 +3,13 @@ import { customElement } from "lit/decorators.js";
 import { ElementEntityBase, ElementEntityBaseConfig } from "./base";
 import { HassEntity } from "home-assistant-js-websocket";
 import { getLocalizeFunction, type LocalizeFunction } from "../localize";
+import { CoverAction, getCoverActionColor, getCoverActions, performCoverAction } from "../utils/cover-actions";
 
 
 interface GateButtonsElementConfig extends ElementEntityBaseConfig {
     orientation: "vertical" | "horizontal";
 }
 
-
-type GateActions = "open" | "close" | "stop";
 
 @customElement("gate-buttons-shp")
 export class GateButtonsElement extends ElementEntityBase<GateButtonsElementConfig> {
@@ -27,50 +26,21 @@ export class GateButtonsElement extends ElementEntityBase<GateButtonsElementConf
 
     protected override renderEntityContent(entity: HassEntity) {
 
-        const renderButtons = (buttons: GateActions[]) => {
-            return html`
-                <div style="display:flex; gap:5px;flex-direction:${this._config?.orientation == 'horizontal' ? 'row' : 'column'}">
-                    ${buttons.map(button => html`${this.getGateButton(button, entity.entity_id)}`)}
-                </div>
-            `
+        const buttons = getCoverActions(entity);
+        if (!buttons) {
+            return html`<span>${entity.state}</span>`
         }
 
-        let state = entity.state;
-
-        if (state == "open" && entity.attributes.current_position != 100) {
-            state = "opened_partially";
-        }
-
-
-        switch (state) {
-            case "open": return renderButtons(["close"]);
-            case "closed": return renderButtons(["open"]);
-            case "opening": return renderButtons(["stop", "close"]);
-            case "closing": return renderButtons(["stop", "open"]);
-            case "opened_partially": return renderButtons(["open", "close"]);
-            default:
-                return html`<span>${state}</span>`
-        }
+        return html`
+            <div style="display:flex; gap:5px;flex-direction:${this._config?.orientation == 'horizontal' ? 'row' : 'column'}">
+                ${buttons.map(button => html`${this.getGateButton(button, entity.entity_id)}`)}
+            </div>
+        `
     }
 
-    private getGateButton(type: GateActions, entity_id: string) {
-        const color = this.getGateButtonColor(type);
+    private getGateButton(type: CoverAction, entity_id: string) {
+        const color = getCoverActionColor(type);
         const text = this.localize(`gate.${type}`);
-        return html`<ha-button raised style="--mdc-theme-primary: ${color}; " @click=${() => this.performGateAction(type, entity_id)}>${text}</ha-button>`
-    }
-
-    private getGateButtonColor(type: GateActions) {
-        switch (type) {
-            case "open": return "var(--success-color)"
-            case "stop": return "var(--warning-color)"
-            case "close": return "var(--primary-color)"
-
-            default: throw new Error("Unsupported button type: " + type);
-
-        }
-    }
-
-    private performGateAction(action: GateActions, entity_id: string) {
-        this.hass?.callService('cover', `${action}_cover`, { entity_id: entity_id });
+        return html`<ha-button raised style="--mdc-theme-primary: ${color}; " @click=${() => performCoverAction(this.hass!, type, entity_id)}>${text}</ha-button>`
     }
 }

@@ -34,6 +34,8 @@ On the overview elements keep their natural size (an icon is an icon, whatever t
 | `0.25` (default) | Elements grow by a quarter of the room's enlargement: a room shown 3× larger gets elements 1.5× larger. |
 | `1` | Elements scale exactly with the room. |
 
+The length of a [door or window](../elements/door-window.md) bar is the exception: it always follows the room, so the bar covers its opening at any ratio. Its thickness and label use the element scale.
+
 ## Position scaling modes
 
 Positions normally scale with the room, so an element stays on the same spot of the picture. In the room detail you can change that per axis with `position_scaling_horizontal` and `position_scaling_vertical`:

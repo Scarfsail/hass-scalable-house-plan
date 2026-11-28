@@ -23,6 +23,27 @@
     "close": "Close",
     "stop": "Stop"
   },
+  "door_window": {
+    "for": "for {duration}",
+    "since": "since {time}",
+    "by": "by {name}",
+    "automation": "automation",
+    "alarmo_armed": "Alarmo armed",
+    "alarmo_disarmed": "Alarmo disarmed",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "open": "Open",
+    "opened_last_24h": "Opened in the last 24 h",
+    "day_ago": "24 h ago",
+    "now": "now",
+    "sensor_door": "Door",
+    "sensor_garage_door": "Gate",
+    "sensor_window": "Window",
+    "sensor_other": "Sensor",
+    "control_lock": "Lock",
+    "control_cover": "Control",
+    "power_energy": "Power & energy"
+  },
   "duration": {
     "week": "w"
   },

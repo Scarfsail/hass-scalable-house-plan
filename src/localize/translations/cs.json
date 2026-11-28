@@ -23,6 +23,27 @@
     "close": "Zavřít",
     "stop": "Zastavit"
   },
+  "door_window": {
+    "for": "{duration}",
+    "since": "od {time}",
+    "by": "({name})",
+    "automation": "automatizace",
+    "alarmo_armed": "Alarmo zastřeženo",
+    "alarmo_disarmed": "Alarmo odstřeženo",
+    "lock": "Zamknout",
+    "unlock": "Odemknout",
+    "open": "Otevřít",
+    "opened_last_24h": "Otevřeno za posledních 24 h",
+    "day_ago": "před 24 h",
+    "now": "teď",
+    "sensor_door": "Dveře",
+    "sensor_garage_door": "Vrata",
+    "sensor_window": "Okno",
+    "sensor_other": "Senzor",
+    "control_lock": "Zámek",
+    "control_cover": "Ovládání",
+    "power_energy": "Výkon a energie"
+  },
   "duration": {
     "week": "t"
   },
