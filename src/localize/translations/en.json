@@ -36,10 +36,12 @@
     "opened_last_24h": "Opened in the last 24 h",
     "day_ago": "24 h ago",
     "now": "now",
-    "sensor_details": "Sensor details",
-    "lock_details": "Lock details",
-    "gate_details": "Gate details",
-    "cover_details": "Cover details",
+    "sensor_door": "Door",
+    "sensor_garage_door": "Gate",
+    "sensor_window": "Window",
+    "sensor_other": "Sensor",
+    "control_lock": "Lock",
+    "control_cover": "Control",
     "power_energy": "Power & energy"
   },
   "duration": {

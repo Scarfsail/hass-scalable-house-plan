@@ -36,10 +36,12 @@
     "opened_last_24h": "Otevřeno za posledních 24 h",
     "day_ago": "před 24 h",
     "now": "teď",
-    "sensor_details": "Detail senzoru",
-    "lock_details": "Detail zámku",
-    "gate_details": "Detail brány",
-    "cover_details": "Detail rolety",
+    "sensor_door": "Dveře",
+    "sensor_garage_door": "Vrata",
+    "sensor_window": "Okno",
+    "sensor_other": "Senzor",
+    "control_lock": "Zámek",
+    "control_cover": "Ovládání",
     "power_energy": "Výkon a energie"
   },
   "duration": {

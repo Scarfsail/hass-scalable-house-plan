@@ -308,9 +308,9 @@ export class DoorWindowDetail extends LitElement {
         const helmanEntityId = [this.controlEntityId, this.entityId].find((id) => id && this.helmanEntityIds.has(id));
         return html`
             <div class="links">
-                <button @click=${() => this._openMoreInfo(this.entityId, true)}>${this.localize('door_window.sensor_details')} ›</button>
+                <button @click=${() => this._openMoreInfo(this.entityId, true)}>${this._getSensorLabel()} ›</button>
                 ${control ? html`
-                    <button @click=${() => this._openMoreInfo(control.entity_id, true)}>${this.localize(this._getControlDetailsKey(control))} ›</button>
+                    <button @click=${() => this._openMoreInfo(control.entity_id, true)}>${control.entity_id.startsWith('lock.') ? '🔒' : '🎛️'} ${this.localize(control.entity_id.startsWith('lock.') ? 'door_window.control_lock' : 'door_window.control_cover')} ›</button>
                 ` : nothing}
                 ${helmanEntityId ? html`
                     <button @click=${() => this._openMoreInfo(helmanEntityId, false)}>⚡ ${this.localize('door_window.power_energy')} ›</button>
@@ -368,10 +368,12 @@ export class DoorWindowDetail extends LitElement {
         return person?.attributes.friendly_name;
     }
 
-    private _getControlDetailsKey(control: HassEntity): string {
-        if (control.entity_id.startsWith('lock.')) return 'door_window.lock_details';
-        const deviceClass = control.attributes.device_class;
-        return deviceClass === 'gate' || deviceClass === 'garage' ? 'door_window.gate_details' : 'door_window.cover_details';
+    private _getSensorLabel(): string {
+        const deviceClass = this.hass.states[this.entityId]?.attributes.device_class;
+        const known: Record<string, string> = { door: '🚪', garage_door: '🚗', window: '🪟' };
+        return known[deviceClass]
+            ? `${known[deviceClass]} ${this.localize(`door_window.sensor_${deviceClass}`)}`
+            : `📡 ${this.localize('door_window.sensor_other')}`;
     }
 
     /** Time of day for today, date and time for older changes */
