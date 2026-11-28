@@ -121,11 +121,14 @@ async function doorInfo(page: Page, entityId: string, view: "overview" | "detail
         const wrapper = room.shadowRoot.querySelector(`.element-wrapper[data-unique-key="${entityId}"]`);
         const door = wrapper.querySelector("door-window-shp");
         const shape = door.shadowRoot.querySelector(".shape").getBoundingClientRect();
+        const hostRect = door.getBoundingClientRect();
         const chip = door.shadowRoot.querySelector(".control");
         const icon = chip?.querySelector("ha-state-icon");
         return {
             roomScale: room.scale,
             shape: { width: shape.width, height: shape.height, x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 },
+            // Where the bar is drawn, relative to the element's own box (the configured position and size)
+            barOffset: { left: shape.left - hostRect.left, top: shape.top - hostRect.top, width: shape.width - hostRect.width, height: shape.height - hostRect.height },
             chip: chip ? {
                 background: chip.style.backgroundColor,
                 icon: icon.style.color,
@@ -184,6 +187,22 @@ test.describe("Door/window with a control", () => {
         expect(detail.roomScale).toBeGreaterThan(1.5);
         expect(detail.shape.width).toBeCloseTo(DOOR_WIDTH * detail.roomScale, 0);
         expect(detail.shape.height).toBeCloseTo(DOOR_HEIGHT * (1 + (detail.roomScale - 1) * 0.25), 0);
+    });
+
+    test("a label wider than the bar does not move the bar", async ({ page }) => {
+        for (const orientation of ["horizontal", "vertical"]) {
+            // A 40 px door with a gate open part way: time pill + chip are wider than the bar
+            await setupPlan(page, fixture({ control_entity: GATE, orientation }));
+            await push(page, { [GATE]: { state: "open", attributes: { current_position: 40 } } });
+            const zero = { left: 0, top: 0, width: 0, height: 0 };
+            const near = (o: typeof zero) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v)]));
+            expect(near((await doorInfo(page, DOOR, "overview")).barOffset), `${orientation} overview`).toEqual(zero);
+
+            await page.evaluate(() => (window as any).__dw.el._openRoomDetail(0));
+            await page.locator("scalable-house-plan-detail").waitFor({ state: "attached" });
+            await page.waitForTimeout(500);
+            expect(near((await doorInfo(page, DOOR, "detail")).barOffset), `${orientation} detail`).toEqual(zero);
+        }
     });
 
     test("tap opens the popup above the overview and the room detail", async ({ page }) => {

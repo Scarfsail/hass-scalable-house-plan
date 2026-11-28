@@ -107,6 +107,7 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
             z-index: 1;
             display: inline-flex;
             gap: 3px;
+            width: max-content;  /* overflows the bar instead of widening .content, which would move the bar */
         }
 
         .control {
@@ -239,6 +240,7 @@ export class DoorWindowElement extends ElementEntityArmableBase<DoorWindowElemen
         return html`
             <div
                 class="content"
+                style="width: ${this._barLength};"
                 @action=${this._handleDoorAction}
                 .actionHandler=${actionHandler({ hasHold: !!(this._config.hold_action || control) })}
             >
